@@ -116,6 +116,7 @@ See [docs/AUTOMATION_WORKFLOW.md](docs/AUTOMATION_WORKFLOW.md) and [docs/4LIFE_C
 
 - [OpenAI API documentation](https://platform.openai.com/docs/)
 - [Supabase documentation](https://supabase.com/docs)
+- [Authentication status and remaining requirements](./docs/AUTHENTICATION_STATUS.md)
 - [BullMQ documentation](https://docs.bullmq.io/)
 - [n8n documentation](https://docs.n8n.io/)
 - [Netlify documentation](https://docs.netlify.com/)

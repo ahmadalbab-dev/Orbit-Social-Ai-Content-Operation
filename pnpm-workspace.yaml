@@ -1,5 +1,7 @@
 packages:
   - apps/*
+  # WorkOS installer demo is preserved locally but intentionally excluded.
+  - '!apps/vanilla-auth'
   - packages/*
 
 # pnpm 11 blocks dependency install scripts unless each package is reviewed.

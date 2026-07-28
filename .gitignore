@@ -14,3 +14,4 @@ test-results
 .tools/
 packages/database/prisma/*.db
 My SOCMED/
+apps/vanilla-auth/
