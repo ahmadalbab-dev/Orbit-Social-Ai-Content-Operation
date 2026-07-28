@@ -11,3 +11,9 @@ allowBuilds:
   msgpackr-extract: true
   prisma: true
   sharp: true
+
+# Next.js currently pins older transitive releases. Keep the framework version
+# stable while selecting upstream security-patched compatible releases.
+overrides:
+  'next>postcss': 8.5.23
+  'next>sharp': 0.35.3

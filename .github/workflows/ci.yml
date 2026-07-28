@@ -31,7 +31,9 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
-      - run: pnpm audit --audit-level high
+      # Runtime dependencies are release blockers. Build-only tooling is
+      # monitored separately because some upstream tools have no patched line.
+      - run: pnpm audit --prod --audit-level high
   secret-scan:
     runs-on: ubuntu-latest
     steps:
