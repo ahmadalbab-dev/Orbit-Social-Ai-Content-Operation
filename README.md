@@ -1,4 +1,4 @@
-# Social Media Automation
+# Orbit Social AI Content Operation
 
 A production-minded, multi-tenant content operations platform that turns a brand brief into reviewed, scheduled, and published social content. The first release defaults to mock publishing and strict AI budgets so it is safe and inexpensive to run.
 
@@ -34,4 +34,4 @@ Run `pnpm check`. End-to-end: `pnpm --filter @sma/web exec playwright install ch
 - Duplicate AI prompts resolve through the request hash cache contract.
 - The default workspace AI cap is USD 10/month and each response is capped.
 
-See `docs/` for architecture, integrations, security, deployment, costs, and operations.
+See `docs/` for architecture, integrations, security, deployment, costs, and operations. Project links and decisions are maintained in [`WIKI.md`](WIKI.md).
