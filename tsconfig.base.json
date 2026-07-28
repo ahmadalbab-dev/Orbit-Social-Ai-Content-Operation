@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "baseUrl": ".",
+    "paths": {
+      "@sma/config": ["packages/config/src"],
+      "@sma/types": ["packages/types/src"],
+      "@sma/ui": ["packages/ui/src"],
+      "@sma/database": ["packages/database/src"],
+      "@sma/ai": ["packages/ai/src"],
+      "@sma/social-connectors": ["packages/social-connectors/src"]
+    }
+  }
+}

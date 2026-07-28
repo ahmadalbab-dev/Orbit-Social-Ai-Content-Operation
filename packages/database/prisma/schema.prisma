@@ -1,0 +1,321 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  EDITOR
+  APPROVER
+  VIEWER
+}
+enum ContentStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  SCHEDULED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+}
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+}
+enum Platform {
+  FACEBOOK
+  INSTAGRAM
+  LINKEDIN
+  TIKTOK
+  YOUTUBE
+  X
+  THREADS
+  PINTEREST
+}
+
+model User {
+  id String @id @default(uuid())
+  authUserId String @unique
+  email String @unique
+  name String?
+  memberships Membership[]
+  auditLogs AuditLog[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Organization {
+  id String @id @default(uuid())
+  name String
+  slug String @unique
+  memberships Membership[]
+  workspaces Workspace[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Workspace {
+  id String @id @default(uuid())
+  organizationId String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name String
+  slug String
+  monthlyAiBudgetUsd Decimal @default(10) @db.Decimal(10, 4)
+  memberships Membership[]
+  brands Brand[]
+  socialAccounts SocialAccount[]
+  campaigns Campaign[]
+  contentItems ContentItem[]
+  mediaAssets MediaAsset[]
+  schedules Schedule[]
+  publishingJobs PublishingJob[]
+  analytics AnalyticsSnapshot[]
+  aiUsage AiUsage[]
+  auditLogs AuditLog[]
+  webhooks Webhook[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+model Membership {
+  id String @id @default(uuid())
+  userId String
+  organizationId String
+  workspaceId String?
+  role Role @default(VIEWER)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@unique([userId, organizationId, workspaceId])
+  @@index([organizationId, role])
+}
+
+model Brand {
+  id String @id @default(uuid())
+  workspaceId String
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name String
+  description String?
+  voice Json
+  audience Json
+  guidelines Json?
+  campaigns Campaign[]
+  contentItems ContentItem[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([workspaceId])
+}
+
+model SocialAccount {
+  id String @id @default(uuid())
+  workspaceId String
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  platform Platform
+  externalAccountId String
+  displayName String
+  status String @default("sandbox")
+  token OAuthToken?
+  jobs PublishingJob[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([workspaceId, platform, externalAccountId])
+  @@index([workspaceId])
+}
+
+model OAuthToken {
+  id String @id @default(uuid())
+  socialAccountId String @unique
+  socialAccount SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  encryptedAccessToken String
+  encryptedRefreshToken String?
+  expiresAt DateTime?
+  scopes String[]
+  keyVersion Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Campaign {
+  id String @id @default(uuid())
+  workspaceId String
+  brandId String
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  name String
+  brief String
+  startsAt DateTime?
+  endsAt DateTime?
+  contentItems ContentItem[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([workspaceId])
+}
+
+model ContentItem {
+  id String @id @default(uuid())
+  workspaceId String
+  brandId String
+  campaignId String?
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  campaign Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  title String
+  body String
+  platform Platform
+  status ContentStatus @default(DRAFT)
+  metadata Json?
+  media ContentMedia[]
+  schedules Schedule[]
+  approvals Approval[]
+  jobs PublishingJob[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([workspaceId, status])
+}
+
+model MediaAsset {
+  id String @id @default(uuid())
+  workspaceId String
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  storageProvider String @default("supabase")
+  storageKey String
+  url String
+  mimeType String
+  bytes Int
+  checksum String
+  content ContentMedia[]
+  createdAt DateTime @default(now())
+  @@unique([workspaceId, checksum])
+}
+
+model ContentMedia {
+  contentItemId String
+  mediaAssetId String
+  position Int @default(0)
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  mediaAsset MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+  @@id([contentItemId, mediaAssetId])
+}
+
+model Schedule {
+  id String @id @default(uuid())
+  workspaceId String
+  contentItemId String
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  scheduledFor DateTime
+  timezone String @default("UTC")
+  jobs PublishingJob[]
+  createdAt DateTime @default(now())
+  @@index([workspaceId, scheduledFor])
+}
+
+model PublishingJob {
+  id String @id @default(uuid())
+  workspaceId String
+  contentItemId String
+  socialAccountId String
+  scheduleId String?
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  socialAccount SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  schedule Schedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  idempotencyKey String @unique
+  status JobStatus @default(PENDING)
+  attempts Int @default(0)
+  externalPostId String?
+  externalUrl String?
+  error String?
+  publishedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([workspaceId, status])
+}
+
+model Approval {
+  id String @id @default(uuid())
+  contentItemId String
+  reviewerId String?
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  status ApprovalStatus @default(PENDING)
+  note String?
+  decidedAt DateTime?
+  createdAt DateTime @default(now())
+}
+
+model AnalyticsSnapshot {
+  id String @id @default(uuid())
+  workspaceId String
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  platform Platform
+  externalPostId String
+  impressions Int @default(0)
+  reach Int @default(0)
+  likes Int @default(0)
+  comments Int @default(0)
+  shares Int @default(0)
+  clicks Int @default(0)
+  capturedAt DateTime @default(now())
+  @@index([workspaceId, capturedAt])
+}
+
+model AiUsage {
+  id String @id @default(uuid())
+  workspaceId String
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  requestHash String
+  model String
+  inputTokens Int
+  outputTokens Int
+  estimatedCostUsd Decimal @db.Decimal(12, 8)
+  purpose String
+  cached Boolean @default(false)
+  createdAt DateTime @default(now())
+  @@unique([workspaceId, requestHash])
+  @@index([workspaceId, createdAt])
+}
+
+model AuditLog {
+  id String @id @default(uuid())
+  workspaceId String?
+  actorId String?
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action String
+  entityType String
+  entityId String?
+  ipAddress String?
+  metadata Json?
+  createdAt DateTime @default(now())
+  @@index([workspaceId, createdAt])
+}
+
+model Webhook {
+  id String @id @default(uuid())
+  workspaceId String
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  url String
+  encryptedSecret String
+  events String[]
+  active Boolean @default(true)
+  lastDeliveryAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([workspaceId])
+}

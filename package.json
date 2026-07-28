@@ -1,0 +1,25 @@
+{
+  "name": "social-media-automation",
+  "private": true,
+  "packageManager": "pnpm@11.17.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev --parallel",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "format": "prettier --write .",
+    "db:generate": "pnpm --filter @sma/database generate",
+    "db:push": "pnpm --filter @sma/database db:push",
+    "db:validate": "pnpm --filter @sma/database validate",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "prettier": "^3.6.2",
+    "turbo": "^2.5.5",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}
