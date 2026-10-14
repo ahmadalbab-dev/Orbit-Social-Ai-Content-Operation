@@ -61,3 +61,17 @@ jobs:
         with:
           name: Orbit-mobile-web-build
           path: tools/mobile-preview/dist
+
+  hosted-oauth:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with: { version: 11.17.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm, cache-dependency-path: tools/hosted-orbit/pnpm-lock.yaml }
+      - run: pnpm --dir tools/hosted-orbit install --frozen-lockfile
+      - run: pnpm --dir tools/hosted-orbit typecheck
+      - run: pnpm --dir tools/hosted-orbit test
+      - run: pnpm --dir tools/hosted-orbit build
+      - run: pnpm --dir tools/hosted-orbit audit --prod --audit-level high
