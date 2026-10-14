@@ -18,4 +18,13 @@ allowBuilds:
 # stable while selecting upstream security-patched compatible releases.
 overrides:
   'next>postcss': 8.5.23
-  'next>sharp': 0.35.3
+  'next>sharp': 0.35.5
+
+# Scoped patched dependency resolutions; checked with audit and builds.
+  '@nestjs/platform-express>multer': 2.4.0
+  'express>proxy-addr': 2.0.8
+  'postcss>nanoid': 3.3.18
+  'postcss>source-map-js': 1.2.2
+  '@prisma/config>deepmerge-ts': 8.0.0
+  'express>qs': 6.16.0
+  'body-parser>qs': 6.16.0

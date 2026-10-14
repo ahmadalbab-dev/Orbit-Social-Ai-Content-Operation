@@ -1,0 +1,3 @@
+import {identity,origin,database} from "../../../../lib/social";
+import {sameOrigin,boundedForm} from "../../../../lib/oauth-security";
+export async function POST(request:Request){try{if(!sameOrigin(request,origin()))return new Response("Invalid origin",{status:403});const userId=await identity();const id=(await boundedForm(request,1024)).get("id");if(!id)return new Response("Account required",{status:400});await database().prepare("DELETE FROM social_accounts WHERE id=? AND user_id=?").bind(id,userId).run();return Response.redirect(`${origin()}/connect?removed=1`,303);}catch{return new Response("Unable to remove connection",{status:503});}}

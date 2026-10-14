@@ -1,0 +1,3 @@
+@import "../../../apps/web/app/globals.css";
+@source "../../../apps/web/app/page.tsx";
+@source "../../../packages/ui/src/index.tsx";

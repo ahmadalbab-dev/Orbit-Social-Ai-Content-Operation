@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "AI-assisted content, approvals, scheduling and social publishing.",
     start_url: "/",
     display: "standalone",
-    background_color: "#f5f5f2",
-    theme_color: "#111111",
+    background_color: "#fafaf7",
+    theme_color: "#fafaf7",
     orientation: "any",
     icons: [{ src: "/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" }],
   };

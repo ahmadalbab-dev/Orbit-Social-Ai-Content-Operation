@@ -1,0 +1,54 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@sma/ui": [
+        "../../packages/ui/src/index.tsx"
+      ],
+      "react": [
+        "./node_modules/@types/react"
+      ],
+      "react-dom/client": [
+        "./node_modules/@types/react-dom/client"
+      ],
+      "react/jsx-runtime": [
+        "./node_modules/@types/react/jsx-runtime"
+      ],
+      "lucide-react": [
+        "./node_modules/lucide-react/dist/lucide-react.d.ts"
+      ],
+      "@radix-ui/react-slot": [
+        "./node_modules/@radix-ui/react-slot/dist/index.d.ts"
+      ],
+      "class-variance-authority": [
+        "./node_modules/class-variance-authority/dist/index.d.ts"
+      ],
+      "clsx": [
+        "./node_modules/clsx/clsx.d.ts"
+      ],
+      "tailwind-merge": [
+        "./node_modules/tailwind-merge/dist/types.d.ts"
+      ]
+    },
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    "src",
+    "../../apps/web/app/page.tsx",
+    "../../apps/web/app/local-preview.ts",
+    "../../packages/ui/src/index.tsx"
+  ]
+}

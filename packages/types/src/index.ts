@@ -10,7 +10,7 @@ export type PublishRequest = {
   scheduledFor?: string;
 };
 export type PublishResult = {
-  status: "published" | "failed";
+  status: "published" | "simulated" | "failed";
   externalId?: string;
   externalUrl?: string;
   error?: string;
