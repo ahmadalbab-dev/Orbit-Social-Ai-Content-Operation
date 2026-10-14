@@ -1,0 +1,1 @@
+Social platform glyphs use the Facebook, Instagram and Threads SVG paths from Simple Icons, retrieved 15 October 2026. Source: https://github.com/simple-icons/simple-icons/tree/develop/icons . Simple Icons distributes its icons under CC0; platform trademarks remain the respective owners’ property. General action icons use Lucide.

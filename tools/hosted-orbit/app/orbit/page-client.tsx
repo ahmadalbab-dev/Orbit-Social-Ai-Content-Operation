@@ -17,7 +17,7 @@ type Profile = { name: string; voice: string; audience: string; topics: string; 
 type View = "overview" | "studio" | "video" | "calendar" | "connections" | "settings";
 type IntegrationStatus = { providers: Record<string, { credentialsConfigured: boolean; connected?: boolean; accounts?: {name:string;accountType:string|null}[] }> };
 const initialProfile: Profile = { name: "azhari_101kerja", voice: "Santai, bersahaja, jelas dan mesra. Elakkan bahasa kaku dan janji viral.", audience: "Pencari kerja dan komuniti sekitar Kuala Lumpur, Klang dan Selangor", topics: "Kerja kosong, suasana Kuala Lumpur dan perkongsian santai", language: "Bahasa Melayu" };
-const navigation = [{ id: "overview", label: "Home", accessible: "Overview", icon: LayoutDashboard }, { id: "studio", label: "Studio", accessible: "Content Studio", icon: PenLine }, { id: "video", label: "Media", accessible: "Video Editor", icon: Film }, { id: "calendar", label: "Calendar", accessible: "Calendar", icon: CalendarDays }, { id: "connections", label: "Channels", accessible: "Connections", icon: Link2 }, { id: "settings", label: "Settings", accessible: "Brand Settings", icon: Settings }] as const;
+const navigation = [{ id: "overview", label: "Home", accessible: "Overview", icon: LayoutDashboard }, { id: "studio", label: "Content", accessible: "Content Studio", icon: PenLine }, { id: "video", label: "Media", accessible: "Media Studio", icon: Film }, { id: "calendar", label: "Calendar", accessible: "Calendar", icon: CalendarDays }, { id: "connections", label: "Channels", accessible: "Connections", icon: Link2 }, { id: "settings", label: "Settings", accessible: "Brand Settings", icon: Settings }] as const;
 async function api<T>(path: string, method = "GET", body?: unknown): Promise<T> {
   if (PHONE_PREVIEW && path==="/integrations/status") { const response=await fetch("/api/social/status"); if(!response.ok)throw new Error("Account status unavailable"); return response.json(); }
   if (PHONE_PREVIEW) return (await import("./local-preview")).localPreviewApi<T>(path, method, body);
@@ -35,7 +35,7 @@ export default function Home() {
   const [connection, setConnection] = useState<IntegrationStatus | null>(null);
   const [notice, setNotice] = useState("");
   const [paused,setPaused] = useState(false);
-  const more = useRef<HTMLDivElement>(null);
+  const [moreOpen,setMoreOpen]=useState(false);
   const refresh = useCallback(async () => {
     try { setItems(await api<Content[]>("/content")); setNotice(""); }
     catch (error) { setNotice(`Workspace: ${errorMessage(error)}`); }
@@ -45,12 +45,12 @@ export default function Home() {
     void refresh();
     api<IntegrationStatus>("/integrations/status").then(setConnection).catch(() => setConnection(null));
   }, [refresh]);
-  const go = (next:View) => { more.current?.hidePopover(); setView(next); window.scrollTo({top:0,behavior:"instant"}); };
+  const go = (next:View) => { setMoreOpen(false); setView(next); window.scrollTo({top:0,behavior:"instant"}); };
   const saveProfile = (next: Profile) => { localStorage.setItem("orbit-brand-profile-v1", JSON.stringify(next)); setProfile(next); };
   return <main className={`orbit-shell ${paused?"motion-paused":""}`}>
     <header className="app-header"><button className="brand-word" onClick={()=>go("overview")} aria-label="Orbit home"><OrbitMark small/><span>orbit<span className="word-dot">.</span></span></button><span className="mode-chip"><ShieldCheck size={14} aria-hidden="true"/>{PHONE_PREVIEW?"Preview":"Review first"}</span><button className="profile-button" onClick={()=>go("settings")} aria-label="Open profile settings" title={profile.name}>{profile.name.slice(0,1).toUpperCase()}</button></header>
-    <nav className="orbit-nav" aria-label="Workspace">{navigation.map(({id,label,accessible,icon:Icon})=><button key={id} className={id==="connections"||id==="settings"?"secondary-nav":""} onClick={()=>go(id)} aria-label={accessible} title={accessible} aria-current={view===id?"page":undefined}><Icon size={19} aria-hidden="true"/><span>{label}</span></button>)}<button className="more-toggle" popoverTarget="orbit-more" aria-label="More tabs" aria-current={["connections","settings"].includes(view)?"page":undefined}><MoreHorizontal size={21} aria-hidden="true"/><span>More</span></button></nav>
-    <div id="orbit-more" className="more-panel" ref={more} popover="auto"><button onClick={()=>go("connections")}><Link2 size={20} aria-hidden="true"/>Channels<ArrowUpRight size={16} aria-hidden="true"/></button><button onClick={()=>go("settings")}><Settings size={20} aria-hidden="true"/>Settings<ArrowUpRight size={16} aria-hidden="true"/></button></div>
+    <nav className="orbit-nav" aria-label="Workspace">{navigation.map(({id,label,accessible,icon:Icon})=><button key={id} className={id==="connections"||id==="settings"?"secondary-nav":""} onClick={()=>go(id)} aria-label={accessible} title={accessible} aria-current={view===id?"page":undefined}><Icon size={19} aria-hidden="true"/><span>{label}</span></button>)}<button className="more-toggle" onClick={()=>setMoreOpen(v=>!v)} aria-expanded={moreOpen} aria-controls="orbit-more" aria-label="More tabs" aria-current={["connections","settings"].includes(view)?"page":undefined}><MoreHorizontal size={21} aria-hidden="true"/><span>More</span></button></nav>
+    <div id="orbit-more" className="more-panel" hidden={!moreOpen} onKeyDown={e=>{if(e.key==="Escape")setMoreOpen(false);}}><button onClick={()=>go("connections")}><Link2 size={20} aria-hidden="true"/>Channels<ArrowUpRight size={16} aria-hidden="true"/></button><button onClick={()=>go("settings")}><Settings size={20} aria-hidden="true"/>Settings<ArrowUpRight size={16} aria-hidden="true"/></button></div>
     <div className="app-content">{notice?<div role="alert" className="alert-message">{notice}<IconButton label="Refresh workspace" onClick={refresh}><RefreshCw size={17}/></IconButton></div>:null}
       <details className="preview-note"><summary><LockKeyhole size={13} aria-hidden="true"/>{PHONE_PREVIEW?"Local preview · live posting off":"Demo workspace · live posting off"}<Info size={13} aria-hidden="true"/></summary><p>{PHONE_PREVIEW?"Drafts and schedules stay in this browser. Sample drafting is not connected to AI. Nothing is posted to social media.":"Drafts and schedules reset on API restart. Production sign-in, storage and connected accounts are still required. Calendar entries do not automatically publish."}</p></details>
       <div hidden={view!=="overview"}><Overview profile={profile} items={items} go={go} paused={paused} toggleMotion={()=>setPaused(v=>!v)}/></div>

@@ -35,7 +35,7 @@ test("news editor exports source duration and approved title settings", async ({
   await page.route("**/v1/**",route=>route.fulfill({json:new URL(route.request().url()).pathname.endsWith("/content")?[]:{providers:{}}}));
   await page.goto("/");
   await page.getByRole("button",{name:"Content Studio",exact:true}).click();
-  await page.getByRole("button",{name:"Video Editor"}).click();
+  await page.getByRole("button",{name:"Media Studio"}).click();
   await page.getByLabel("Choose video").setInputFiles(path.join(process.cwd(),"tests/fixtures/sample.mp4"));
   await page.getByLabel("Video date").fill("2026-10-14");
   await page.getByLabel("Video title").fill("Pemandangan terkini\ndi sekitar Kuala Lumpur");
@@ -69,7 +69,7 @@ test("profile persists without manual account type and news editor has transpare
   await page.getByRole("button",{name:"Content Studio",exact:true}).click();await page.getByRole("button",{name:"Brand Settings"}).click();
   await expect(page.getByRole("button",{name:"Business",exact:true})).toHaveCount(0);await expect(page.getByRole("button",{name:"Creator",exact:true})).toHaveCount(0);await page.getByLabel("Brand or creator name").fill("Kedai Saya");await page.getByRole("button",{name:"Save profile"}).click();
   await page.reload();await expect(page.locator(".hero-platforms")).toContainText("Kedai Saya");
-  await page.getByRole("button",{name:"Video Editor"}).click();
+  await page.getByRole("button",{name:"Media Studio"}).click();
   await expect(page.getByRole("heading",{name:"A story worth sharing."})).toBeVisible();
   await expect(page.getByLabel("Panel opacity",{exact:true})).toHaveValue("35");
   await expect(page.getByRole("button",{name:"Export render settings"})).toBeDisabled();
@@ -88,7 +88,7 @@ for (const width of [320,390]) test(`mobile navigation reaches every tab at ${wi
     expect(layout.scroll,JSON.stringify(layout)).toBeLessThanOrEqual(layout.viewport);
   };
   await checkWidth();
-  for(const label of ["Content Studio","Video Editor","Calendar"]){await page.getByRole("button",{name:label,exact:true}).click();await checkWidth();}
+  for(const label of ["Content Studio","Media Studio","Calendar"]){await page.getByRole("button",{name:label,exact:true}).click();await checkWidth();}
   await page.getByRole("button",{name:"More tabs",exact:true}).click();
   await page.locator("#orbit-more").getByRole("button",{name:"Channels",exact:true}).click();
   await expect(page.getByRole("heading",{name:"One workspace. Your channels."})).toBeVisible();await checkWidth();
@@ -102,7 +102,7 @@ test("switching tabs retains an unsaved channel draft",async({page})=>{
   await page.goto("/");await page.getByRole("button",{name:"Content Studio",exact:true}).click();
   await page.getByRole("button",{name:"Generate draft",exact:true}).click();
   await page.getByLabel("threads copy",{exact:true}).fill("Keep this unsaved text");
-  await page.getByRole("button",{name:"Video Editor",exact:true}).click();
+  await page.getByRole("button",{name:"Media Studio",exact:true}).click();
   await page.getByRole("button",{name:"Content Studio",exact:true}).click();
   await expect(page.getByLabel("threads copy",{exact:true})).toHaveValue("Keep this unsaved text");
   await expect(page.getByRole("button",{name:"Record schedule",exact:true})).toBeDisabled();
@@ -110,7 +110,7 @@ test("switching tabs retains an unsaved channel draft",async({page})=>{
 
 test("image editor exports a square PNG and retains edits across media tabs",async({page})=>{
   await page.route("**/v1/**",route=>route.fulfill({json:new URL(route.request().url()).pathname.endsWith("/content")?[]:{providers:{}}}));
-  await page.goto("/");await page.getByRole("button",{name:"Video Editor",exact:true}).click();await page.getByRole("button",{name:"Image Editor",exact:true}).click();
+  await page.goto("/");await page.getByRole("button",{name:"Media Studio",exact:true}).click();await page.getByRole("button",{name:"Image Editor",exact:true}).click();
   const png=await page.evaluate(()=>{const canvas=document.createElement("canvas");canvas.width=400;canvas.height=200;const ctx=canvas.getContext("2d")!;ctx.fillStyle="red";ctx.fillRect(0,0,400,200);return canvas.toDataURL("image/png").split(",")[1];});
   await page.getByLabel("Choose image").setInputFiles({name:"sample.png",mimeType:"image/png",buffer:Buffer.from(png,"base64")});
   await expect(page.getByRole("button",{name:"Export image",exact:true})).toBeEnabled();
@@ -119,4 +119,14 @@ test("image editor exports a square PNG and retains edits across media tabs",asy
   await expect(page.getByLabel("Image caption",{exact:true})).toHaveValue("Kuala Lumpur");
   const downloaded=page.waitForEvent("download");await page.getByRole("button",{name:"Export image",exact:true}).click();const download=await downloaded;
   expect(download.suggestedFilename()).toBe("orbit-image.png");const bytes=await fs.readFile((await download.path())!);expect(bytes.readUInt32BE(16)).toBe(200);expect(bytes.readUInt32BE(20)).toBe(200);
+});
+
+for(const width of [320,390]) test(`blank image canvas leaves navigation clickable at ${width}px`,async({page})=>{
+ await page.setViewportSize({width,height:844});
+ await page.route("**/v1/**",route=>route.fulfill({json:new URL(route.request().url()).pathname.endsWith("/content")?[]:{providers:{}}}));
+ await page.goto("/");await page.getByRole("button",{name:"Media Studio",exact:true}).click();await page.getByRole("button",{name:"Image Editor",exact:true}).click();
+ await expect(page.getByLabel("Choose image")).toBeVisible();
+ await page.getByRole("button",{name:"Overview",exact:true}).click();await expect(page.getByRole("heading",{name:/More ideas/})).toBeVisible();
+ await page.getByRole("button",{name:"More tabs",exact:true}).click();await expect(page.getByRole("button",{name:"More tabs",exact:true})).toHaveAttribute("aria-expanded","true");
+ await page.locator("#orbit-more").getByRole("button",{name:"Settings",exact:true}).click();await expect(page.getByRole("heading",{name:"Make it sound like you."})).toBeVisible();
 });
