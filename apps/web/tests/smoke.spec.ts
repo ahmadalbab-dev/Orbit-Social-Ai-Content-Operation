@@ -45,7 +45,7 @@ test("news editor exports source duration and approved title settings", async ({
   const download=await downloaded;
   const settings=JSON.parse(await fs.readFile((await download.path())!,"utf8"));
   expect(settings).toMatchObject({template:"News report",panelOpacity:0.35,titleFontSize:27,width:512,height:910,fps:30,durationInFrames:30,date:"14 OKTOBER 2026"});
-  await expect(page.getByRole("status")).toContainText("Settings exported");
+  await expect(page.locator(".video-controls").getByRole("status").filter({hasText:"Settings exported"})).toContainText("Settings exported");
 });
 
 test("failed approval never displays success",async({page})=>{
@@ -78,8 +78,8 @@ test("business profile persists and news editor has transparent panel controls",
 });
 
 
-test("mobile navigation reaches every tab without horizontal overflow",async({page})=>{
-  await page.setViewportSize({width:390,height:844});
+for (const width of [320,390]) test(`mobile navigation reaches every tab at ${width}px without horizontal overflow`,async({page})=>{
+  await page.setViewportSize({width,height:844});
   await page.route("**/v1/**",route=>route.fulfill({json:new URL(route.request().url()).pathname.endsWith("/content")?[]:{providers:{}}}));
   await page.goto("/");
   await expect(page.getByRole("heading",{name:/More ideas/})).toBeVisible();

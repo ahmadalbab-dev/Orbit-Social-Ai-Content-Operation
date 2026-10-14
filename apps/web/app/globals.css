@@ -54,7 +54,7 @@ a { color:inherit; }
 .hero-intro h1 { font:800 clamp(2.65rem,4.6vw,4.5rem)/1.07 var(--mono);letter-spacing:-.075em;margin:0; }
 .hero-intro h1 em { font-style:italic;font-weight:450;background:linear-gradient(110deg,#377e70,#7760b5 55%,#9d5f83);background-clip:text;-webkit-background-clip:text;color:transparent; }
 .hero-caption { color:var(--soft);font-size:16px;line-height:1.65;margin:24px 0 0; }
-.hero-actions { display:flex;align-items:center;gap:24px;margin-top:30px; }
+.hero-actions { display:flex;flex-wrap:wrap;align-items:center;gap:24px;margin-top:30px; }
 .hero-primary { border-radius:999px;min-height:50px!important;padding-inline:20px; }
 .hero-platforms { display:flex;align-items:center;gap:8px;margin-top:34px; }
 .hero-platforms>span:last-child { margin-left:6px;color:var(--soft);font-size:11px;max-width:190px;overflow:hidden;text-overflow:ellipsis; }
@@ -123,3 +123,5 @@ a { color:inherit; }
  .video-canvas { padding:18px; }.video-stage { max-width:290px; }.field input,.field textarea,.field select,.advanced-fields input,.draft-select select { font-size:16px; }.two-fields { gap:12px; }.field { min-width:0; }.calendar-toolbar { flex-wrap:wrap;gap:14px; }.month-control { justify-content:space-between;width:100%;gap:6px; }.month-control h2 { font-size:17px; }.calendar-filters { margin-left:auto; }.month-grid button { height:66px;padding:10px 7px;font-size:10px; }.month-grid button.today>span:first-child { width:21px;height:21px; }.day-post-count { padding:2px 5px;font-size:9px; }.desktop-only { display:none; }.calendar-caption { flex-wrap:wrap;font-size:9px; }.schedule-row { padding:18px;gap:12px;grid-template-columns:1fr; }.schedule-row p { grid-column:1; }.schedule-channels { grid-row:3; }.connection-grid { grid-template-columns:1fr;gap:14px; }.connection-card { grid-template-columns:70px 1fr;gap:10px 16px;align-items:center;padding:24px; }.connection-icon { grid-row:1/4;width:60px;height:60px; }.connection-card h2 { font-size:23px;margin:0; }.connection-card .connection-state,.connection-card p { grid-column:2; }.connection-card .full-button { grid-column:1/-1; }.connection-card small { grid-column:1/-1; }.connection-setup h2 { font-size:21px; }.profile-modes button { padding:16px 14px;font-size:12px; }.profile-settings .two-fields { grid-template-columns:1fr;gap:22px; }.settings-summary { margin-top:0; }.orbit-footer { margin-top:52px;padding-top:26px;display:grid;grid-template-columns:auto 1fr;gap:15px;font-size:10px; }.orbit-footer>div { grid-column:1/-1;margin:0;gap:25px; }.orbit-shell input[type=range] { min-height:32px; }
 }
 @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important;scroll-behavior:auto!important;transition:none!important; } }
+
+@media (max-width:390px) { .brief-bottom { flex-wrap:wrap; } .brief-bottom>button { margin-left:auto; } }
