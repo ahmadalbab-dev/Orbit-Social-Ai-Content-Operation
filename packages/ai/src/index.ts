@@ -13,9 +13,16 @@ export type UsageRecord = { requestHash: string; model: string; inputTokens: num
 export interface UsageStore { find(workspaceId: string, requestHash: string): Promise<ContentVariant[] | null>; monthlyCost(workspaceId: string): Promise<number>; save(workspaceId: string, variants: ContentVariant[], usage: UsageRecord): Promise<void>; }
 export class MemoryUsageStore implements UsageStore {
   private cache = new Map<string, ContentVariant[]>();
+  private usage: { workspaceId: string; month: string; cost: number }[] = [];
   async find(workspaceId: string, hash: string) { return this.cache.get(`${workspaceId}:${hash}`) ?? null; }
-  async monthlyCost() { return 0; }
-  async save(workspaceId: string, variants: ContentVariant[], usage: UsageRecord) { this.cache.set(`${workspaceId}:${usage.requestHash}`, variants); }
+  async monthlyCost(workspaceId: string) {
+    const month = new Date().toISOString().slice(0, 7);
+    return this.usage.filter((item) => item.workspaceId === workspaceId && item.month === month).reduce((total, item) => total + item.cost, 0);
+  }
+  async save(workspaceId: string, variants: ContentVariant[], usage: UsageRecord) {
+    this.cache.set(`${workspaceId}:${usage.requestHash}`, variants);
+    if (!usage.cached) this.usage.push({ workspaceId, month: new Date().toISOString().slice(0, 7), cost: usage.estimatedCostUsd });
+  }
 }
 export class AiBudgetExceededError extends Error {}
 
