@@ -47,4 +47,11 @@ describe("tenant authorization", () => {
     }
   });
 
+  it("bounds workspace headers even in local demo", async () => {
+    vi.stubEnv("NODE_ENV", "development"); vi.stubEnv("AUTH_MODE", "local-demo");
+    for (const workspace of ["", "a".repeat(101), "../other", "with spaces"]) {
+      await expect(new TenantAuthGuard().canActivate(context("generate", { "x-workspace-id": workspace }).context)).rejects.toThrow("Valid workspace");
+    }
+  });
+
 });

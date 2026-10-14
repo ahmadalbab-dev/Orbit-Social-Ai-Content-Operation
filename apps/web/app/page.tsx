@@ -55,6 +55,7 @@ export default function Home() {
 }
 
 function ContentStudio({profile,items,onRefresh}: {profile:Profile;items:Content[];onRefresh:()=>Promise<void>}) {
+  const brandCache = useRef<{ key: string; id: string } | null>(null);
   const [topic,setTopic] = useState("Kongsi peluang mencari kerja dan ajak orang berbual tentang kawasan kerja pilihan mereka.");
   const [selected,setSelected] = useState<string[]>([...channels]);
   const [item,setItem] = useState<Content | null>(null);
@@ -70,9 +71,14 @@ function ContentStudio({profile,items,onRefresh}: {profile:Profile;items:Content
     const next=await api<Content>(`/content/${item.id}/review`,"PUT",{variants,expectedRevision:item.revision}); accept(next);return next;
   }
   const generate = () => action(async()=>{
-    const brand=await api<{id:string}>("/brands","POST",{name:profile.name,voice:profile.voice,audience:profile.audience});
+    const brandKey = JSON.stringify({name:profile.name,voice:profile.voice,audience:profile.audience});
+    const brand = brandCache.current?.key === brandKey ? brandCache.current : await api<{id:string}>("/brands","POST",{name:profile.name,voice:profile.voice,audience:profile.audience});
+    brandCache.current = { key:brandKey, id:brand.id };
     const brief=`${topic}\nAccount type: ${profile.mode}\nLanguage: ${profile.language}\nTopics: ${profile.topics}\nUse a natural conversational voice. Do not invent current vacancies, salary, employer details, events or personal experiences. Ask one relevant question; do not guarantee engagement. Return drafts only.`;
-    const next=await api<Content>("/content/generate","POST",{brandId:brand.id,topic:brief,platforms:selected});accept(next);setNotice(next.source === "ai" ? "AI draft ready for your review." : "Demo draft ready. AI is not connected; replace the sample wording before approval.");
+    let next: Content;
+    try { next=await api<Content>("/content/generate","POST",{brandId:brand.id,topic:brief,platforms:selected}); }
+    catch(error) { if(errorMessage(error) === "Brand not found in workspace") brandCache.current=null; throw error; }
+    accept(next);setNotice(next.source === "ai" ? "AI draft ready for your review." : "Demo draft ready. AI is not connected; replace the sample wording before approval.");
   });
   const approve = () => action(async()=>{
     if(!item) return;

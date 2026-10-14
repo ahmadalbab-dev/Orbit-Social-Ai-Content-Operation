@@ -10,7 +10,7 @@ export class TenantAuthGuard implements CanActivate {
     const handler = context.getHandler();
     if (["health", "ready"].includes(handler.name)) return true;
     const workspaceId = request.headers["x-workspace-id"];
-    if (!workspaceId) throw new UnauthorizedException("Workspace header required");
+    if (typeof workspaceId !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$/.test(workspaceId)) throw new UnauthorizedException("Valid workspace header required");
     if (process.env.NODE_ENV !== "production" && process.env.AUTH_MODE === "local-demo") {
       request.identity = { sub: "local-developer", workspaceId, role: "owner" }; return true;
     }

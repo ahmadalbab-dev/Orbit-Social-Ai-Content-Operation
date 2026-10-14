@@ -1,5 +1,5 @@
 import type { PublishRequest, PublishResult, SocialPlatform } from "@sma/types";
-export * from "./meta";
+export * from "./meta.js";
 
 export interface SocialConnector {
   readonly platform: SocialPlatform;

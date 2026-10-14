@@ -12,25 +12,36 @@ export class WorkflowService {
   private brands = new Map<string, Brand>();
   private content = new Map<string, Content>();
   private usageStore = new MemoryUsageStore();
+  private generationLocks = new Set<string>();
   private registry = new ConnectorRegistry();
   constructor() { for (const p of socialPlatforms) this.registry.register(new MockConnector(p)); }
   list(workspaceId: string) { return structuredClone([...this.content.values()].filter(item => item.workspaceId === workspaceId)); }
   createBrand(workspaceId: string, input: Omit<Brand, "id" | "workspaceId">) {
     if (!input || [input.name, input.voice, input.audience].some(v => typeof v !== "string" || !v.trim() || v.length > 2000)) throw new BadRequestException("Name, voice and audience required (maximum 2000 characters each)");
-    const brand = { ...input, id: randomUUID(), workspaceId }; this.brands.set(brand.id, brand); return structuredClone(brand);
+    this.checkCapacity(workspaceId, "brand");
+    const brand = { name: input.name, voice: input.voice, audience: input.audience, id: randomUUID(), workspaceId }; this.brands.set(brand.id, brand); return structuredClone(brand);
   }
   async generate(workspaceId: string, input: { brandId: string; topic: string; platforms: SocialPlatform[] }) {
     if (!input || typeof input.topic !== "string" || !input.topic.trim() || input.topic.length > 4000 || !Array.isArray(input.platforms) || !input.platforms.length || new Set(input.platforms).size !== input.platforms.length || !input.platforms.every(p => socialPlatforms.includes(p))) throw new BadRequestException("Valid topic and unique supported platforms required");
     const brand = this.brands.get(input.brandId);
     if (!brand || brand.workspaceId !== workspaceId) throw new NotFoundException("Brand not found in workspace");
-    let variants: ContentVariant[];
-    if (process.env.OPENAI_API_KEY) {
-      const ai = new OpenAiContentProvider(this.usageStore, { apiKey: process.env.OPENAI_API_KEY, model: process.env.OPENAI_DEFAULT_MODEL, monthlyBudgetUsd: Number(process.env.AI_MONTHLY_BUDGET_USD ?? 10) });
-      variants = (await ai.generateVariants({ workspaceId, brandName: brand.name, voice: brand.voice, audience: brand.audience, topic: input.topic, platforms: input.platforms })).variants;
-    } else variants = input.platforms.map(platform => ({ platform, copy: input.topic, hashtags: [], callToAction: "" }));
-    if (!variantsValid(variants)) throw new BadRequestException("Generated variants need valid content");
-    const item: Content = { id: randomUUID(), workspaceId, brandId: brand.id, topic: input.topic, status: "DRAFT", variants, revision: 1, source: process.env.OPENAI_API_KEY ? "ai" : "demo" };
-    this.content.set(item.id, item); return structuredClone(item);
+    this.checkCapacity(workspaceId, "content");
+    if (this.generationLocks.has(workspaceId)) throw new ConflictException("Workspace generation already in progress");
+    this.generationLocks.add(workspaceId);
+    try {
+      let variants: ContentVariant[];
+      if (process.env.OPENAI_API_KEY) {
+        const monthlyBudgetUsd = Number(process.env.AI_MONTHLY_BUDGET_USD ?? 10);
+        const maxOutputTokens = Number(process.env.AI_REQUEST_MAX_TOKENS ?? 1200);
+        if (!Number.isFinite(monthlyBudgetUsd) || monthlyBudgetUsd <= 0 || !Number.isInteger(maxOutputTokens) || maxOutputTokens <= 0 || maxOutputTokens > 4000) throw new ServiceUnavailableException("Invalid AI limits configuration");
+        const ai = new OpenAiContentProvider(this.usageStore, { apiKey: process.env.OPENAI_API_KEY, model: process.env.OPENAI_DEFAULT_MODEL, monthlyBudgetUsd, maxOutputTokens });
+        variants = (await ai.generateVariants({ workspaceId, brandName: brand.name, voice: brand.voice, audience: brand.audience, topic: input.topic, platforms: input.platforms })).variants;
+      } else variants = input.platforms.map(platform => ({ platform, copy: input.topic, hashtags: [], callToAction: "" }));
+      if (!variantsValid(variants)) throw new BadRequestException("Generated variants need valid content");
+      const item: Content = { id: randomUUID(), workspaceId, brandId: brand.id, topic: input.topic, status: "DRAFT", variants, revision: 1, source: process.env.OPENAI_API_KEY ? "ai" : "demo" };
+      this.checkCapacity(workspaceId, "content");
+      this.content.set(item.id, item); return structuredClone(item);
+    } finally { this.generationLocks.delete(workspaceId); }
   }
   review(workspaceId: string, id: string, variants: ContentVariant[], expectedRevision: number) {
     const item = this.requireItem(workspaceId, id);
@@ -61,6 +72,14 @@ export class WorkflowService {
       const results = await Promise.all(item.variants.map(variant => this.registry.get(variant.platform).publish({ idempotencyKey: createHash("sha256").update(`${id}:${item.revision}:${variant.platform}`).digest("hex"), workspaceId, accountId: `sandbox-${variant.platform}`, platform: variant.platform, text: [variant.copy, variant.callToAction, variant.hashtags.join(" ")].filter(Boolean).join("\n\n") })));
       item.status = "SIMULATED"; item.publishResult = { mode: "mock", simulated: true, results }; return structuredClone(item);
     } catch (error) { item.status = "SIMULATION_FAILED"; throw error; }
+  }
+  private checkCapacity(workspaceId: string, kind: "brand" | "content") {
+    const workspaces = new Set([...this.brands.values(), ...this.content.values()].map(item => item.workspaceId));
+    if (!workspaces.has(workspaceId) && workspaces.size >= 100) throw new ConflictException("Demo workspace capacity reached");
+    const records = kind === "brand" ? this.brands : this.content;
+    const limit = kind === "brand" ? 50 : 500;
+    if (records.size >= (kind === "brand" ? 500 : 2000)) throw new ConflictException("Demo global record capacity reached");
+    if ([...records.values()].filter(item => item.workspaceId === workspaceId).length >= limit) throw new ConflictException("Demo record capacity reached");
   }
   private checkRevision(item: Content, expectedRevision: number) { if (!Number.isInteger(expectedRevision) || item.revision !== expectedRevision) throw new ConflictException("Content revision changed; refresh before editing or approving"); }
   private requireApproved(workspaceId: string, id: string) {
