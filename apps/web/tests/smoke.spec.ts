@@ -63,11 +63,11 @@ test("failed approval never displays success",async({page})=>{
   await expect(page.getByRole("button",{name:"Simulate publishing"})).toBeDisabled();
 });
 
-test("business profile persists and news editor has transparent panel controls",async({page})=>{
+test("profile persists without manual account type and news editor has transparent panel controls",async({page})=>{
   await page.route("**/v1/**",route=>route.fulfill({json:new URL(route.request().url()).pathname.endsWith("/content")?[]:{providers:{}}}));
   await page.goto("/");
   await page.getByRole("button",{name:"Content Studio",exact:true}).click();await page.getByRole("button",{name:"Brand Settings"}).click();
-  await page.getByRole("button",{name:"Business",exact:true}).click();await page.getByLabel("Brand or creator name").fill("Kedai Saya");await page.getByRole("button",{name:"Save profile"}).click();
+  await expect(page.getByRole("button",{name:"Business",exact:true})).toHaveCount(0);await expect(page.getByRole("button",{name:"Creator",exact:true})).toHaveCount(0);await page.getByLabel("Brand or creator name").fill("Kedai Saya");await page.getByRole("button",{name:"Save profile"}).click();
   await page.reload();await expect(page.locator(".hero-platforms")).toContainText("Kedai Saya");
   await page.getByRole("button",{name:"Video Editor"}).click();
   await expect(page.getByRole("heading",{name:"A story worth sharing."})).toBeVisible();
@@ -106,4 +106,17 @@ test("switching tabs retains an unsaved channel draft",async({page})=>{
   await page.getByRole("button",{name:"Content Studio",exact:true}).click();
   await expect(page.getByLabel("threads copy",{exact:true})).toHaveValue("Keep this unsaved text");
   await expect(page.getByRole("button",{name:"Record schedule",exact:true})).toBeDisabled();
+});
+
+test("image editor exports a square PNG and retains edits across media tabs",async({page})=>{
+  await page.route("**/v1/**",route=>route.fulfill({json:new URL(route.request().url()).pathname.endsWith("/content")?[]:{providers:{}}}));
+  await page.goto("/");await page.getByRole("button",{name:"Video Editor",exact:true}).click();await page.getByRole("button",{name:"Image Editor",exact:true}).click();
+  const png=await page.evaluate(()=>{const canvas=document.createElement("canvas");canvas.width=400;canvas.height=200;const ctx=canvas.getContext("2d")!;ctx.fillStyle="red";ctx.fillRect(0,0,400,200);return canvas.toDataURL("image/png").split(",")[1];});
+  await page.getByLabel("Choose image").setInputFiles({name:"sample.png",mimeType:"image/png",buffer:Buffer.from(png,"base64")});
+  await expect(page.getByRole("button",{name:"Export image",exact:true})).toBeEnabled();
+  await page.getByLabel("Image crop",{exact:true}).selectOption("1:1");await page.getByLabel("Image caption",{exact:true}).fill("Kuala Lumpur");
+  await page.getByRole("button",{name:"Video",exact:true}).click();await page.getByRole("button",{name:"Image Editor",exact:true}).click();
+  await expect(page.getByLabel("Image caption",{exact:true})).toHaveValue("Kuala Lumpur");
+  const downloaded=page.waitForEvent("download");await page.getByRole("button",{name:"Export image",exact:true}).click();const download=await downloaded;
+  expect(download.suggestedFilename()).toBe("orbit-image.png");const bytes=await fs.readFile((await download.path())!);expect(bytes.readUInt32BE(16)).toBe(200);expect(bytes.readUInt32BE(20)).toBe(200);
 });

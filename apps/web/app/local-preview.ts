@@ -39,7 +39,7 @@ export async function localPreviewApi<T>(path: string, method = "GET", input?: u
     if (!state.brands.some(b => b.id === body.brandId)) throw new Error("Brand not found in workspace");
     if (state.items.length >= 200) throw new Error("Preview draft limit reached.");
     if (typeof body.topic !== "string" || !body.topic.trim() || body.topic.length > 4000 || !Array.isArray(body.platforms) || !body.platforms.length || body.platforms.length > 3 || new Set(body.platforms).size !== body.platforms.length || !body.platforms.every(p => channels.includes(p))) throw new Error("Valid topic and channels required.");
-    const topic = body.topic.split("\nAccount type:")[0];
+    const topic = body.topic.split(/\n(?:Account type|Language):/)[0];
     const item: Item = { id: crypto.randomUUID(), brandId: body.brandId as string, topic, variants: body.platforms.map(platform => ({ platform, copy: topic, hashtags: [], callToAction: "" })), revision: 1, status: "DRAFT", source: "demo" };
     state.items.unshift(item); result = item; save(state);
   } else {
