@@ -1,4 +1,4 @@
-# Orbit Social phone testing build
+# Orbit Social phone testing build v0.2
 
 This package reuses the web app's React UI, shared components and responsive styles. It replaces only API calls with a device-local test adapter at build time. It contains no backend keys, OAuth tokens or live publisher.
 
@@ -10,7 +10,12 @@ Open the private preview URL in Safari and sign in to the owning ChatGPT account
 
 ## Included tests and features
 
-- Bottom navigation, 44px touch controls, adaptive icon/text sizing and safe-area spacing.
+- Ponytail-inspired light design with mint, lavender and peach accents.
+- Overview, Studio, Video, Calendar, Channels and Settings share the web app UI.
+- Floating web navigation, phone bottom dock, native More menu, adaptive icons and safe-area spacing.
+- Accessible icon controls with concise labels and optional help.
+- Per-channel editor/preview and Malaysia month calendar with channel filters.
+- Draft edits and video selection are retained while changing tabs.
 - Profile settings and saved sample drafts on this browser only.
 - Review, approval tied to revision, recorded Malaysia-time schedules and explicitly simulated posting.
 - Local video selection with the News report title/date/opacity controls and render-settings JSON export.

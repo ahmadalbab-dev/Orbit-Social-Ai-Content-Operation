@@ -19,6 +19,7 @@ test("creator studio saves edits and approves the returned revision before sched
     return route.fulfill({json:[]});
   });
   await page.goto("/");
+  await page.getByRole("button",{name:"Content Studio",exact:true}).click();
   await expect(page.getByRole("heading",{name:"Create once. Review every channel."})).toBeVisible();
   await page.getByRole("button",{name:"Generate draft"}).click();
   await page.getByRole("textbox",{name:"threads copy"}).fill("Kerja dekat rumah atau jauh sikit?");
@@ -33,6 +34,7 @@ test("creator studio saves edits and approves the returned revision before sched
 test("news editor exports source duration and approved title settings", async ({page}) => {
   await page.route("**/v1/**",route=>route.fulfill({json:new URL(route.request().url()).pathname.endsWith("/content")?[]:{providers:{}}}));
   await page.goto("/");
+  await page.getByRole("button",{name:"Content Studio",exact:true}).click();
   await page.getByRole("button",{name:"Video Editor"}).click();
   await page.getByLabel("Choose video").setInputFiles(path.join(process.cwd(),"tests/fixtures/sample.mp4"));
   await page.getByLabel("Video date").fill("2026-10-14");
@@ -43,7 +45,7 @@ test("news editor exports source duration and approved title settings", async ({
   const download=await downloaded;
   const settings=JSON.parse(await fs.readFile((await download.path())!,"utf8"));
   expect(settings).toMatchObject({template:"News report",panelOpacity:0.35,titleFontSize:27,width:512,height:910,fps:30,durationInFrames:30,date:"14 OKTOBER 2026"});
-  await expect(page.getByRole("status")).toContainText("Use the local Remotion renderer");
+  await expect(page.getByRole("status")).toContainText("Settings exported");
 });
 
 test("failed approval never displays success",async({page})=>{
@@ -55,20 +57,50 @@ test("failed approval never displays success",async({page})=>{
     if(path.endsWith("/integrations/status"))return route.fulfill({json:{providers:{}}});
     return route.fulfill({json:[]});
   });
-  await page.goto("/");await page.getByRole("button",{name:"Generate draft"}).click();await page.getByRole("button",{name:"Approve content"}).click();
+  await page.goto("/");
+  await page.getByRole("button",{name:"Content Studio",exact:true}).click();await page.getByRole("button",{name:"Generate draft"}).click();await page.getByRole("button",{name:"Approve content"}).click();
   await expect(page.getByRole("status")).toHaveText("Approval role required");
   await expect(page.getByRole("button",{name:"Simulate publishing"})).toBeDisabled();
 });
 
 test("business profile persists and news editor has transparent panel controls",async({page})=>{
   await page.route("**/v1/**",route=>route.fulfill({json:new URL(route.request().url()).pathname.endsWith("/content")?[]:{providers:{}}}));
-  await page.goto("/");await page.getByRole("button",{name:"Brand Settings"}).click();
-  await page.getByLabel("Account type").selectOption("business");await page.getByLabel("Brand or creator name").fill("Kedai Saya");await page.getByRole("button",{name:"Save profile"}).click();
-  await page.reload();await expect(page.getByText("Orbit Social · Kedai Saya")).toBeVisible();
+  await page.goto("/");
+  await page.getByRole("button",{name:"Content Studio",exact:true}).click();await page.getByRole("button",{name:"Brand Settings"}).click();
+  await page.getByRole("button",{name:"Business",exact:true}).click();await page.getByLabel("Brand or creator name").fill("Kedai Saya");await page.getByRole("button",{name:"Save profile"}).click();
+  await page.reload();await expect(page.locator(".hero-platforms")).toContainText("Kedai Saya");
   await page.getByRole("button",{name:"Video Editor"}).click();
-  await expect(page.getByRole("heading",{name:"News report video editor"})).toBeVisible();
-  await expect(page.getByText("Panel opacity · 35%")).toBeVisible();
+  await expect(page.getByRole("heading",{name:"A story worth sharing."})).toBeVisible();
+  await expect(page.getByLabel("Panel opacity",{exact:true})).toHaveValue("35");
   await expect(page.getByRole("button",{name:"Export render settings"})).toBeDisabled();
   await page.getByRole("button",{name:"Connections",exact:true}).click();
-  await expect(page.getByRole("button",{name:"OAuth setup pending"})).toHaveCount(3);
+  await expect(page.getByText("OAuth setup pending",{exact:true})).toHaveCount(3);
+});
+
+
+test("mobile navigation reaches every tab without horizontal overflow",async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.route("**/v1/**",route=>route.fulfill({json:new URL(route.request().url()).pathname.endsWith("/content")?[]:{providers:{}}}));
+  await page.goto("/");
+  await expect(page.getByRole("heading",{name:/More ideas/})).toBeVisible();
+  const checkWidth=async()=>expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+  await checkWidth();
+  for(const label of ["Content Studio","Video Editor","Calendar"]){await page.getByRole("button",{name:label,exact:true}).click();await checkWidth();}
+  await page.getByRole("button",{name:"More tabs",exact:true}).click();
+  await page.locator("#orbit-more").getByRole("button",{name:"Channels",exact:true}).click();
+  await expect(page.getByRole("heading",{name:"One workspace. Your channels."})).toBeVisible();await checkWidth();
+  await page.getByRole("button",{name:"More tabs",exact:true}).click();
+  await page.locator("#orbit-more").getByRole("button",{name:"Settings",exact:true}).click();
+  await expect(page.getByRole("heading",{name:"Make it sound like you."})).toBeVisible();await checkWidth();
+});
+
+test("switching tabs retains an unsaved channel draft",async({page})=>{
+  await page.route("**/v1/**",route=>{const path=new URL(route.request().url()).pathname;return route.fulfill({json:path.endsWith("/brands")?{id:"b"}:path.endsWith("/generate")?{id:"c",status:"DRAFT",revision:1,variants:[{platform:"threads",copy:"Draft",hashtags:[],callToAction:""}]}:path.endsWith("/content")?[]:{providers:{}}});});
+  await page.goto("/");await page.getByRole("button",{name:"Content Studio",exact:true}).click();
+  await page.getByRole("button",{name:"Generate draft",exact:true}).click();
+  await page.getByLabel("threads copy",{exact:true}).fill("Keep this unsaved text");
+  await page.getByRole("button",{name:"Video Editor",exact:true}).click();
+  await page.getByRole("button",{name:"Content Studio",exact:true}).click();
+  await expect(page.getByLabel("threads copy",{exact:true})).toHaveValue("Keep this unsaved text");
+  await expect(page.getByRole("button",{name:"Record schedule",exact:true})).toBeDisabled();
 });

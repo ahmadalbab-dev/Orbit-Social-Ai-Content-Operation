@@ -32,6 +32,8 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       - run: node scripts/api-smoke.mjs
+      - run: pnpm --filter @sma/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @sma/web test:e2e
       # Runtime dependencies are release blockers. Build-only tooling is
       # monitored separately because some upstream tools have no patched line.
       - run: pnpm audit --prod --audit-level high

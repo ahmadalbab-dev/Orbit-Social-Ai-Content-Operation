@@ -48,3 +48,10 @@ describe('device-only phone preview', () => {
     memory.set(PREVIEW_STORAGE_KEY,'{broken'); await assert.rejects(api('/content'),/could not be read/);
   });
 });
+
+
+import { malaysiaDateKey, monthGrid } from '../../../apps/web/app/calendar-data.ts';
+describe('Malaysia calendar',()=>{
+  it('uses Malaysia date at a UTC day boundary',()=>{assert.equal(malaysiaDateKey(new Date('2026-10-14T17:00:00Z')),'2026-10-15');});
+  it('includes leap day and begins each grid on Monday',()=>{const grid=monthGrid(2028,1);assert.equal(grid.length,42);assert.equal(grid.filter(d=>d.current).length,29);assert.ok(grid.some(d=>d.key==='2028-02-29'&&d.current));assert.equal(new Date(grid[0].key).getUTCDay(),1);});
+});
