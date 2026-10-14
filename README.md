@@ -31,3 +31,11 @@ Prisma-backed content/approval/job persistence, database memberships, production
 Estimated AI usage is process-local and checked before generation; it is not a durable, concurrency-safe billing cap. No AI API key means demo text only, clearly marked for editing.
 
 See docs/BUSINESS_CREATOR_REVIEW.md for findings and workflow, docs/META_INTEGRATION_OPTIONS.md for API/MCP and self-hosted options, and docs/META_SOCIAL_SETUP.md for account prerequisites.
+
+## Phone testing app
+
+A private iPhone-compatible web-app preview reuses the web UI and adds bottom navigation, adaptive icons, safe-area spacing and device-local sample workflows. Build/package instructions are in [tools/mobile-preview/README.md](tools/mobile-preview/README.md).
+
+Phone preview: https://orbit-mobile-albab-preview.airy-kiwi-2012.chatgpt.site
+
+This build uses browser-local test data, no AI API calls and no live social connections. Add it to the Home Screen from Safari. It is a portable web app, not a signed IPA or APK; video export remains render-settings JSON. Physical iPhone visual/playback verification remains a user testing step.

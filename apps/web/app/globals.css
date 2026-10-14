@@ -1,4 +1,11 @@
 @import "tailwindcss";
+@theme inline {
+  --color-background: var(--background); --color-foreground: var(--foreground);
+  --color-card: var(--card); --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary); --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted); --color-ring: var(--ring);
+}
+
 :root { --background:#f5f5f2; --foreground:#0f172a; --card:#fff; --card-foreground:#0f172a; --primary:#111; --primary-foreground:#fff; --muted:#f1f1ee; --ring:#111; }
 * { border-color:#e5e7eb; box-sizing:border-box; }
 html { scroll-behavior: smooth; }
@@ -19,3 +26,28 @@ iframe { color-scheme:light; }
   textarea { font-size:16px; }
 }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior:auto!important; animation-duration:.01ms!important; animation-iteration-count:1!important; transition-duration:.01ms!important; } }
+/* Shared phone layout, including iPhone safe areas and software keyboard. */
+.orbit-shell { min-height:100dvh; }
+.orbit-shell header { padding-top:max(1.25rem,env(safe-area-inset-top)); }
+.orbit-shell h1 { font-size:clamp(1.45rem,5.5vw,1.875rem); }
+.orbit-shell svg { flex-shrink:0; }
+.orbit-shell section, .orbit-shell .grid > * { min-width:0; }
+@media (max-width:640px) {
+  .orbit-shell { padding-bottom:calc(5.5rem + env(safe-area-inset-bottom)); }
+  .orbit-nav { position:fixed; inset:auto 0 0; z-index:40; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:0; margin:0; padding:.35rem max(.25rem,env(safe-area-inset-right)) calc(.35rem + env(safe-area-inset-bottom)) max(.25rem,env(safe-area-inset-left)); background:rgba(255,255,255,.97); border-top:1px solid #e5e7eb; }
+  .orbit-nav button { flex-direction:column; gap:.3rem; min-width:0; min-height:58px; padding:.5rem .125rem; border-radius:.8rem; font-size:clamp(.6rem,2.5vw,.72rem); line-height:1.15; }
+  .orbit-nav button svg { width:clamp(19px,5.5vw,23px); height:clamp(19px,5.5vw,23px); }
+  .orbit-nav button span { max-width:100%; text-align:center; }
+  .orbit-shell input:not([type=checkbox]):not([type=range]), .orbit-shell textarea, .orbit-shell select { font-size:16px; max-width:100%; min-width:0; }
+  .orbit-shell input[type=checkbox] { min-height:20px; width:20px; height:20px; }
+  .orbit-shell input[type=file] { width:100%; font-size:14px; }
+  .orbit-shell button { min-height:44px; }
+  .orbit-shell select[aria-label="Open saved draft"] { display:block; width:100%; margin:.5rem 0 0; }
+  .orbit-shell header > div { gap:.75rem; }
+  .orbit-shell section > .flex { flex-wrap:wrap; gap:1rem; }
+  .orbit-shell footer { padding-bottom:1rem; }
+}
+@media (prefers-reduced-motion:reduce) { .orbit-shell * { scroll-behavior:auto; } }
+.orbit-shell > div { padding-left:max(1rem,env(safe-area-inset-left)); padding-right:max(1rem,env(safe-area-inset-right)); }
+.orbit-shell p { overflow-wrap:anywhere; }
+@media (min-width:640px) { .orbit-shell > div { padding-left:max(2rem,env(safe-area-inset-left)); padding-right:max(2rem,env(safe-area-inset-right)); } }

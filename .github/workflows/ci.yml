@@ -43,3 +43,19 @@ jobs:
       - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  mobile-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: tools/mobile-preview/package-lock.json }
+      - run: npm ci --prefix tools/mobile-preview
+      - run: npm run typecheck --prefix tools/mobile-preview
+      - run: npm test --prefix tools/mobile-preview
+      - run: npm run build --prefix tools/mobile-preview
+      - run: npm audit --prefix tools/mobile-preview --omit=dev --audit-level low
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Orbit-mobile-web-build
+          path: tools/mobile-preview/dist
