@@ -125,3 +125,7 @@ a { color:inherit; }
 @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important;scroll-behavior:auto!important;transition:none!important; } }
 
 @media (max-width:390px) { .brief-bottom { flex-wrap:wrap; } .brief-bottom>button { margin-left:auto; } }
+/* Let intrinsic video and native date controls shrink within phone grid tracks. */
+.surface,.studio-grid>*,.video-grid>*,.settings-grid>* { min-width:0; }
+.two-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
+@media (max-width:640px) { .studio-grid,.video-grid,.settings-grid { grid-template-columns:minmax(0,1fr); } .profile-settings .two-fields { grid-template-columns:minmax(0,1fr); } }

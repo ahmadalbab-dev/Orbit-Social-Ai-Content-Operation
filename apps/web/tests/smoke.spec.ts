@@ -83,7 +83,10 @@ for (const width of [320,390]) test(`mobile navigation reaches every tab at ${wi
   await page.route("**/v1/**",route=>route.fulfill({json:new URL(route.request().url()).pathname.endsWith("/content")?[]:{providers:{}}}));
   await page.goto("/");
   await expect(page.getByRole("heading",{name:/More ideas/})).toBeVisible();
-  const checkWidth=async()=>expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+  const checkWidth=async()=>{
+    const layout=await page.evaluate(()=>({view:document.querySelector('.orbit-nav [aria-current="page"]')?.getAttribute('aria-label'),viewport:window.innerWidth,scroll:document.documentElement.scrollWidth,offenders:Array.from(document.querySelectorAll('body *')).filter(el=>{const r=el.getBoundingClientRect();return r.width>0&&r.right>window.innerWidth+1;}).slice(0,12).map(el=>({tag:el.tagName,classes:el.className,right:el.getBoundingClientRect().right,width:el.getBoundingClientRect().width}))}));
+    expect(layout.scroll,JSON.stringify(layout)).toBeLessThanOrEqual(layout.viewport);
+  };
   await checkWidth();
   for(const label of ["Content Studio","Video Editor","Calendar"]){await page.getByRole("button",{name:label,exact:true}).click();await checkWidth();}
   await page.getByRole("button",{name:"More tabs",exact:true}).click();
