@@ -1,3 +1,5 @@
+import { MediaController } from "./media.controller";
+import { MediaService } from "./media.service";
 import { Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
@@ -9,7 +11,7 @@ import { TenantAuthGuard } from "./security";
 
 @Module({
   imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 60 }])],
-  controllers: [AppController],
-  providers: [WorkflowService, DatabaseService, WorkspaceService, TenantAuthGuard, { provide: APP_GUARD, useClass: TenantAuthGuard }, { provide: APP_GUARD, useClass: ThrottlerGuard }]
+  controllers: [AppController, MediaController],
+  providers: [MediaService, WorkflowService, DatabaseService, WorkspaceService, TenantAuthGuard, { provide: APP_GUARD, useClass: TenantAuthGuard }, { provide: APP_GUARD, useClass: ThrottlerGuard }]
 })
 export class AppModule {}

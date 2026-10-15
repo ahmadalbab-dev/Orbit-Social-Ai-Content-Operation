@@ -57,6 +57,9 @@ importers:
       '@sma/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@sma/media':
+        specifier: workspace:*
+        version: link:../../packages/media
       '@sma/social-connectors':
         specifier: workspace:*
         version: link:../../packages/social-connectors
@@ -109,6 +112,15 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(supports-color@8.1.1)(terser@5.49.0)(tsx@4.23.1)
+
+  apps/media-worker:
+    dependencies:
+      '@sma/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@sma/media':
+        specifier: workspace:*
+        version: link:../../packages/media
 
   apps/web:
     dependencies:

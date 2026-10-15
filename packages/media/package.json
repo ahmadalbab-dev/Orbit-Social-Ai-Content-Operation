@@ -1,1 +1,29 @@
-{"name":"@sma/media","version":"0.1.0","private":true,"type":"module","main":"./dist/index.js","types":"./dist/index.d.ts","scripts":{"build":"tsc -p tsconfig.json","typecheck":"tsc --noEmit -p tsconfig.json","lint":"tsc --noEmit -p tsconfig.json","test":"vitest run"},"devDependencies":{"vitest":"^3.2.4"}}
+{
+  "name": "@sma/media",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "import": "./dist/worker.js",
+      "default": "./dist/worker.js"
+    }
+  }
+}

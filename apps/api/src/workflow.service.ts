@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
-import { HuggingFaceContentProvider, OpenAiContentProvider, type UsageRecord, type UsageStore } from "@sma/ai";
+import { HuggingFaceContentProvider, OpenAiContentProvider, validateAiGenerationInput, socialDraftLimitViolation, type UsageRecord, type UsageStore } from "@sma/ai";
 import { Prisma, type ContentItem, type Platform } from "@sma/database";
 import { socialPlatforms, type ContentVariant, type SocialPlatform } from "@sma/types";
 import { z } from "zod";
@@ -44,6 +44,20 @@ export class WorkflowService {
     const brand = await this.db.brand.findFirst({where:{id:body.brandId,workspaceId:identity.workspaceId}});
     if (!brand) throw new NotFoundException("Brand not found");
     if (!process.env.HF_TOKEN && !process.env.OPENAI_API_KEY) throw new ServiceUnavailableException("Platform AI is not configured");
+    // Both provider routes use the same bounded Studio input. Reject local input
+    // before quota reservation so a saved oversized profile cannot spend attempts.
+    let generationInput: ReturnType<typeof validateAiGenerationInput>;
+    try {
+      generationInput = validateAiGenerationInput({
+        workspaceId:identity.workspaceId,brandName:brand.name,
+        voice:typeof brand.voice === "string" ? brand.voice : JSON.stringify(brand.voice),
+        audience:typeof brand.audience === "string" ? brand.audience : JSON.stringify(brand.audience),
+        topic:body.topic,platforms:body.platforms,mode:body.mode,language:body.language,
+        brandFacts:JSON.stringify(brand.guidelines ?? {})
+      });
+    } catch {
+      throw new BadRequestException("AI input is too long or invalid. Use a brief of at most 4,000 characters, voice and audience of at most 1,000 each, and shorten brand topics so Brand Memory fits 4,000 characters including JSON formatting.");
+    }
     const period = new Date().toISOString().slice(0,7); const where={workspaceId_period:{workspaceId:identity.workspaceId,period}};
     const limit = Number(process.env.AI_MONTHLY_GENERATION_LIMIT ?? 100);
     if (!Number.isSafeInteger(limit) || limit < 1) throw new ServiceUnavailableException("AI quota is not configured");
@@ -59,7 +73,7 @@ export class WorkflowService {
       const workspace = await this.db.workspace.findUniqueOrThrow({where:{id:identity.workspaceId}});
       const options={monthlyBudgetUsd:Number(workspace.monthlyAiBudgetUsd)};
       const provider = process.env.HF_TOKEN ? new HuggingFaceContentProvider(store,{...options,apiKey:process.env.HF_TOKEN,model:process.env.HF_MODEL}) : new OpenAiContentProvider(store,{...options,apiKey:process.env.OPENAI_API_KEY!,model:process.env.OPENAI_DEFAULT_MODEL});
-      const result=await provider.generateVariants({workspaceId:identity.workspaceId,brandName:brand.name,voice:typeof brand.voice==="string"?brand.voice:JSON.stringify(brand.voice),audience:typeof brand.audience==="string"?brand.audience:JSON.stringify(brand.audience),topic:body.topic,platforms:body.platforms,mode:body.mode,language:body.language,brandFacts:JSON.stringify(brand.guidelines??{})});
+      const result=await provider.generateVariants(generationInput);
       const variants=parse(variantsSchema,result.variants);
       const item=await this.db.contentItem.create({data:{workspaceId:identity.workspaceId,brandId:brand.id,title:body.topic,body:variants[0].copy,platform:variants[0].platform.toUpperCase() as Platform,metadata:json({variants,generationMode:"ai"}),revisions:{create:{revision:1,variants:json(variants),actorId:identity.userId}}}});
       return present(item);
@@ -84,7 +98,11 @@ export class WorkflowService {
     requireRole(identity,["OWNER","ADMIN","APPROVER"]);
     return this.db.$transaction(async tx=>{
       const item=await this.requireItem(tx,identity.workspaceId,id); assertRevision(item.revision,expectedRevision);
-      parse(variantsSchema,(item.metadata as {variants?:unknown}|null)?.variants);
+      const variants = parse(variantsSchema,(item.metadata as {variants?:unknown}|null)?.variants);
+      for (const variant of variants) {
+        const violation = socialDraftLimitViolation(variant);
+        if (violation) throw new BadRequestException(`${variant.platform} draft exceeds ${violation.limit} characters including CTA and hashtags (${violation.length}). Shorten it before approval.`);
+      }
       const changed=await tx.contentItem.updateMany({where:{id,workspaceId:identity.workspaceId,revision:expectedRevision,status:{in:["DRAFT","IN_REVIEW","APPROVED"]}},data:{status:"APPROVED"}});
       if(!changed.count) throw new ConflictException("Content cannot be approved in its current state");
       await tx.approval.create({data:{contentItemId:id,contentRevision:expectedRevision,reviewerId:identity.userId,status:"APPROVED",decidedAt:new Date()}});

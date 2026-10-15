@@ -75,6 +75,9 @@ model Workspace {
   name String
   slug String
   monthlyAiBudgetUsd Decimal @default(10) @db.Decimal(10, 4)
+  mediaBytes Int @default(0)
+  mediaRenderSlots Int @default(50)
+  mediaRenders MediaRender[]
   memberships Membership[]
   brands Brand[]
   socialAccounts SocialAccount[]
@@ -203,6 +206,7 @@ model MediaAsset {
   bytes Int
   checksum String
   content ContentMedia[]
+  renders MediaRender[]
   createdAt DateTime @default(now())
   @@unique([workspaceId, checksum])
 }
@@ -342,4 +346,32 @@ model AiQuota {
   period String
   used Int @default(0)
   @@unique([workspaceId, period])
+}
+
+
+enum MediaRenderStatus {
+  QUEUED
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+model MediaRender {
+  id String @id @default(uuid())
+  workspaceId String
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  assetId String
+  asset MediaAsset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  status MediaRenderStatus @default(QUEUED)
+  options Json
+  outputKey String?
+  errorCode String?
+  attempts Int @default(0)
+  leaseToken String?
+  leaseUntil DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status, createdAt])
+  @@index([workspaceId, createdAt])
 }

@@ -13,9 +13,11 @@ Orbit is a responsive content workspace for creators and businesses. This branch
 
 ## Boundaries
 
+The private-volume media alpha now supports explicit authenticated video upload, persistent render jobs, cancellation and MP4 download. It uses a separate PostgreSQL worker with bounded attempts and lease recovery. See [media setup](docs/MEDIA_SETUP.md) and the [task tracker](docs/TASKS.md).
+
 Schedules are saved drafts; they do not automatically publish. The publish endpoint returns an explicit preview and sends no social post. The existing private Sites OAuth preview is a separate deployment: its successful account connections and secrets are not migrated here. Connector scaffolding is not proof of live support for every platform.
 
-The FFmpeg worker has not been connected to public uploads, a render queue or downloadable exports. Video controls remain previews until that service is connected. Subscription checkout, signed payment webhooks, plan entitlements, production media storage and live analytics remain release work. The current optional Supabase sign-in stores access tokens in memory and requires signing in again after a reload.
+The media flow requires operator setup and a shared private volume with an isolated codec worker. It is not deployed, and production object storage, scanning, retention and phone acceptance remain open. Subscription checkout, signed payment webhooks, plan entitlements, production media storage and live analytics remain release work. The current optional Supabase sign-in stores access tokens in memory and requires signing in again after a reload.
 
 ## Local setup
 

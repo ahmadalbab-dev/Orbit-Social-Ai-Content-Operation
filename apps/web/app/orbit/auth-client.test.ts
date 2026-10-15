@@ -29,7 +29,9 @@ describe("customer authentication boundaries",()=>{
  });
  it("scopes requests to selected workspace and clears on sign-out",async()=>{
   const fetcher=vi.fn().mockResolvedValue(Response.json([]));vi.stubGlobal("fetch",fetcher);setApiSession({token:"verified",workspaceId:"workspace-a"});await api("/content");
-  expect(fetcher.mock.calls[0][1].headers).toMatchObject({Authorization:"Bearer verified","x-workspace-id":"workspace-a"});
+  const headers=new Headers(fetcher.mock.calls[0][1].headers);
+  expect(headers.get("Authorization")).toBe("Bearer verified");
+  expect(headers.get("x-workspace-id")).toBe("workspace-a");
   setApiSession(null);await expect(api("/content")).rejects.toThrow("Sign in");
  });
 });

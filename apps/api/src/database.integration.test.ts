@@ -1,5 +1,12 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { Readable } from "node:stream";
+import { processOneRender } from "@sma/media/worker";
+import { createRenderStore } from "../../media-worker/src/store";
+import { MediaService } from "./media.service";
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { DatabaseService } from "./database.service";
 import { WorkspaceService } from "./workspace.service";
 import { WorkflowService } from "./workflow.service";
@@ -12,10 +19,14 @@ describe.skipIf(process.env.ORBIT_DATABASE_TESTS !== "true")("PostgreSQL workspa
   const workflow = new WorkflowService(db);
   const subject = `integration-${randomUUID()}`;
   const organizations: string[] = [];
+  let mediaRoot: string;
   let owner: RequestIdentity;
   let otherWorkspace: string;
   beforeAll(async () => {
     await db.$connect();
+    mediaRoot=await mkdtemp(path.join(tmpdir(),"orbit-db-media-"));
+    vi.stubEnv("MEDIA_ROOT",mediaRoot);
+    vi.stubEnv("MEDIA_RENDER_ENABLED","true");
     const identity = { sub: subject, userId: "", workspaceId: "", role: "" };
     const a = await workspaces.create(identity, { name: "Integration A" });
     const b = await workspaces.create(identity, { name: "Integration B" });
@@ -31,6 +42,8 @@ describe.skipIf(process.env.ORBIT_DATABASE_TESTS !== "true")("PostgreSQL workspa
     await db.organization.deleteMany({ where: { id: { in: organizations } } });
     await db.user.deleteMany({ where: { authUserId: subject } });
     await db.$disconnect();
+    vi.unstubAllEnvs();
+    if(mediaRoot) await rm(mediaRoot,{recursive:true,force:true});
   });
   it("persists drafts and invalidates approval/schedule after a revision", async () => {
     const brand = await workflow.createBrand(owner, { name: "Orbit test", voice: "Santai", audience: "Creators" });
@@ -52,4 +65,33 @@ describe.skipIf(process.env.ORBIT_DATABASE_TESTS !== "true")("PostgreSQL workspa
     await expect(workflow.schedule(owner, draft.id, { expectedRevision: 3, scheduledFor: new Date(Date.now() + 3600000).toISOString() })).rejects.toThrow("Current revision needs approval");
     await expect(workflow.approve(owner, draft.id, 2)).rejects.toThrow("Content changed");
   });
+  it("recovers a durable render lease, rejects stale completion and downloads only in its workspace", async()=>{
+    const media=new MediaService(db);
+    const source=Buffer.from("0000ftypisom-integration-fixture");
+    const asset=await media.upload(owner,Readable.from(source),"video/mp4",String(source.length));
+    await expect(media.create({...owner,workspaceId:otherWorkspace},{assetId:asset.id,duration:1,format:"portrait"})).rejects.toThrow("Video not found");
+    const queued=await media.create(owner,{assetId:asset.id,duration:1,format:"portrait"});
+    const store=createRenderStore(db);
+    const stale=await store.claim();
+    expect(stale?.id).toBe(queued.id);
+    expect(await store.claim()).toBeNull();
+    await db.mediaRender.update({where:{id:queued.id},data:{leaseUntil:new Date(0)}});
+    // The actual SQL claim recovers the interrupted attempt. Renderer bytes are a
+    // test fixture; codec correctness is tested by the real FFmpeg media suite.
+    await processOneRender(store,mediaRoot,{renderer:async(job:any,directory:string)=>{
+      await writeFile(path.join(directory,job.output),source);
+      return {output:job.output,duration:1,width:720,height:1280};
+    }});
+    expect(await store.complete(stale!,"exports/stale.mp4")).toBe(false);
+    expect((await db.mediaRender.findUniqueOrThrow({where:{id:queued.id}}))).toMatchObject({status:"SUCCEEDED",attempts:2});
+    await expect(media.download(otherWorkspace,queued.id)).rejects.toThrow("Render not found");
+    const file=await media.download(owner.workspaceId,queued.id);
+    const chunks:Buffer[]=[];
+    for await(const chunk of file.getStream())chunks.push(Buffer.from(chunk));
+    expect(Buffer.concat(chunks)).toEqual(source);
+    const cancelled=await media.create(owner,{assetId:asset.id,duration:1,format:"square"});
+    expect((await media.cancel(owner,cancelled.id)).status).toBe("CANCELLED");
+    expect(await store.claim()).toBeNull();
+  });
+
 });

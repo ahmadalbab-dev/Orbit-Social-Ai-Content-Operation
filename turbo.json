@@ -29,7 +29,8 @@
         "OPENAI_*",
         "AI_MONTHLY_GENERATION_LIMIT",
         "WEB_URL",
-        "PORT"
+        "PORT",
+        "MEDIA_*"
       ]
     },
     "lint": {

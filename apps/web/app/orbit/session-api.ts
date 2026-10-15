@@ -1,12 +1,57 @@
-const base=(process.env.NEXT_PUBLIC_API_URL??"http://localhost:3001").replace(/\/$/,"");
-let session:{token:string;workspaceId:string}|null=null;
-export function setApiSession(next:typeof session){session=next;}
-export async function api<T>(path:string,method="GET",body?:unknown,workspace=true):Promise<T>{
- const current=session;
- if(!current?.token)throw Error("Sign in to access your workspace.");
- if(workspace&&!current.workspaceId)throw Error("Choose or create a workspace first.");
- const response=await fetch(`${base}/v1${path}`,{method,cache:"no-store",headers:{"Content-Type":"application/json",Authorization:`Bearer ${current.token}`,...(workspace?{"x-workspace-id":current.workspaceId}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{})});
- const data=await response.json().catch(()=>({}));
- if(!response.ok){if(response.status===401)throw Error("Your session has expired. Sign out and sign in again.");throw Error(typeof data.message==="string"?data.message:`Request failed (${response.status}).`);}
- return data as T;
+const base = (
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"
+).replace(/\/$/, "");
+let session: { token: string; workspaceId: string } | null = null;
+export function setApiSession(next: typeof session) {
+  session = next;
+}
+
+/** Binary upload/download and JSON calls share the same in-memory identity. */
+export async function apiResponse(
+  path: string,
+  init: RequestInit = {},
+  workspace = true,
+): Promise<Response> {
+  const current = session;
+  if (!current?.token) throw Error("Sign in to access your workspace.");
+  if (workspace && !current.workspaceId)
+    throw Error("Choose or create a workspace first.");
+  const headers = new Headers(init.headers);
+  headers.set("Authorization", `Bearer ${current.token}`);
+  if (workspace) headers.set("x-workspace-id", current.workspaceId);
+  const response = await fetch(`${base}/v1${path}`, {
+    ...init,
+    cache: "no-store",
+    headers,
+    redirect: "error",
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 401)
+      throw Error("Your session has expired. Sign out and sign in again.");
+    throw Error(
+      typeof data.message === "string"
+        ? data.message
+        : `Request failed (${response.status}).`,
+    );
+  }
+  return response;
+}
+
+export async function api<T>(
+  path: string,
+  method = "GET",
+  body?: unknown,
+  workspace = true,
+): Promise<T> {
+  const response = await apiResponse(
+    path,
+    {
+      method,
+      headers: { "Content-Type": "application/json" },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    },
+    workspace,
+  );
+  return response.json() as Promise<T>;
 }

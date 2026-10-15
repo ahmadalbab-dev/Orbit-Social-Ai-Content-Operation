@@ -17,6 +17,17 @@ const inputSchema = z.object({
   brandFacts: z.string().max(4000).default("")
 }).strict();
 export type AiGenerationInput = z.input<typeof inputSchema>;
+/** Validate locally before reserving a generation attempt or calling a provider. */
+export function validateAiGenerationInput(value: unknown) { return inputSchema.parse(value); }
+
+export function socialDraftLimitViolation(variant: ContentVariant) {
+  const limits: Partial<Record<ContentVariant["platform"], number>> = {threads:500,instagram:2200,x:280};
+  const limit = limits[variant.platform];
+  if (limit === undefined) return null;
+  const composed = [variant.copy, variant.callToAction, variant.hashtags.join(" ")].filter(Boolean).join("\n\n");
+  const length = [...composed].length;
+  return length > limit ? {limit,length} : null;
+}
 const variantSchema = z.object({
   platform: z.enum(platforms), copy: z.string().trim().min(1).max(4000),
   hashtags: z.array(z.string().regex(/^#[\p{L}\p{N}_]{1,80}$/u)).max(5),
@@ -38,9 +49,7 @@ export function parseSocialDrafts(text: string, selected: readonly string[]): Co
   catch { throw new AiProviderError("invalid_response"); }
   if (parsed.variants.length !== selected.length || new Set(parsed.variants.map(v => v.platform)).size !== selected.length || parsed.variants.some(v => !selected.includes(v.platform))) throw new AiProviderError("invalid_response");
   for (const v of parsed.variants) {
-    const rendered = [v.copy, v.callToAction, v.hashtags.join(" ")].filter(Boolean).join("\n\n");
-    // Count Unicode code points, including the exact separators used by the composer.
-    if ((v.platform === "threads" && [...rendered].length > 500) || (v.platform === "instagram" && [...rendered].length > 2200) || (v.platform === "x" && [...rendered].length > 280)) throw new AiProviderError("invalid_response");
+    if (socialDraftLimitViolation(v)) throw new AiProviderError("invalid_response");
   }
   return selected.map(p => parsed.variants.find(v => v.platform === p)!);
 }
@@ -89,7 +98,7 @@ export class HuggingFaceContentProvider {
     if (!Number.isSafeInteger(this.maxOutputTokens) || this.maxOutputTokens < 128 || this.maxOutputTokens > 6000 || (options.monthlyBudgetUsd !== undefined && (!Number.isFinite(options.monthlyBudgetUsd) || options.monthlyBudgetUsd < 0))) throw new AiProviderError("unconfigured");
   }
   async generateVariants(value: AiGenerationInput) {
-    const input = inputSchema.parse(value);
+    const input = validateAiGenerationInput(value);
     const requestHash = createHash("sha256").update(JSON.stringify({version:1,provider:"huggingface",model:this.model,input})).digest("hex");
     const cached = await this.store.find(input.workspaceId, requestHash);
     if (cached) return {variants:parseSocialDrafts(JSON.stringify({variants:cached}), input.platforms),usage:{requestHash,model:this.model,inputTokens:0,outputTokens:0,estimatedCostUsd:0,cached:true} satisfies UsageRecord};
