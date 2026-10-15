@@ -1,3 +1,4 @@
+import { BillingService } from "./billing.service";
 import {
   BadRequestException,
   ConflictException,
@@ -60,7 +61,7 @@ function present(job: MediaRender) {
 }
 @Injectable()
 export class MediaService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly db: DatabaseService, private readonly billing: BillingService) {}
 
   status() {
     return {
@@ -102,6 +103,7 @@ export class MediaService {
     const bytes = Number(contentLength);
     if (!Number.isSafeInteger(bytes) || bytes < 12 || bytes > MAX_UPLOAD_BYTES)
       throw new BadRequestException("Video must be under 100 MB");
+    await this.billing.requirePaidAccess(identity.workspaceId);
     const root = await this.root(identity.workspaceId);
     const reserved = await this.db.workspace.updateMany({
       where: {
@@ -195,7 +197,6 @@ export class MediaService {
   }
   async create(identity: RequestIdentity, input: unknown) {
     requireRole(identity);
-    await this.root(identity.workspaceId);
     const parsed = renderSchema.safeParse(input);
     if (!parsed.success)
       throw new BadRequestException("Invalid video render settings");
@@ -210,6 +211,8 @@ export class MediaService {
     } catch {
       throw new BadRequestException("Invalid video render settings");
     }
+    await this.billing.requirePaidAccess(identity.workspaceId);
+    await this.root(identity.workspaceId);
     return this.db.$transaction(async (tx) => {
       const asset = await tx.mediaAsset.findFirst({
         where: {

@@ -1,3 +1,4 @@
+import { BillingService } from "./billing.service";
 import { createHash } from "node:crypto";
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import { HuggingFaceContentProvider, OpenAiContentProvider, validateAiGenerationInput, socialDraftLimitViolation, type UsageRecord, type UsageStore } from "@sma/ai";
@@ -20,7 +21,7 @@ export function present(item: ContentItem & { schedules?: {scheduledFor: Date}[]
 }
 @Injectable()
 export class WorkflowService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly db: DatabaseService, private readonly billing: BillingService) {}
   async list(workspaceId: string) { return (await this.db.contentItem.findMany({ where: { workspaceId }, include: {schedules: {orderBy:{createdAt:"desc"},take:1}}, orderBy: {updatedAt:"desc"}, take:100 })).map(present); }
   listBrands(workspaceId: string) { return this.db.brand.findMany({ where: {workspaceId}, orderBy: {createdAt:"desc"}, take:100 }); }
   async createBrand(identity: RequestIdentity, input: unknown) { requireRole(identity); const body = parse(brandSchema,input); const {language,topics,...brand}=body; return this.db.brand.create({ data: {workspaceId: identity.workspaceId,...brand,guidelines:json({language:language??"Bahasa Melayu",topics:topics??[]})} }); }
@@ -58,6 +59,7 @@ export class WorkflowService {
     } catch {
       throw new BadRequestException("AI input is too long or invalid. Use a brief of at most 4,000 characters, voice and audience of at most 1,000 each, and shorten brand topics so Brand Memory fits 4,000 characters including JSON formatting.");
     }
+    await this.billing.requirePaidAccess(identity.workspaceId);
     const period = new Date().toISOString().slice(0,7); const where={workspaceId_period:{workspaceId:identity.workspaceId,period}};
     const limit = Number(process.env.AI_MONTHLY_GENERATION_LIMIT ?? 100);
     if (!Number.isSafeInteger(limit) || limit < 1) throw new ServiceUnavailableException("AI quota is not configured");

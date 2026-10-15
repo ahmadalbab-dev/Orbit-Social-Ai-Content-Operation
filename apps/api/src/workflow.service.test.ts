@@ -1,3 +1,4 @@
+import { BillingService } from "./billing.service";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WorkflowService } from "./workflow.service";
 import type { DatabaseService } from "./database.service";
@@ -7,7 +8,7 @@ function setup(item:any={id:"content-a",workspaceId:"workspace-a",revision:2,sta
   const contentItem={findFirst:vi.fn(async({where}:any)=>where.workspaceId===item?.workspaceId?item:null),updateMany:vi.fn(async({data}:any)=>{Object.assign(item,data);return {count:1};})};
   const tx={contentItem,approval:{findFirst:vi.fn(async()=>({status:"APPROVED"})),create:vi.fn()},schedule:{deleteMany:vi.fn(),create:vi.fn()},contentRevision:{create:vi.fn()}};
   const db={...tx,$transaction:async(fn:any)=>fn(tx)} as unknown as DatabaseService;
-  return {service:new WorkflowService(db),tx,item};
+  return {service:new WorkflowService(db, new BillingService(db)),tx,item};
 }
 describe("tenant and revision workflow",()=>{
   it("never loads a content item in another workspace",async()=>{
@@ -66,7 +67,7 @@ describe("AI input validation before quota reservation",()=>{
     const brand={id:"brand-a",name:"Orbit",voice:"Santai",audience:"Creators",guidelines:{},...overrides};
     const aiQuota={upsert:vi.fn(),updateMany:vi.fn()};
     const db={brand:{findFirst:vi.fn().mockResolvedValue(brand)},aiQuota} as unknown as DatabaseService;
-    const error=await new WorkflowService(db).generate(identity,{brandId:brand.id,topic:"topic" in overrides?overrides.topic:"KL today",platforms:["threads"]}).catch(error=>error);
+    const error=await new WorkflowService(db, new BillingService(db)).generate(identity,{brandId:brand.id,topic:"topic" in overrides?overrides.topic:"KL today",platforms:["threads"]}).catch(error=>error);
     expect(error.getStatus()).toBe(400);
     expect(error.message).toContain("AI input is too long or invalid");
     expect(aiQuota.upsert).not.toHaveBeenCalled();
@@ -91,5 +92,36 @@ describe("publication-ready approval limits",()=>{
     const {service,tx}=setup({id:"content-a",workspaceId:"workspace-a",revision:1,status:"DRAFT",metadata:{variants:[{platform:"threads",copy:"😀".repeat(500),hashtags:[],callToAction:""}]}});
     expect((await service.approve(identity,"content-a",1)).status).toBe("APPROVED");
     expect(tx.approval.create).toHaveBeenCalledOnce();
+  });
+});
+
+describe("paid AI generation gate", () => {
+  afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+  it("rejects unpaid workspaces before reserving quota or dispatching AI", async () => {
+    vi.stubEnv("HF_TOKEN", "hf_test");
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    const brand = { id: "brand-a", name: "Orbit", voice: "Santai", audience: "Creators", guidelines: {} };
+    const aiQuota = { upsert: vi.fn(), updateMany: vi.fn() };
+    const aiUsage = { findUnique: vi.fn(), aggregate: vi.fn(), upsert: vi.fn() };
+    const contentItem = { create: vi.fn() };
+    const transaction = vi.fn();
+    const db = { brand: { findFirst: vi.fn().mockResolvedValue(brand) }, aiQuota, aiUsage, contentItem, $transaction: transaction } as unknown as DatabaseService;
+    const requirePaidAccess = vi.fn().mockRejectedValue(Error("An active paid sandbox subscription is required"));
+    const billing = { requirePaidAccess } as unknown as BillingService;
+
+    await expect(new WorkflowService(db, billing).generate(identity, {
+      brandId: brand.id, topic: "KL today", platforms: ["threads"],
+    })).rejects.toThrow("active paid sandbox subscription");
+
+    expect(requirePaidAccess).toHaveBeenCalledExactlyOnceWith(identity.workspaceId);
+    expect(aiQuota.upsert).not.toHaveBeenCalled();
+    expect(aiQuota.updateMany).not.toHaveBeenCalled();
+    expect(aiUsage.findUnique).not.toHaveBeenCalled();
+    expect(aiUsage.aggregate).not.toHaveBeenCalled();
+    expect(aiUsage.upsert).not.toHaveBeenCalled();
+    expect(contentItem.create).not.toHaveBeenCalled();
+    expect(transaction).not.toHaveBeenCalled();
+    expect(fetcher).not.toHaveBeenCalled();
   });
 });

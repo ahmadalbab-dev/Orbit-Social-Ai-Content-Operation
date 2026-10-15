@@ -77,6 +77,7 @@ model Workspace {
   monthlyAiBudgetUsd Decimal @default(10) @db.Decimal(10, 4)
   mediaBytes Int @default(0)
   mediaRenderSlots Int @default(50)
+  billingAccount BillingAccount?
   mediaRenders MediaRender[]
   memberships Membership[]
   brands Brand[]
@@ -374,4 +375,34 @@ model MediaRender {
   updatedAt DateTime @updatedAt
   @@index([status, createdAt])
   @@index([workspaceId, createdAt])
+}
+
+// One Stripe test customer and one subscription projection per workspace.
+model BillingAccount {
+  id String @id @default(uuid())
+  workspaceId String @unique
+  organizationId String
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  customerId String? @unique
+  subscriptionId String? @unique
+  plan String?
+  priceId String?
+  status String @default("none")
+  cancelAtPeriodEnd Boolean @default(false)
+  currentPeriodEnd DateTime?
+  paidThrough DateTime?
+  pendingRequestId String?
+  pendingPlan String?
+  pendingSince DateTime?
+  checkoutSessionId String?
+  reconciledAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// IDs only: never persist the webhook body, card data or secrets.
+model BillingEvent {
+  id String @id
+  type String
+  createdAt DateTime @default(now())
 }

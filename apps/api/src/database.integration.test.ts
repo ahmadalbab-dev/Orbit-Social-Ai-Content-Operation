@@ -1,3 +1,4 @@
+import { BillingService } from "./billing.service";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -16,7 +17,7 @@ import type { RequestIdentity } from "./security";
 describe.skipIf(process.env.ORBIT_DATABASE_TESTS !== "true")("PostgreSQL workspace/revision integration", () => {
   const db = new DatabaseService();
   const workspaces = new WorkspaceService(db);
-  const workflow = new WorkflowService(db);
+  const workflow = new WorkflowService(db, new BillingService(db));
   const subject = `integration-${randomUUID()}`;
   const organizations: string[] = [];
   let mediaRoot: string;
@@ -66,7 +67,7 @@ describe.skipIf(process.env.ORBIT_DATABASE_TESTS !== "true")("PostgreSQL workspa
     await expect(workflow.approve(owner, draft.id, 2)).rejects.toThrow("Content changed");
   });
   it("recovers a durable render lease, rejects stale completion and downloads only in its workspace", async()=>{
-    const media=new MediaService(db);
+    const media=new MediaService(db, new BillingService(db));
     const source=Buffer.from("0000ftypisom-integration-fixture");
     const asset=await media.upload(owner,Readable.from(source),"video/mp4",String(source.length));
     await expect(media.create({...owner,workspaceId:otherWorkspace},{assetId:asset.id,duration:1,format:"portrait"})).rejects.toThrow("Video not found");

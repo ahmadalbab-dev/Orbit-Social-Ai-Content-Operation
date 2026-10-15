@@ -42,6 +42,7 @@ function launch(entry, cwd, extra) {
       NODE_ENV: "production",
       MEDIA_ROOT: mediaRoot,
       MEDIA_RENDER_ENABLED: "true",
+      BILLING_ENABLED: "false",
       ...extra,
     },
   });
@@ -145,6 +146,19 @@ try {
   console.log(
     "PASS compiled API verifies identity and denies cross-workspace access",
   );
+
+  assert.equal((await request("/billing/status")).status, 401);
+  assert.equal((await request("/billing/status", { jwt: b, workspace: one.id })).status, 403);
+  const billing = await jsonOk("/billing/status", { jwt: a, workspace: one.id });
+  assert.equal(billing.enabled, false);
+  assert.equal(billing.mode, "test");
+  assert.equal(billing.canManage, true);
+  assert.equal(billing.subscription, null);
+  assert.equal((await request("/billing/checkout", {
+    jwt: a, workspace: one.id, method: "POST",
+    body: { plan: "creator", requestId: randomUUID() },
+  })).status, 503);
+  console.log("PASS compiled billing routes enforce membership and disabled sandbox cannot open checkout");
 
   const fixture = path.join(mediaRoot, "source.mp4");
   execFileSync(

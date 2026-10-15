@@ -1,3 +1,4 @@
+import { BillingService } from "./billing.service";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -41,7 +42,7 @@ function setup() {
     ...tx,
     $transaction: async (fn: any) => fn(tx),
   } as unknown as DatabaseService;
-  return { ...tx, service: new MediaService(db) };
+  return { ...tx, service: new MediaService(db, new BillingService(db)) };
 }
 beforeEach(async () => {
   root = await mkdtemp(path.join(tmpdir(), "orbit-api-media-"));
@@ -175,5 +176,35 @@ describe("private media API", () => {
     expect(mediaRender.findFirst).toHaveBeenCalledWith({
       where: { id: assetId, workspaceId: owner.workspaceId },
     });
+  });
+});
+
+describe("paid media processing gate", () => {
+  it.each(["upload", "render"] as const)("rejects unpaid %s before files, quota or jobs are created", async (operation) => {
+    const workspace = { updateMany: vi.fn() };
+    const mediaAsset = { findFirst: vi.fn(), create: vi.fn() };
+    const mediaRender = { create: vi.fn() };
+    const transaction = vi.fn();
+    const db = { workspace, mediaAsset, mediaRender, $transaction: transaction } as unknown as DatabaseService;
+    const requirePaidAccess = vi.fn().mockRejectedValue(Error("An active paid sandbox subscription is required"));
+    const billing = { requirePaidAccess } as unknown as BillingService;
+    const service = new MediaService(db, billing);
+    const stream = Readable.from(bytes);
+    const read = vi.spyOn(stream, "read");
+
+    await expect(operation === "upload"
+      ? service.upload(owner, stream, "video/mp4", String(bytes.length))
+      : service.create(owner, { assetId, duration: 1, format: "portrait" })
+    ).rejects.toThrow("active paid sandbox subscription");
+
+    expect(requirePaidAccess).toHaveBeenCalledExactlyOnceWith(owner.workspaceId);
+    expect(workspace.updateMany).not.toHaveBeenCalled();
+    expect(mediaAsset.findFirst).not.toHaveBeenCalled();
+    expect(mediaAsset.create).not.toHaveBeenCalled();
+    expect(mediaRender.create).not.toHaveBeenCalled();
+    expect(transaction).not.toHaveBeenCalled();
+    expect(read).not.toHaveBeenCalled();
+    expect(await readdir(root)).toEqual([]);
+    stream.destroy();
   });
 });
