@@ -18,7 +18,7 @@ Status: **Siap** = code implemented and checks named below passed; **Sedang dibu
 | I02 | AI background removal, inpainting and image generation | Belum | Licensed model/provider selection and metered asset jobs |
 | V01 | FFmpeg MP4 worker: trim, ratios, News report and captions | Siap | Real local MP4 render test |
 | V02 | Authenticated private media upload and workspace quotas | Siap | Code + authorization/stream/quota tests; shared-volume staging setup still required |
-| V03 | Durable render queue, recovery, cancellation and download | Siap | PostgreSQL job queue, separate worker, lease/cancel tests; CI database acceptance pending latest commit |
+| V03 | Durable render queue, recovery, cancellation and download | Siap | PostgreSQL job queue, separate worker, lease/cancel tests; SQL recovery/download integration included in CI |
 | V04 | Connect mobile editor to real render jobs | Siap | Upload → queue → status → authenticated download; web tests/build passed, real phone test pending |
 | V05 | Production object storage, retention and scanning | Belum | Shared-volume staging is not public production storage |
 | V06 | Transcription, auto captions, voiceover and audio tools | Belum | Async provider jobs and timeline UI |
@@ -49,5 +49,6 @@ V02–V04 and A05 are implemented as one reviewable staging flow. Latest CI must
 ## Evidence
 
 - PR: https://github.com/ahmadalbab-dev/Orbit-Social-Ai-Content-Operation/pull/2
-- Previously verified commit: `6aa6503` (CI quality + secret scan passed).
+- Initial foundation commit: `6aa6503` (CI quality + secret scan passed).
+- Media delivery: `9783c0e` adds private-volume uploads, durable jobs, worker and editor connection. CI checks on PR #2 are the current verification record.
 - Update this tracker only when code or verification changes the feature status.
