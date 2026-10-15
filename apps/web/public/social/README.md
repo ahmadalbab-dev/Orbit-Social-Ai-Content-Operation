@@ -1,0 +1,1 @@
+Social glyphs from Simple Icons 16.35.0 (CC0): https://simpleicons.org/ . Facebook, Instagram and Threads are trademarks of Meta. Glyph geometry is retained. Instagram uses a multicolour gradient. Brand usage remains subject to the respective brand guidelines.

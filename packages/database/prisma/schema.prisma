@@ -181,6 +181,8 @@ model ContentItem {
   platform Platform
   status ContentStatus @default(DRAFT)
   metadata Json?
+  revision Int @default(1)
+  revisions ContentRevision[]
   media ContentMedia[]
   schedules Schedule[]
   approvals Approval[]
@@ -221,6 +223,7 @@ model Schedule {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
   scheduledFor DateTime
+  contentRevision Int @default(1)
   timezone String @default("UTC")
   jobs PublishingJob[]
   createdAt DateTime @default(now())
@@ -253,6 +256,7 @@ model Approval {
   id String @id @default(uuid())
   contentItemId String
   reviewerId String?
+  contentRevision Int @default(1)
   contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
   status ApprovalStatus @default(PENDING)
   note String?
@@ -281,6 +285,7 @@ model AiUsage {
   workspaceId String
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   requestHash String
+  variants Json?
   model String
   inputTokens Int
   outputTokens Int
@@ -318,4 +323,23 @@ model Webhook {
   lastDeliveryAt DateTime?
   createdAt DateTime @default(now())
   @@index([workspaceId])
+}
+
+model ContentRevision {
+  id String @id @default(uuid())
+  contentItemId String
+  revision Int
+  variants Json
+  actorId String
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@unique([contentItemId, revision])
+}
+
+model AiQuota {
+  id String @id @default(uuid())
+  workspaceId String
+  period String
+  used Int @default(0)
+  @@unique([workspaceId, period])
 }

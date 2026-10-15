@@ -19,6 +19,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/social_automation
       REDIS_URL: redis://localhost:6379
+      ORBIT_DATABASE_TESTS: "true"
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v4
@@ -26,7 +27,9 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      - run: pnpm db:generate
       - run: pnpm db:validate
+      - run: pnpm db:migrate
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test

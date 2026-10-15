@@ -1,4 +1,5 @@
 import "./globals.css";
+import "./orbit/design-system.css";
 export const metadata = {
   title: "Orbit Social",
   description: "AI-assisted social media content operations",
@@ -8,5 +9,5 @@ export const metadata = {
 };
 export const viewport = { themeColor: "#111111", width: "device-width", initialScale: 1, viewportFit: "cover" as const };
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body>{children}</body></html>;
+  return <html lang="en" data-theme="dark" suppressHydrationWarning><head><script src="/orbit-appearance.js"/></head><body>{children}</body></html>;
 }
