@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { ContentVariant } from "@sma/types";
-import { AiBudgetExceededError, type UsageRecord, type UsageStore } from "./index";
+import { AiBudgetExceededError, type UsageRecord, type UsageStore } from "./index.js";
 
 export const HF_CHAT_ENDPOINT = "https://router.huggingface.co/v1/chat/completions";
 export const DEFAULT_HF_MODEL = "Qwen/Qwen3-235B-A22B-Instruct-2507";

@@ -15,3 +15,6 @@ test-results
 packages/database/prisma/*.db
 My SOCMED/
 apps/vanilla-auth/
+
+# Optional operator-only staging credentials; never commit.
+deploy/staging/secrets/

@@ -32,11 +32,11 @@ Status: **Siap** = code implemented and checks named below passed; **Sedang dibu
 | Q01 | Agent code review and understandable module boundaries | Siap | Review fixes; media split into controller/service/worker/UI files; new code formatted |
 | Q02 | CI build, type checks, tests, secret scan and dependency audit | Siap | PR #2 initial and Brand Memory commits passed; rerun each delivery |
 | Q03 | Mobile Safari/browser acceptance | Belum | Local Chromium download failed; real phone test required |
-| Q04 | Staging deployment, backup/restore and production readiness | Belum | No production migration/deployment in this delivery |
+| Q04 | Staging deployment, backup/restore and production readiness | Perlu setup | Docker staging kit + compiled HTTP/MP4 acceptance added; hosting/domain, identity and deployed phone test still required |
 
 ## Current delivery
 
-V02–V04 and A05 are implemented as one reviewable staging flow. Latest CI must pass before merge. Keep the design, human review requirement and working private OAuth preview intact. Do not create billing products or send social posts during this work.
+Private staging Dockerfiles/Compose and native-process HTTP acceptance are added. The acceptance test uses generated JWT identities, restarts the API, renders a real fixture through the worker and checks private MP4 download. CI checks on PR #2 are the verification record. No hosting was provisioned and no connected StockPilot project was modified. V02–V04 and A05 remain implemented; hosted acceptance still needs a separate target. Keep the design, human review requirement and working private OAuth preview intact. Do not create billing products or send social posts during this work.
 
 ## Keep code easy to edit
 

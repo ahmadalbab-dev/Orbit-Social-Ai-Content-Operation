@@ -57,5 +57,5 @@ export function estimateCost(model: string, inputTokens: number, outputTokens: n
   return (inputTokens * rate.input + outputTokens * rate.output) / 1_000_000;
 }
 
-export { HuggingFaceContentProvider, AiProviderError, HF_CHAT_ENDPOINT, DEFAULT_HF_MODEL, aiModes, parseSocialDrafts, socialMessages, readBoundedAiJson, validateAiGenerationInput, socialDraftLimitViolation } from "./huggingface";
-export type { AiGenerationInput, AiProviderFailure } from "./huggingface";
+export { HuggingFaceContentProvider, AiProviderError, HF_CHAT_ENDPOINT, DEFAULT_HF_MODEL, aiModes, parseSocialDrafts, socialMessages, readBoundedAiJson, validateAiGenerationInput, socialDraftLimitViolation } from "./huggingface.js";
+export type { AiGenerationInput, AiProviderFailure } from "./huggingface.js";

@@ -1,0 +1,152 @@
+name: orbit-staging
+
+x-app-security: &app-security
+  user: "1000:1000"
+  read_only: true
+  init: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  tmpfs: ["/tmp:rw,noexec,nosuid,size=256m,mode=1777"]
+  pids_limit: 128
+  cpus: 1.0
+  mem_limit: 768m
+
+x-database-environment: &database-environment
+  DATABASE_URL: postgresql://orbit:${STAGING_DB_PASSWORD:?Set STAGING_DB_PASSWORD in the staging env file}@postgres:5432/orbit
+
+services:
+  postgres:
+    image: postgres:16-bookworm
+    environment:
+      POSTGRES_DB: orbit
+      POSTGRES_USER: orbit
+      POSTGRES_PASSWORD: ${STAGING_DB_PASSWORD:?Set STAGING_DB_PASSWORD in the staging env file}
+    volumes: ["database:/var/lib/postgresql/data"]
+    networks: [backend]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 128
+    cpus: 1.0
+    mem_limit: 768m
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U orbit -d orbit"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  # Explicit, one-time initialization. No host directories or existing files are chowned.
+  media-init:
+    image: busybox:1.37
+    profiles: [setup]
+    user: "0:0"
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, FOWNER]
+    security_opt: ["no-new-privileges:true"]
+    network_mode: none
+    volumes: ["media:/media"]
+    command: [sh, -c, "chown 1000:1000 /media && chmod 0700 /media"]
+    pids_limit: 16
+    cpus: 0.25
+    mem_limit: 32m
+    restart: "no"
+
+  # Operator-run only. API and web startup never apply migrations.
+  migrate:
+    <<: *app-security
+    image: orbit-staging-api
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    profiles: [setup]
+    environment:
+      <<: *database-environment
+    command: [node, packages/database/node_modules/prisma/build/index.js, migrate, deploy, --schema, packages/database/prisma/schema.prisma]
+    networks: [backend]
+    depends_on:
+      postgres: {condition: service_healthy}
+    restart: "no"
+
+  api:
+    <<: *app-security
+    image: orbit-staging-api
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    environment:
+      <<: *database-environment
+      PORT: 3001
+      WEB_URL: ${WEB_URL:-http://localhost:3000}
+      DEV_AUTH_ENABLED: "false"
+      AUTH_JWT_ISSUER: ${AUTH_JWT_ISSUER:?Set the trusted JWT issuer}
+      AUTH_JWT_AUDIENCE: ${AUTH_JWT_AUDIENCE:-authenticated}
+      AUTH_JWKS_URL: ${AUTH_JWKS_URL:?Set the trusted HTTPS JWKS URL}
+      HF_TOKEN: ${HF_TOKEN:-}
+      HF_MODEL: ${HF_MODEL:-Qwen/Qwen3-235B-A22B-Instruct-2507}
+      AI_MONTHLY_GENERATION_LIMIT: ${AI_MONTHLY_GENERATION_LIMIT:-100}
+      MEDIA_ROOT: /media
+      MEDIA_RENDER_ENABLED: ${MEDIA_RENDER_ENABLED:-false}
+    ports: ["127.0.0.1:3001:3001"]
+    volumes: ["media:/media"]
+    networks: [backend, egress]
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3001/v1/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  web:
+    <<: *app-security
+    image: orbit-staging-web
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+    ports: ["127.0.0.1:3000:3000"]
+    networks: [egress]
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  media-worker:
+    <<: *app-security
+    image: orbit-staging-media-worker
+    build:
+      context: ../..
+      dockerfile: apps/media-worker/Dockerfile
+    profiles: [render]
+    environment:
+      <<: *database-environment
+      MEDIA_ROOT: /media
+      MEDIA_RENDER_ENABLED: ${MEDIA_RENDER_ENABLED:-false}
+    volumes: ["media:/media"]
+    networks: [backend]
+    depends_on:
+      postgres: {condition: service_healthy}
+    cpus: 2.0
+    mem_limit: 1536m
+    pids_limit: 128
+    stop_grace_period: 30s
+    restart: "no"
+
+networks:
+  backend:
+    internal: true
+  egress: {}
+
+volumes:
+  database: {}
+  media: {}

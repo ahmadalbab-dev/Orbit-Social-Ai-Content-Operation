@@ -36,4 +36,6 @@ For a Supabase identity project, issuer is `https://PROJECT.supabase.co/auth/v1`
 
 `pnpm check` runs lint, TypeScript, unit tests and production builds. CI applies migrations to disposable PostgreSQL and runs the opt-in integration suite with `ORBIT_DATABASE_TESTS=true`. Never enable that suite on a production database. Browser smoke: `pnpm --filter @sma/web test:e2e` with Playwright Chromium installed. Media tests perform a real short MP4 render when FFmpeg is installed; otherwise they skip that case.
 
+Private staging containers and setup instructions: [deploy/staging/README.md](deploy/staging/README.md). The CI acceptance script starts compiled API/worker processes with disposable identities and a real trusted MP4 fixture. Hosting and phone access are configured separately.
+
 See [commercial delivery roadmap](docs/COMMERCIAL_ROADMAP.md), [security](docs/SECURITY.md) and the worker documentation for release requirements.
