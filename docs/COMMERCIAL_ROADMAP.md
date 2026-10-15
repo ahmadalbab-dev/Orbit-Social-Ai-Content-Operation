@@ -22,6 +22,6 @@ The existing Orbit design remains the shared web/mobile visual system. Deliver e
 
 ## Verification record for this delivery
 
-Local lint, TypeScript, unit tests and production builds passed before the final CI additions. Real FFmpeg MP4 rendering was exercised locally. PostgreSQL integration is explicitly gated and must run against the disposable CI database; no local PostgreSQL service or production identity end-to-end test is assumed. CI results on the pull request are the source of truth after push.
+Local lint, TypeScript, unit tests and production builds passed. Real FFmpeg MP4 rendering was exercised locally. The initial PR CI quality and secret scan passed, including clean PostgreSQL migrations and the opt-in database integration suite. The final Brand Memory mapping fix adds two passing unit tests and a successful web production build. Browser phone smoke was attempted but remains unverified: Chromium was absent and its download failed. Production identity/provider acceptance has not been exercised. CI results on the latest PR commit are the source of truth.
 
 No production migration, payment product creation, public deployment or real social post is part of this branch delivery.
