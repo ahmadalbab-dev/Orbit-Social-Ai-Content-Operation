@@ -82,3 +82,9 @@ Private staging Dockerfiles/Compose and native-process HTTP acceptance are added
 - Production API requires an explicit trusted HTTPS `WEB_URL`. Docker/Compose defaults no longer imply that HTTP localhost is a supported production browser destination. Loopback health checks remain available.
 - Rate limiting runs before identity verification/database membership work. A real in-process HTTP test verifies 429 is returned before the 61st invalid identity evaluation. Narrowly configured `TRUSTED_PROXY_IPS` and forwarded-header spoofing tests are included; default proxy trust stays off. This in-memory per-instance limit does not replace edge rate limits or a shared multi-instance limiter.
 - AI provider live acceptance, API hosting, private database migrations and SMTP remain pending. No monetary AI budget or malware immunity is claimed.
+
+## Full-width home and AI hosting preparation, 17 October 2026
+
+- Home hero now spans the viewport, with larger animated Orbit identity and quick actions below the hero. Capsule navigation replaces individual tiles; the phone launcher remains compact. Web build and 41 unit tests passed; agent review fixed mobile row direction and light theme cascade.
+- Dedicated Vercel project `orbit-ai-studio-api` (`prj_4rEplCiAPm0GhgeIOAx4iiR0uQMh`) created for the existing NestJS API, Node 22 and Singapore. Known nonsecret production identity/origin/alpha settings saved. `DATABASE_URL` and `HF_TOKEN` are still required through secure dashboard entry.
+- Native NestJS build configuration and Prisma native/RHEL engine generation prepared. API dependency build passed. No schema migration or provider generation was performed. Media rendering and billing stay off for this private alpha; readiness, SMTP and cross-workspace hosted acceptance remain pending. See [VERCEL_API_SETUP.md](VERCEL_API_SETUP.md).

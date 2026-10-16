@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nestjs",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "cd ../.. && pnpm --filter @sma/api... build",
+  "functions": {
+    "src/main.ts": {
+      "maxDuration": 60,
+      "includeFiles": "../../node_modules/.pnpm/@prisma+client*/node_modules/.prisma/client/**"
+    }
+  }
+}
