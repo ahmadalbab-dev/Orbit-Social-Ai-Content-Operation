@@ -94,3 +94,9 @@ Cloudflare Workers are not a drop-in host for the existing NestJS + Prisma nativ
 - https://vercel.com/docs/functions/limitations
 - https://www.prisma.io/docs/orm/v6/prisma-client/deployment/serverless/deploy-to-vercel
 - https://huggingface.co/docs/inference-providers/en/guides/first-api-call
+
+## Requested custom web domain, 17 October 2026
+
+Albab requested `https://orbit.aistudio.app`. Vercel currently reports `verified=false` and requires DNS ownership proof for the parent zone `aistudio.app`. Adding a name to the project does not register or purchase it. Treat the new origin as pending until ownership, DNS routing and HTTPS are verified. Keep the working web origin in API `WEB_URL` and Supabase Auth configuration until cutover; do not send identities or credentials to an unverified destination.
+
+After verification: update API `WEB_URL`, Supabase Site URL/allowed redirects and the documented canonical web origin, then rebuild/redeploy and test CORS, sign-in and recovery. The separate API origin and JWT issuer/JWKS stay unchanged unless their own domains are deliberately migrated. Existing private Sites Meta/Threads OAuth callbacks must stay on their deployed backend until commercial routes exist. No custom-domain DNS writes or auth-origin switch were performed in this preparation.
