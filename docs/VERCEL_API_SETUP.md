@@ -95,8 +95,10 @@ Cloudflare Workers are not a drop-in host for the existing NestJS + Prisma nativ
 - https://www.prisma.io/docs/orm/v6/prisma-client/deployment/serverless/deploy-to-vercel
 - https://huggingface.co/docs/inference-providers/en/guides/first-api-call
 
-## Requested custom web domain, 17 October 2026
+## Custom domain attempt withdrawn, 17 October 2026
 
-Albab requested `https://orbit.aistudio.app`. Vercel currently reports `verified=false` and requires DNS ownership proof for the parent zone `aistudio.app`. Adding a name to the project does not register or purchase it. Treat the new origin as pending until ownership, DNS routing and HTTPS are verified. Keep the working web origin in API `WEB_URL` and Supabase Auth configuration until cutover; do not send identities or credentials to an unverified destination.
+Albab confirmed that `aistudio.app` was not purchased and the name was only entered as an experiment in Vercel. The attempted `orbit.aistudio.app` custom domain is withdrawn. Continue using `https://orbit-ai-studio-two.vercel.app`; production API `WEB_URL` was never switched, and no Supabase Auth or OAuth URLs were changed for this attempt.
 
-After verification: update API `WEB_URL`, Supabase Site URL/allowed redirects and the documented canonical web origin, then rebuild/redeploy and test CORS, sign-in and recovery. The separate API origin and JWT issuer/JWKS stay unchanged unless their own domains are deliberately migrated. Existing private Sites Meta/Threads OAuth callbacks must stay on their deployed backend until commercial routes exist. No custom-domain DNS writes or auth-origin switch were performed in this preparation.
+Vercel still listed the unverified custom-domain attachment at the last check. The current connector does not expose removal and the available dashboard browser is signed out. The operator can remove that exact attachment from web project Settings → Domains → `orbit.aistudio.app` → Edit → Remove. Preserve the `vercel.app` domain. No DNS ownership claim, purchase, registration transfer or DNS writes were performed.
+
+Any future custom origin requires confirmed ownership/DNS control and working HTTPS before changing API `WEB_URL`, identity redirects or canonical URLs. The separate API origin and JWT issuer/JWKS stay unchanged unless deliberately migrated. Existing private Sites OAuth callbacks stay with their deployed backend until commercial routes exist.
