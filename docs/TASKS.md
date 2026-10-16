@@ -7,7 +7,7 @@ Status: **Siap** = code implemented and checks named below passed; **Sedang dibu
 | F01 | Design Orbit web/mobile, Light/Dark, motion, icon dock | Siap | Production build; browser phone acceptance still pending |
 | F02 | JWT identity and workspace membership/roles | Siap | Unit tests and PostgreSQL CI integration |
 | F03 | Database drafts, revision history, approval and saved schedules | Siap | Editing invalidates approval/schedule; CI integration |
-| F04 | Commercial sign-in, recovery and renewed sessions | Perlu setup | Initial sign-in UI exists; staging identity, recovery and session refresh pending |
+| F04 | Commercial sign-in, recovery and renewed sessions | Perlu setup | Email-code recovery and in-memory rotating refresh implemented; late sign-out responses guarded; Orbit identity project provisioned, backend/SMTP/live acceptance pending |
 | F05 | Team invitations and granular account permissions | Belum | Workspace roles exist; invite lifecycle pending |
 | A01 | Hugging Face platform AI writing modes | Siap | Captions, ideas, rewrite, hashtags, script; adapter unit tests |
 | A02 | Brand Memory voice, audience, language and topics | Siap | DB persistence and web/API mapping tests |
@@ -65,4 +65,12 @@ Private staging Dockerfiles/Compose and native-process HTTP acceptance are added
 
 - Prepared `apps/web/vercel.json` for the `apps/web` monorepo root and dependency-aware build.
 - Added explicit `/preview` using existing web/mobile UI and local editors without a demo identity or backend access.
-- Setup and actual deployment blocker are recorded in [VERCEL_V1.md](VERCEL_V1.md): project creation returned 403; account administrator setup is needed. No live deployment or Cloudflare protection is claimed.
+- Vercel project `orbit-ai-studio` is live at `https://orbit-ai-studio-two.vercel.app/preview`. Latest verified design release `15773ce` reached READY; CI passed. Albab changed Production Branch Tracking to `feature/commercial-foundation` on 17 October 2026. See [VERCEL_V1.md](VERCEL_V1.md). Cloudflare is not configured.
+
+## Identity delivery, 17 October 2026
+
+- Dedicated Supabase project `orbit-ai-studio` (`lgzyvgmuyrnpwccviqgq`) created in the user-selected MD Tech organisation, Singapore. Provider quoted USD0/month for project creation. ACTIVE_HEALTHY and database connection verified; public tables count is zero. StockPilot was not modified.
+- Web sign-in now retains refresh tokens only in memory, rotates them before expiry, serializes refresh requests and rechecks when a phone tab resumes. Token renewal preserves the open editor.
+- Password recovery uses an emailed code, verifies it with the identity service, updates the password and discards/revokes the temporary session. Email template must include `{{ .Token }}` before enabling this flow.
+- Review fixed late workspace-create responses restoring a signed-out token and guarded late sign-in replies after unmount.
+- Public auth settings are not enabled on the live web app yet. API hosting, server DB connection/JWT settings, migrations and real email/recovery tests remain setup work. No HF provider, payment or publishing activation is claimed.

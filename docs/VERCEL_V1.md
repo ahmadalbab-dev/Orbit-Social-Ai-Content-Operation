@@ -2,19 +2,21 @@
 
 Vercel hosts the Next.js web application for design and browser testing. Cloudflare remains the chosen future domain/security layer. Neither Cloudflare protection nor a live full-stack deployment is implied by this configuration.
 
-## Confirmed target and current blocker
+## Confirmed deployment
 
 - Vercel team: `ahmadfaizyaakop-7657s-projects` (`team_No5PjqwSgoX8ip61SmGkMJya`).
-- Intended new project: `orbit-social-v1`.
+- Project: `orbit-ai-studio` (`prj_0ZmwpcHBNAeRrJPHE4u3oB0uklyl`).
 - Repository: `ahmadalbab-dev/Orbit-Social-Ai-Content-Operation`.
 - Testing branch: `feature/commercial-foundation`; do not accidentally release the older `main` app.
-- The connected Vercel API returned **403 forbidden** when creating this project. No project/deployment was created. The local CLI has no authentication fallback.
-- An account/team administrator must create/import the project, or enable project creation for this connection. Never send a Vercel token in chat.
+- Latest verified design release: `15773ce`, production deployment `dpl_85eD4XnH7HRaQ47VZoBfB9AHvgQo`, READY and GitHub CI passed.
+- Preview: https://orbit-ai-studio-two.vercel.app/preview . Direct HTTP and browser access were verified. The connector protected-fetch helper returned 403; that did not mean the app itself was inaccessible. No global protection was disabled.
+- On 17 October 2026 Albab saved Production Branch Tracking as `feature/commercial-foundation`; screenshot confirms it. The next Git push should create a production deployment.
+- No web environment variables were configured in that screenshot. Real identity/API setup remains pending. Never send a Vercel token in chat.
 
 ## Dashboard import
 
 1. Open [Vercel New Project](https://vercel.com/new) under the team above. Import the existing GitHub repository, without copying it to another repository.
-2. Set Project Name to `orbit-social-v1`, Framework to **Next.js**, and Root Directory to **apps/web**. Include source files outside the root directory so workspace dependencies can be traced.
+2. Set Project Name to `orbit-ai-studio`, Framework to **Next.js**, and Root Directory to **apps/web**. Include source files outside the root directory so workspace dependencies can be traced.
 3. Build configuration is committed in `apps/web/vercel.json`:
    - Install: `pnpm install --frozen-lockfile`
    - Build: `cd ../.. && pnpm exec turbo run build --filter=@sma/web...`
