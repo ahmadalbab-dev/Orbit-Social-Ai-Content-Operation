@@ -74,3 +74,11 @@ Private staging Dockerfiles/Compose and native-process HTTP acceptance are added
 - Password recovery uses an emailed code, verifies it with the identity service, updates the password and discards/revokes the temporary session. Email template must include `{{ .Token }}` before enabling this flow.
 - Review fixed late workspace-create responses restoring a signed-out token and guarded late sign-in replies after unmount.
 - Public auth settings are not enabled on the live web app yet. API hosting, server DB connection/JWT settings, migrations and real email/recovery tests remain setup work. No HF provider, payment or publishing activation is claimed.
+
+## Backend boundary hardening, 17 October 2026
+
+- Supabase organisation rename to ORBIT verified; project ref is unchanged. Prior identity delivery CI passed all four jobs: quality, secret scan, browser preview and staging images.
+- Production frontend no longer defaults authenticated API requests to localhost. API destinations must be a precise HTTPS origin, and API paths cannot normalize outside `/v1/`.
+- Production API requires an explicit trusted HTTPS `WEB_URL`. Docker/Compose defaults no longer imply that HTTP localhost is a supported production browser destination. Loopback health checks remain available.
+- Rate limiting runs before identity verification/database membership work. A real in-process HTTP test verifies 429 is returned before the 61st invalid identity evaluation. Narrowly configured `TRUSTED_PROXY_IPS` and forwarded-header spoofing tests are included; default proxy trust stays off. This in-memory per-instance limit does not replace edge rate limits or a shared multi-instance limiter.
+- AI provider live acceptance, API hosting, private database migrations and SMTP remain pending. No monetary AI budget or malware immunity is claimed.

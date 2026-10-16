@@ -6,7 +6,7 @@ WORKDIR /app
 COPY . .
 RUN pnpm install --frozen-lockfile
 # NEXT_PUBLIC values are embedded in browser JavaScript. Never pass secrets here.
-ARG NEXT_PUBLIC_API_URL=http://localhost:3001
+ARG NEXT_PUBLIC_API_URL=
 ARG NEXT_PUBLIC_SUPABASE_URL=
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \

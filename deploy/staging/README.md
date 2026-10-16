@@ -11,7 +11,11 @@ cp deploy/staging/.env.example deploy/staging/.env
 chmod 600 deploy/staging/.env
 ```
 
+Production images reject HTTP/localhost browser destinations. Set `WEB_URL` to the exact HTTPS web origin served by your TLS proxy, and `NEXT_PUBLIC_API_URL` to the real HTTPS API origin. Leave the public API empty for design-only testing; authenticated browser requests then fail closed. The example `.invalid` web origin is a disposable CI placeholder, not a working endpoint.
+
 Edit that file. Replace the database password with a random hexadecimal value, and configure the trusted identity issuer and HTTPS JWKS URL. For Supabase asymmetric JWT signing keys, the example URL shapes apply. Use only the project's public publishable/anon key for the web app. Never put an App Secret, HF token, service-role key, or JWT signing secret in a `NEXT_PUBLIC_*` value. Use a dedicated private staging database, not an exposed Supabase Data API schema.
+
+After the real ingress is known, set `TRUSTED_PROXY_IPS` only to its literal IP address(es) and restrict direct origin access. Leave it empty otherwise; never trust arbitrary forwarded headers. Without trusted proxy configuration, staging clients behind the same proxy share a rate-limit bucket. A shared limiter and edge controls are still needed before public multi-instance hosting.
 
 All commands below must use the same env file and Compose file:
 
@@ -28,7 +32,7 @@ docker compose --env-file deploy/staging/.env -f deploy/staging/compose.yml run 
 docker compose --env-file deploy/staging/.env -f deploy/staging/compose.yml up -d api web
 ```
 
-Open `http://localhost:3000` on the Docker host. The API listens at `http://localhost:3001`; `/v1/ready` must report a connected database. Sign in with the configured identity provider, create a workspace, and save a draft before testing AI. Missing HF credentials leave AI generation unavailable. Never use `docker compose config` without `--quiet` in shared logs because resolved runtime credentials can be displayed.
+The loopback services remain available at `http://localhost:3000` and `http://localhost:3001` for local health checks; `/v1/ready` must report a connected database. For sign-in and authenticated browser requests, open the configured HTTPS web origin through your TLS proxy. Sign in with the configured identity provider, create a workspace, and save a draft before testing AI. Missing HF credentials leave AI generation unavailable. Never use `docker compose config` without `--quiet` in shared logs because resolved runtime credentials can be displayed.
 
 The migration command is for a fresh database or one already tracked by this repository's Prisma migrations. An existing database with tables but no migration history needs a separate reviewed baseline plan. Do not run schema reset or `db push` on persisted staging data.
 

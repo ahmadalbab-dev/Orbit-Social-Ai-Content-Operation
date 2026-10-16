@@ -76,8 +76,9 @@ services:
     environment:
       <<: *database-environment
       PORT: 3001
-      WEB_URL: ${WEB_URL:-http://localhost:3000}
+      WEB_URL: ${WEB_URL:?Set WEB_URL to the trusted HTTPS web origin}
       DEV_AUTH_ENABLED: "false"
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-}
       AUTH_JWT_ISSUER: ${AUTH_JWT_ISSUER:?Set the trusted JWT issuer}
       AUTH_JWT_AUDIENCE: ${AUTH_JWT_AUDIENCE:-authenticated}
       AUTH_JWKS_URL: ${AUTH_JWKS_URL:?Set the trusted HTTPS JWKS URL}
@@ -111,7 +112,7 @@ services:
       context: ../..
       dockerfile: apps/web/Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
     ports: ["127.0.0.1:3000:3000"]

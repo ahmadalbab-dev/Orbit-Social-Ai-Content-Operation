@@ -4,7 +4,7 @@ Reviewed 17 October 2026. Project is provisioned; application identity is not li
 
 ## Confirmed resources
 
-- Organisation: MD Tech, explicitly selected by Albab.
+- Organisation: ORBIT (`rjxhuiwfyxcbejkchmwy`), renamed by Albab from MD Tech after project creation. The organisation and project IDs did not change.
 - Supabase project: `orbit-ai-studio`, ref `lgzyvgmuyrnpwccviqgq`.
 - Region: Singapore, `ap-southeast-1`.
 - URL: `https://lgzyvgmuyrnpwccviqgq.supabase.co`.

@@ -14,6 +14,6 @@ import { TenantAuthGuard } from "./security";
 @Module({
   imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 60 }])],
   controllers: [AppController, MediaController, BillingController],
-  providers: [BillingService, MediaService, WorkflowService, DatabaseService, WorkspaceService, TenantAuthGuard, { provide: APP_GUARD, useClass: TenantAuthGuard }, { provide: APP_GUARD, useClass: ThrottlerGuard }]
+  providers: [BillingService, MediaService, WorkflowService, DatabaseService, WorkspaceService, TenantAuthGuard, { provide: APP_GUARD, useClass: ThrottlerGuard }, { provide: APP_GUARD, useClass: TenantAuthGuard }]
 })
 export class AppModule {}
