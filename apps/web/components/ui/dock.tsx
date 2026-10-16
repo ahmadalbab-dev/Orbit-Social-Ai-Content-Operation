@@ -11,7 +11,7 @@ export type DockProps=Omit<React.HTMLAttributes<HTMLElement>,"onSelect"> & {
  onSelect:(id:string)=>void;
 };
 
-/** Adapted from the user-supplied 21st.dev Dali Agents dock. */
+/** Shared Orbit navigation: a slim pill with a readable active destination. */
 export function Dock({items,activeId,onSelect,className,...props}:DockProps){
  return <nav {...props} className={cn("reference-dock",className)} aria-label={props["aria-label"]??"Navigation"}>
   {items.map(item=><DockIcon key={item.id} item={item} active={activeId===item.id} onClick={()=>onSelect(item.id)}/>)}
@@ -22,7 +22,7 @@ function DockIcon({item,active,onClick}:{item:DockItem;active:boolean;onClick:()
  return <button type="button" className="reference-dock-icon group relative grid place-items-center rounded-xl transition-transform duration-200" aria-label={item.accessible??item.label} aria-current={active?"page":undefined} onClick={onClick}>
   <Icon className="reference-dock-svg" size={21} strokeWidth={2.1} aria-hidden="true"/>
   {item.badge?<span className="reference-dock-badge" aria-hidden="true">{item.badge}</span>:null}
-  <span className="reference-dock-tooltip" aria-hidden="true">{item.label}</span>
+  <span className="reference-dock-label" aria-hidden="true">{item.label}</span>
  </button>;
 }
 const demoItems:readonly DockItem[]=[

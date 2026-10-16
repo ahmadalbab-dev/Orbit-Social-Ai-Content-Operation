@@ -26,7 +26,7 @@ export function OrbitField({paused}:{paused:boolean}){
    context.font="12px JetBrains Mono, monospace";
    for(let row=0;row<Math.ceil(height/20);row++){
     context.fillStyle=dark?"rgba(180,156,255,.16)":"rgba(82,55,142,.14)";
-    context.fillText(codeLines[row%codeLines.length].repeat(4),-40+Math.sin(row*.23+phase)*15,row*20+14);
+    context.fillText(codeLines[row%codeLines.length].repeat(Math.ceil(width/320)),-40+Math.sin(row*.23+phase)*15,row*20+14);
    }
    paint.clearRect(0,0,width,height);
    paint.drawImage(mask,0,0,width,height);
@@ -39,7 +39,7 @@ export function OrbitField({paused}:{paused:boolean}){
    paint.fillStyle=dark?"rgba(7,6,6,.48)":"rgba(250,248,243,.55)";
    paint.fillRect(0,0,width,height);paint.fillStyle=gradient;paint.font="600 11px JetBrains Mono, monospace";
    for(let row=0;row<Math.ceil(height/13);row++){
-    paint.fillText(codeLines[row%codeLines.length].repeat(5),-25+Math.sin(phase+row*.2)*8,row*13+11);
+    paint.fillText(codeLines[row%codeLines.length].repeat(Math.ceil(width/320)),-25+Math.sin(phase+row*.2)*8,row*13+11);
    }
    paint.globalCompositeOperation="source-over";context.drawImage(layer,0,0,width,height);
    if(!document.hidden&&!paused&&!reduced.matches)frame=requestAnimationFrame(draw);
@@ -50,10 +50,10 @@ export function OrbitField({paused}:{paused:boolean}){
    const ratio=Math.min(window.devicePixelRatio||1,2);
    for(const target of [element,layer,mask]){target.width=Math.round(width*ratio);target.height=Math.round(height*ratio);}
    context.setTransform(ratio,0,0,ratio,0,0);paint.setTransform(ratio,0,0,ratio,0,0);shape.setTransform(ratio,0,0,ratio,0,0);
-   const size=Math.min(width*.23,190),logo=size*.7,gap=size*.14;
+   const size=Math.min(width*.19,300),logo=size*.7,gap=size*.14;
    shape.font=`800 ${size}px JetBrains Mono, monospace`;
    const textWidth=shape.measureText("Orbit").width,total=logo+gap+textWidth;
-   const left=(width-total)/2,cy=width<640?132:190;
+   const left=width<700?(width-total)/2:width-total-width*.055,cy=width<700?130:height*.34;
    shape.fillStyle="#fff";shape.textBaseline="middle";shape.fillText("Orbit",left+logo+gap,cy);
    shape.save();shape.translate(left+logo/2,cy);shape.strokeStyle="#fff";shape.lineWidth=logo*.065;
    shape.beginPath();shape.arc(0,0,logo*.3,0,Math.PI*2);shape.stroke();
