@@ -1,6 +1,6 @@
 # Orbit identity staging
 
-Reviewed 17 October 2026. Project is provisioned; application identity is not live yet.
+Reviewed 17 October 2026. API/database and web public configuration are deployed; first real-user acceptance remains pending.
 
 ## Confirmed resources
 
@@ -9,7 +9,7 @@ Reviewed 17 October 2026. Project is provisioned; application identity is not li
 - Region: Singapore, `ap-southeast-1`.
 - URL: `https://lgzyvgmuyrnpwccviqgq.supabase.co`.
 - Provider quoted project cost: USD0/month at creation. This is not a promise of unlimited free usage or free future paid services.
-- Project status and a read-only database query passed. No application schema/migrations have been applied. StockPilot is a different project and was not changed.
+- Project status and a read-only database query passed. Five tracked Prisma migrations have been applied; 23 application tables and migration history have RLS and no browser table access. StockPilot is a different project and was not changed.
 
 ## Activation order
 

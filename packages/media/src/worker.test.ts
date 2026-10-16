@@ -100,19 +100,24 @@ describe("durable media worker", () => {
   });
   it("aborts rendering on cancellation without replacing the cancelled status", async () => {
     const f = await fixture();
-    vi.mocked(f.store.stillOwned).mockResolvedValue(false);
+    let rendering = false;
+    // Cancellation must happen while the renderer is listening, not during
+    // filesystem preparation whose duration varies on busy CI machines.
+    vi.mocked(f.store.stillOwned).mockImplementation(async () => !rendering);
     const renderer = vi.fn(
       async (
         _value: unknown,
         _root: string,
         options?: { signal?: AbortSignal },
       ) => {
+        options?.signal?.throwIfAborted();
         await new Promise<void>((_resolve, reject) => {
           options?.signal?.addEventListener(
             "abort",
             () => reject(new Error("aborted")),
             { once: true },
           );
+          rendering = true;
         });
         return { output: "", duration: 1, width: 720, height: 1280 };
       },
@@ -121,6 +126,8 @@ describe("durable media worker", () => {
       renderer,
       cancellationPollMs: 5,
     });
+    expect(renderer).toHaveBeenCalledOnce();
+    expect(renderer.mock.calls[0][2]?.signal?.aborted).toBe(true);
     expect(f.store.complete).not.toHaveBeenCalled();
     expect(f.store.fail).not.toHaveBeenCalled();
   });

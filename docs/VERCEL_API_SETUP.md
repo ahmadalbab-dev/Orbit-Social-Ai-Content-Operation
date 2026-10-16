@@ -2,7 +2,7 @@
 
 This recipe deploys the existing NestJS API for authenticated cloud drafts and text AI. It does not deploy an FFmpeg daemon, share the old Sites database, migrate existing Sites OAuth tokens, enable live social publishing, or charge customers. No infrastructure has been provisioned by this document.
 
-API project prepared by the parent workflow: `orbit-ai-studio-api` (`prj_4rEplCiAPm0GhgeIOAx4iiR0uQMh`), Root Directory `apps/api`, NestJS, Node 22, source outside root enabled, Fluid Compute in Singapore. This is project configuration only; database credentials, live provider verification and successful API deployment remain unconfirmed.
+API project prepared by the parent workflow: `orbit-ai-studio-api` (`prj_4rEplCiAPm0GhgeIOAx4iiR0uQMh`), Root Directory `apps/api`, NestJS, Node 22, source outside root enabled, Fluid Compute in Singapore. Production API deployment and database connectivity are verified. Five tracked migrations are applied; real identity/provider acceptance remains pending.
 
 ## Recommended minimal topology
 
@@ -20,7 +20,7 @@ The Prisma v6 generator includes both `native` and `rhel-openssl-3.0.x`, the Nod
 
 ## API environment variables
 
-The parent workflow has already saved the production nonsecret values for `WEB_URL`, `DEV_AUTH_ENABLED`, `MEDIA_RENDER_ENABLED`, `BILLING_ENABLED`, `AI_MONTHLY_GENERATION_LIMIT` and the three JWT issuer/audience/JWKS variables for the dedicated Orbit Supabase project. `DATABASE_URL` and `HF_TOKEN` are still missing.
+The parent workflow has already saved the production nonsecret values for `WEB_URL`, `DEV_AUTH_ENABLED`, `MEDIA_RENDER_ENABLED`, `BILLING_ENABLED`, `AI_MONTHLY_GENERATION_LIMIT` and the three JWT issuer/audience/JWKS variables for the dedicated Orbit Supabase project. `DATABASE_URL` and `HF_TOKEN` are saved as Sensitive Production variables. Database connectivity is verified; provider credentials have not yet been exercised by a real generation.
 
 Go to **Vercel Dashboard → orbit-ai-studio-api → Settings → Environment Variables**. Add each variable to the intended environment; use separate databases and credentials for Preview and Production. Store credentials as Secret. Configuration changes require a new deployment.
 
@@ -122,3 +122,5 @@ The API build now runs `scripts/api-release.mjs`. Normally it only builds depend
 Before first migration on the empty Orbit Supabase project, revoke public schema usage from PUBLIC, anon and authenticated to prevent temporary Data API exposure between tracked migrations. The tracked private-table migration then enables RLS with no browser policies and revokes browser table grants on the known Orbit tables and migration history. Server access uses its existing owner/bypass-RLS role; tenant authorization remains in NestJS. This does not harden unrelated projects or silently change Auth tables.
 
 Live signup, confirmed email delivery, isolated customer workspaces and an actual paid-provider response must still be tested with a real test identity. `/preview` remains local-only. Publishing, billing and remote media rendering stay disabled.
+
+Verified release outcome: `8c2edb8` deployed successfully, all five Prisma migrations completed with matching checksums, and all 24 public tables (23 application tables plus history) have RLS and zero anon/authenticated SELECT privileges. Supabase advisors report only informational no-policy notices, expected because browser table access is deliberately denied (https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy). The release opt-in is now false. Production web `NEXT_PUBLIC_API_URL` points to `https://orbit-ai-studio-api.vercel.app`; no private credential was copied into a public variable.

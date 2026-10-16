@@ -88,3 +88,19 @@ Private staging Dockerfiles/Compose and native-process HTTP acceptance are added
 - Home hero now spans the viewport, with larger animated Orbit identity and quick actions below the hero. Capsule navigation replaces individual tiles; the phone launcher remains compact. Web build and 41 unit tests passed; agent review fixed mobile row direction and light theme cascade.
 - Dedicated Vercel project `orbit-ai-studio-api` (`prj_4rEplCiAPm0GhgeIOAx4iiR0uQMh`) created for the existing NestJS API, Node 22 and Singapore. Known nonsecret production identity/origin/alpha settings saved. `DATABASE_URL` and `HF_TOKEN` are still required through secure dashboard entry.
 - Native NestJS build configuration and Prisma native/RHEL engine generation prepared. API dependency build passed. No schema migration or provider generation was performed. Media rendering and billing stay off for this private alpha; readiness, SMTP and cross-workspace hosted acceptance remain pending. See [VERCEL_API_SETUP.md](VERCEL_API_SETUP.md).
+
+## Live private alpha activation, 17 October 2026
+
+Completed:
+- API `/v1/ready` HTTP 200 against the dedicated Orbit Supabase database.
+- Five tracked Prisma migrations applied through the reviewed opt-in Vercel release script; all checksums match repository SQL. Opt-in reset to false afterward.
+- All 23 app tables plus Prisma history have RLS. Neither anon nor authenticated can read any of them. Public schema usage revoked before first migration; no exposure window between migrations. Supabase advisors report only the expected informational no-policy findings for private API tables.
+- Production web API origin configured; web redeployed with existing dedicated-project public Auth configuration. Supabase email auth and ES256 JWKS are reachable. Unauthenticated workspace requests return 401.
+- Agent code review and three opt-in release tests passed; full CI is tracked separately for this revision.
+
+Requires real test identity:
+- Supabase Site URL/allowed redirect and email confirmation delivery checked in Auth settings. SMTP/recovery email templates remain operator setup.
+- First user signup/confirmation and sign-in, workspace creation, two-user isolation, brand save/reload and one live Hugging Face generation with quota persistence. No Auth users existed at activation inspection; no credentials or confirmation emails were fabricated.
+- Phone acceptance on live authenticated Studio. Publishing, billing and cloud video rendering remain disabled.
+
+- Hosted acceptance: API readiness 200, trusted web CORS origin exact match, root sign-in page 200, correct API/Auth origins in shipped browser bundle, and direct anon Data API table read denied (401). CI exposed a cancellation-test timing race; the mock now waits until rendering listens for abort, with additional start/abort assertions and no production worker change. All 10 media tests passed locally.
