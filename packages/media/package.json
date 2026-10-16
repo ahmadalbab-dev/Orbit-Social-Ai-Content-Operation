@@ -2,7 +2,7 @@
   "name": "@sma/media",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
+  "type": "commonjs",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
@@ -18,12 +18,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "default": "./dist/index.js"
+      "default": "./dist/index.js",
+      "require": "./dist/index.js"
     },
     "./worker": {
       "types": "./dist/worker.d.ts",
       "import": "./dist/worker.js",
-      "default": "./dist/worker.js"
+      "default": "./dist/worker.js",
+      "require": "./dist/worker.js"
     }
   }
 }

@@ -34,6 +34,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - name: Verify compiled backend modules without require ESM interop
+        run: node scripts/check-runtime-modules.mjs
       - name: Install codec for trusted fixture acceptance
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
       - name: Compiled HTTP upload, restart, real worker and private download

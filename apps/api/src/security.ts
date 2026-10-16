@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException, ForbiddenException, SetMetadata } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { DatabaseService } from "./database.service";
-import { jwtVerify, createRemoteJWKSet } from "jose";
+import type { createRemoteJWKSet } from "jose" with { "resolution-mode": "import" };
 
 const trustedKeySets = new Map<string,ReturnType<typeof createRemoteJWKSet>>();
 
@@ -26,6 +26,7 @@ export class TenantAuthGuard implements CanActivate {
       const audience = process.env.AUTH_JWT_AUDIENCE;
       if (!token || !issuer || !audience || (!process.env.AUTH_JWKS_URL && (!secret || secret.length < 32))) throw new UnauthorizedException("Verified identity is required");
       try {
+        const { jwtVerify, createRemoteJWKSet } = await import("jose");
         const jwksUrl = process.env.AUTH_JWKS_URL;
         let key: Uint8Array | ReturnType<typeof createRemoteJWKSet>;
         if(jwksUrl){

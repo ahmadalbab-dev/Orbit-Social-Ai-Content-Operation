@@ -106,3 +106,9 @@ Any future custom origin requires confirmed ownership/DNS control and working HT
 ## Deployment correction, 17 October 2026
 
 The first native build rejected a `functions["src/main.ts"]` override with `unused_function` before database authentication ran. That legacy matcher was removed. A 60-second function default was set at the Vercel API project instead. Production `DATABASE_URL` and `HF_TOKEN` are now present as Sensitive variables; their presence is not a successful connection test. No schema migration is run automatically during builds.
+
+## Runtime module correction
+
+A READY deployment can still fail on invocation. The production log reported `ERR_REQUIRE_ESM` when Nest's CommonJS output required `@sma/database`. The six backend workspace packages now emit CommonJS with matching package metadata; the media worker uses the same format. The API uses TypeScript Node16 emission so `await import("jose")` stays a native ESM import. No JWT dependency downgrade or identity validation change is required.
+
+After building API dependencies and the media worker, run `node scripts/check-runtime-modules.mjs`. It disables Node's optional require(ESM) interoperability, loads the compiled Nest graph and worker store, and verifies an actual signed JWT through the compiled guard without a database connection. CI runs this after its full build. A successful local check does not establish hosted database connectivity or migration state; verify `/v1/ready` on the deployed API separately.

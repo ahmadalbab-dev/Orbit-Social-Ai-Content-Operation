@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SignJWT } from "jose";
 import { randomBytes } from "node:crypto";
 import { Reflector } from "@nestjs/core";
 import { TenantAuthGuard, TokenVault } from "./security";
@@ -25,13 +24,13 @@ describe("tenant authentication",()=>{
  });
  it("rejects a valid JWT when workspace membership is absent",async()=>{
   vi.stubEnv("NODE_ENV","production");vi.stubEnv("AUTH_JWT_SECRET",secret);vi.stubEnv("AUTH_JWT_ISSUER","https://identity.test");vi.stubEnv("AUTH_JWT_AUDIENCE","authenticated");
-  const {guard,context,request,db}=setup();request.headers.authorization=`Bearer ${await new SignJWT({}).setProtectedHeader({alg:"HS256"}).setSubject("subject-a").setIssuer("https://identity.test").setAudience("authenticated").setIssuedAt().setExpirationTime("5m").sign(new TextEncoder().encode(secret))}`;
+  const {guard,context,request,db}=setup();request.headers.authorization=`Bearer ${await new (await import("jose")).SignJWT({}).setProtectedHeader({alg:"HS256"}).setSubject("subject-a").setIssuer("https://identity.test").setAudience("authenticated").setIssuedAt().setExpirationTime("5m").sign(new TextEncoder().encode(secret))}`;
   await expect(guard.canActivate(context)).rejects.toThrow("Workspace access denied");
   expect(db.membership.findFirst).toHaveBeenCalledWith({where:{userId:"user-a",workspaceId:"workspace-b"}});
  });
  it("rejects wrong JWT audience before querying memberships",async()=>{
   vi.stubEnv("NODE_ENV","production");vi.stubEnv("AUTH_JWT_SECRET",secret);vi.stubEnv("AUTH_JWT_ISSUER","https://identity.test");vi.stubEnv("AUTH_JWT_AUDIENCE","authenticated");
-  const {guard,context,request,db}=setup({role:"OWNER"});request.headers.authorization=`Bearer ${await new SignJWT({}).setProtectedHeader({alg:"HS256"}).setSubject("subject-a").setIssuer("https://identity.test").setAudience("wrong-app").setIssuedAt().setExpirationTime("5m").sign(new TextEncoder().encode(secret))}`;
+  const {guard,context,request,db}=setup({role:"OWNER"});request.headers.authorization=`Bearer ${await new (await import("jose")).SignJWT({}).setProtectedHeader({alg:"HS256"}).setSubject("subject-a").setIssuer("https://identity.test").setAudience("wrong-app").setIssuedAt().setExpirationTime("5m").sign(new TextEncoder().encode(secret))}`;
   await expect(guard.canActivate(context)).rejects.toThrow("Invalid or expired");expect(db.membership.findFirst).not.toHaveBeenCalled();
  });
 });
