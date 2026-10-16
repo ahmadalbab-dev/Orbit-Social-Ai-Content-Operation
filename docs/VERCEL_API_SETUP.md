@@ -8,7 +8,7 @@ API project prepared by the parent workflow: `orbit-ai-studio-api` (`prj_4rEplCi
 
 - Keep the existing Next.js web project `orbit-ai-studio`.
 - Import the **same GitHub repository** a second time as `orbit-ai-studio-api` with Root Directory `apps/api` and framework **NestJS**. Use the intended `feature/commercial-foundation` revision, not an older default branch.
-- Enable inclusion of source outside the Root Directory for the monorepo. Keep Node 22.x and the repository-pinned pnpm version. `apps/api/vercel.json` defines install/build commands, a 60-second ceiling for the existing bounded AI request, and Prisma generated-file inclusion.
+- Enable inclusion of source outside the Root Directory for the monorepo. Keep Node 22.x and the repository-pinned pnpm version. `apps/api/vercel.json` defines install/build commands, native NestJS detection without a legacy `functions` entrypoint glob.
 - Use a dedicated Orbit PostgreSQL database and identity project, for example Supabase Auth and Postgres. Application traffic must use a provider-compatible pooled PostgreSQL URL with TLS; execute migrations separately using a direct connection.
 - Leave `MEDIA_RENDER_ENABLED=false` and `BILLING_ENABLED=false` for private alpha. Do not supply a fake API URL or enable development auth on the hosted API.
 
@@ -16,7 +16,7 @@ Vercel recognizes `src/main.ts` and its Nest bootstrap directly. An old Express-
 
 ### Prisma platform check before first deployment
 
-The Prisma v6 generator includes both `native` and `rhel-openssl-3.0.x`, the Node 22 Vercel runtime target. Regenerate during the dependency build and verify the deployed function bundle. Do not blindly use a binary generated on a different operating system. The `includeFiles` configuration copies generated files but does not generate a missing platform engine.
+The Prisma v6 generator includes both `native` and `rhel-openssl-3.0.x`, the Node 22 Vercel runtime target. Regenerate during the dependency build and verify the deployed function bundle. Do not blindly use a binary generated on a different operating system. The native builder must trace the generated Prisma files; verify the deployed bundle and database readiness before activation.
 
 ## API environment variables
 
@@ -102,3 +102,7 @@ Albab confirmed that `aistudio.app` was not purchased and the name was only ente
 Vercel still listed the unverified custom-domain attachment at the last check. The current connector does not expose removal and the available dashboard browser is signed out. The operator can remove that exact attachment from web project Settings → Domains → `orbit.aistudio.app` → Edit → Remove. Preserve the `vercel.app` domain. No DNS ownership claim, purchase, registration transfer or DNS writes were performed.
 
 Any future custom origin requires confirmed ownership/DNS control and working HTTPS before changing API `WEB_URL`, identity redirects or canonical URLs. The separate API origin and JWT issuer/JWKS stay unchanged unless deliberately migrated. Existing private Sites OAuth callbacks stay with their deployed backend until commercial routes exist.
+
+## Deployment correction, 17 October 2026
+
+The first native build rejected a `functions["src/main.ts"]` override with `unused_function` before database authentication ran. That legacy matcher was removed. A 60-second function default was set at the Vercel API project instead. Production `DATABASE_URL` and `HF_TOKEN` are now present as Sensitive variables; their presence is not a successful connection test. No schema migration is run automatically during builds.
