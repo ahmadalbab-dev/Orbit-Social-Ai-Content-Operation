@@ -30,6 +30,8 @@ jobs:
       - run: pnpm db:generate
       - run: pnpm db:validate
       - run: pnpm db:migrate
+      - name: Verify opt-in release configuration
+        run: node --test scripts/api-release.test.mjs
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test

@@ -112,3 +112,13 @@ The first native build rejected a `functions["src/main.ts"]` override with `unus
 A READY deployment can still fail on invocation. The production log reported `ERR_REQUIRE_ESM` when Nest's CommonJS output required `@sma/database`. The six backend workspace packages now emit CommonJS with matching package metadata; the media worker uses the same format. The API uses TypeScript Node16 emission so `await import("jose")` stays a native ESM import. No JWT dependency downgrade or identity validation change is required.
 
 After building API dependencies and the media worker, run `node scripts/check-runtime-modules.mjs`. It disables Node's optional require(ESM) interoperability, loads the compiled Nest graph and worker store, and verifies an actual signed JWT through the compiled guard without a database connection. CI runs this after its full build. A successful local check does not establish hosted database connectivity or migration state; verify `/v1/ready` on the deployed API separately.
+
+## Private alpha release, 17 October 2026
+
+Production `/v1/ready` returned HTTP 200 with `database: connected` after the operator corrected the database Secret and redeployed. This proves connectivity, not table migrations or AI generation. CI for `91b1082` passed all four jobs.
+
+The API build now runs `scripts/api-release.mjs`. Normally it only builds dependencies/API. An explicitly authorized Production release can set `ORBIT_MIGRATE_ON_BUILD=true` and `ORBIT_MIGRATION_PROJECT_REF` to the dedicated project ref. Only matching Supabase postgres pooler URLs are accepted. The script derives the same project's session pooler on port 5432 for `prisma migrate deploy`, preserving the runtime Secret and Prisma migration history. Disable the opt-in flag immediately after creating the release deployment. Never use this path for Preview or a shared database.
+
+Before first migration on the empty Orbit Supabase project, revoke public schema usage from PUBLIC, anon and authenticated to prevent temporary Data API exposure between tracked migrations. The tracked private-table migration then enables RLS with no browser policies and revokes browser table grants on the known Orbit tables and migration history. Server access uses its existing owner/bypass-RLS role; tenant authorization remains in NestJS. This does not harden unrelated projects or silently change Auth tables.
+
+Live signup, confirmed email delivery, isolated customer workspaces and an actual paid-provider response must still be tested with a real test identity. `/preview` remains local-only. Publishing, billing and remote media rendering stay disabled.
