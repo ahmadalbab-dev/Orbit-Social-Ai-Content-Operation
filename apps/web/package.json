@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests --exclude tests/**",
+    "test": "vitest run --passWithNoTests --exclude \"tests/**\"",
     "test:e2e": "playwright test"
   },
   "dependencies": {
