@@ -55,7 +55,7 @@ const failures: Record<string, string> = {
   RENDER_TIMEOUT: "The render took too long. Try a shorter clip.",
 };
 
-export function VideoEditor({ active = true }: { active?: boolean }) {
+export function VideoEditor({ active = true, preview = false }: { active?: boolean; preview?: boolean }) {
   const [source, setSource] = useState("");
   const [selected, setSelected] = useState<File | null>(null);
   const [asset, setAsset] = useState<MediaAsset | null>(null);
@@ -93,7 +93,7 @@ export function VideoEditor({ active = true }: { active?: boolean }) {
   );
   const pending = jobs.some(renderPending);
   useEffect(() => {
-    if (!active) return;
+    if (!active || preview) return;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     let polling = false;
@@ -135,7 +135,7 @@ export function VideoEditor({ active = true }: { active?: boolean }) {
       if (timer) clearTimeout(timer);
       document.removeEventListener("visibilitychange", visibility);
     };
-  }, [active, pending]);
+  }, [active, pending, preview]);
 
   async function action(work: (signal: AbortSignal) => Promise<void>) {
     const controller = new AbortController();
@@ -352,7 +352,7 @@ export function VideoEditor({ active = true }: { active?: boolean }) {
             </p>
           ) : null}
           <p className="review-help">
-            {status
+            {preview ? "Local preview. Sign in for uploads and MP4 rendering." : status
               ? status.configured
                 ? `Private render setup enabled. Jobs wait for an available worker. Output up to ${maxDuration} seconds; upload up to ${Math.floor(status.limits.uploadBytes / 1024 / 1024)} MB.`
                 : "Rendering is not configured by the workspace operator yet."
@@ -674,7 +674,7 @@ export function VideoEditor({ active = true }: { active?: boolean }) {
           )}
           <Button
             variant="outline"
-            disabled={busy || !active}
+            disabled={preview || busy || !active}
             onClick={() =>
               action(async (signal) => {
                 const next = await listRenders(signal);

@@ -18,3 +18,6 @@ apps/vanilla-auth/
 
 # Optional operator-only staging credentials; never commit.
 deploy/staging/secrets/
+
+# Local deployment links can contain platform metadata.
+.vercel/

@@ -60,3 +60,9 @@ Private staging Dockerfiles/Compose and native-process HTTP acceptance are added
 - Local lint, typecheck, unit tests and production build passed; production dependency audit reported no known vulnerabilities. PostgreSQL billing/checkout tests and compiled route acceptance are included for CI verification.
 - QA found and fixed canceled-subscription restart and expired-checkout retry errors. See [STRIPE_SANDBOX.md](STRIPE_SANDBOX.md), [AGENT_DEPARTMENTS.md](AGENT_DEPARTMENTS.md) and [HOSTING_DECISION.md](HOSTING_DECISION.md).
 - This delivery does not deploy Cloudflare, set a live Stripe price, activate real payments or replace the working private OAuth preview.
+
+## Vercel v1 delivery
+
+- Prepared `apps/web/vercel.json` for the `apps/web` monorepo root and dependency-aware build.
+- Added explicit `/preview` using existing web/mobile UI and local editors without a demo identity or backend access.
+- Setup and actual deployment blocker are recorded in [VERCEL_V1.md](VERCEL_V1.md): project creation returned 403; account administrator setup is needed. No live deployment or Cloudflare protection is claimed.
