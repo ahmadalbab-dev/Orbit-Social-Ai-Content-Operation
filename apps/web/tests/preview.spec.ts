@@ -21,8 +21,9 @@ test("phone preview navigates without backend calls or fake access", async ({ pa
   await expect(page.getByRole("heading", { name: "Make space for your next post." })).toBeVisible();
   await navigate(page, "Connections");
   await expect(page.getByRole("link", { name: "Connect facebook", exact: true })).toHaveAttribute("href", "/");
-  await navigate(page, "Brand Settings");
+  await page.getByRole("button", {name:"Open profile",exact:true}).click();
   await expect(page.getByRole("button", { name: "Save profile" })).toBeDisabled();
+  await navigate(page, "Workspace Settings");
   await page.getByRole("button", { name: "Light", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.getByRole("button", { name: "Dark", exact: true }).click();
@@ -44,11 +45,12 @@ test("local image edits export from preview without sign-in or upload", async ({
     return canvas.toDataURL("image/png").split(",")[1];
   });
   await page.getByLabel("Choose image", { exact: true }).setInputFiles({ name: "fixture.png", mimeType: "image/png", buffer: Buffer.from(png, "base64") });
+  await page.getByText("Adjust image and text", {exact:true}).click();
   await expect(page.getByRole("button", { name: "Rotate image" })).toBeEnabled();
   await page.getByRole("button", { name: "Rotate image" }).click();
   await page.getByLabel("Image crop", { exact: true }).selectOption("1:1");
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export image", exact: true }).click();
-  expect((await download).suggestedFilename()).toBe("orbit-image.png");
+  expect((await download).suggestedFilename()).toBe("orbit-slide-01.png");
   expect(uploaded).toEqual([]);
 });

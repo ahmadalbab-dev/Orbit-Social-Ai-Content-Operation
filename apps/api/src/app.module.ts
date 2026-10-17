@@ -14,10 +14,11 @@ import { ImageAiController } from "./image-ai.controller";
 import { ImageAiService } from "./image-ai.service";
 import { VideoAiController } from "./video-ai.controller";
 import { VideoAiService } from "./video-ai.service";
+import { EditorAiController } from './editor-ai.controller';
 
 @Module({
   imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 60 }])],
-  controllers: [AppController, MediaController, BillingController, ImageAiController, VideoAiController],
+  controllers: [AppController, MediaController, BillingController, ImageAiController, VideoAiController, EditorAiController],
   providers: [VideoAiService, ImageAiService, BillingService, MediaService, WorkflowService, DatabaseService, WorkspaceService, TenantAuthGuard, { provide: APP_GUARD, useClass: ThrottlerGuard }, { provide: APP_GUARD, useClass: TenantAuthGuard }]
 })
 export class AppModule {}

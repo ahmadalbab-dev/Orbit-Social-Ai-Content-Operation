@@ -1,0 +1,15 @@
+.theme-segment {display:flex;gap:2px;padding:3px;background:var(--muted);border-radius:24px;margin-left:auto;}
+.theme-segment button {display:inline-flex;align-items:center;justify-content:center;gap:5px!important;min-height:36px!important;border:0;border-radius:20px;padding:7px 10px;background:transparent;color:var(--soft);font-size:12px;}
+.theme-segment button[aria-pressed=true] {background:var(--card);color:var(--foreground);box-shadow:0 2px 7px #0000000b;}
+.settings-intro {max-width:68ch;color:var(--soft);margin-bottom:28px;}
+.settings-stack {display:flex;flex-direction:column;gap:24px;min-width:0;}
+.device-settings {padding:clamp(20px,3vw,32px);min-width:0;}
+.device-settings p {color:var(--soft);font-size:14px;line-height:1.65;}
+.device-settings .two-fields {margin:20px 0;}
+.settings-links {display:flex;flex-wrap:wrap;gap:16px;margin-top:22px;font-size:13px;}
+.preference-check {display:flex;align-items:center;gap:12px;margin-top:24px;}
+.preference-check input {accent-color:var(--primary);width:18px;height:18px;}
+.profile-heading-actions {display:flex;gap:14px;align-items:center;flex-wrap:wrap;}
+html[data-motion=paused] {scroll-behavior:auto;}
+html[data-motion=paused] .orbit-shell *,html[data-motion=paused] .orbit-shell *::before,html[data-motion=paused] .orbit-shell *::after {animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;}
+@media(max-width:600px) {.theme-segment button span {display:none;}.theme-segment button {padding:8px;}.app-header .mode-chip {display:none;}.settings-page .settings-grid {grid-template-columns:minmax(0,1fr);}.appearance-options {flex-wrap:wrap;}}

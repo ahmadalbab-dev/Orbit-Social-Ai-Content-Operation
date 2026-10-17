@@ -12,7 +12,19 @@ import {
 } from "lucide-react";
 import { Button, Card } from "./ui";
 import { SectionHeading } from "./design-ui";
-import { exportLocalVideo } from "./local-video-export";
+import {
+  drawEditedFrame,
+  exportLocalVideo,
+  type LocalVideoEdit,
+  type VideoImageOverlay,
+} from "./local-video-export";
+import { videoTemplates } from "./video-templates";
+import { EditorAiPanel } from "./editor-ai-panel";
+import type {
+  VideoEditorChanges,
+  VideoEditorState,
+} from "./editor-ai-contract";
+import "./video-editor-advanced.css";
 import { VideoAiPlanPanel } from "./video-ai-plan-panel";
 import { malaysiaDateKey } from "./calendar-data";
 import { DatePicker } from "../../components/ui/date-picker";
@@ -65,6 +77,20 @@ export function VideoEditor({
   preview?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayImages = useRef(new Map<string, HTMLImageElement>());
+  const overlayUrls = useRef(new Set<string>());
+  const overlayLoading = useRef(false);
+  const sourceGeneration = useRef(0);
+  const [overlays, setOverlays] = useState<VideoImageOverlay[]>([]);
+  const [template, setTemplate] = useState("news");
+  const [aiUndo, setAiUndo] = useState<{
+    state: VideoEditorState;
+    overlays: VideoImageOverlay[];
+  } | null>(null);
+  const [brightness, setBrightness] = useState(1);
+  const [contrast, setContrast] = useState(1);
+  const [saturation, setSaturation] = useState(1);
   const localExport = useRef<AbortController | null>(null);
   const [exportProgress, setExportProgress] = useState<number | null>(null);
   const [speed, setSpeed] = useState(1);
@@ -98,6 +124,9 @@ export function VideoEditor({
     mounted.current = true;
     return () => {
       mounted.current = false;
+      overlayUrls.current.forEach((url) => URL.revokeObjectURL(url));
+      overlayUrls.current.clear();
+      overlayImages.current.clear();
       for (const controller of operations.current) controller.abort();
     };
   }, []);
@@ -201,11 +230,184 @@ export function VideoEditor({
       c.end <= duration,
   );
   const dimensions = formats[format];
+  const validOverlays = overlays.every(
+    (o) => o.start >= 0 && o.end > o.start && o.end <= duration,
+  );
+  const edit: LocalVideoEdit = {
+    start,
+    duration,
+    width: dimensions.width,
+    height: dimensions.height,
+    speed,
+    volume,
+    rotation,
+    flip,
+    brightness,
+    contrast,
+    saturation,
+    overlays,
+    captions,
+    ...(news ? { news: { title: cleanText(title), date: dateLabel } } : {}),
+  };
+  const latestEdit = useRef(edit);
+  latestEdit.current = edit;
+  useEffect(() => {
+    if (!active) videoRef.current?.pause();
+  }, [active]);
+  useEffect(() => {
+    if (!source || !active) return;
+    let frame = 0;
+    const draw = () => {
+      const video = videoRef.current,
+        canvas = canvasRef.current;
+      if (video && canvas && video.readyState >= 2) {
+        const current = latestEdit.current;
+        if (canvas.width !== current.width) canvas.width = current.width;
+        if (canvas.height !== current.height) canvas.height = current.height;
+        const context = canvas.getContext("2d");
+        if (context)
+          drawEditedFrame(
+            context,
+            video,
+            current,
+            Math.max(0, video.currentTime - current.start),
+            overlayImages.current,
+          );
+      }
+      frame = requestAnimationFrame(draw);
+    };
+    frame = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(frame);
+  }, [source, active]);
+  async function addOverlays(files: FileList | null) {
+    if (!files || busy || overlayLoading.current) return;
+    overlayLoading.current = true;
+    const generation = sourceGeneration.current;
+    const room = 6 - overlays.length;
+    const next: VideoImageOverlay[] = [];
+    for (const file of Array.from(files).slice(0, room)) {
+      if (
+        !["image/png", "image/jpeg", "image/webp"].includes(file.type) ||
+        file.size > 8 * 1024 * 1024
+      ) {
+        setNotice("Use PNG, JPEG or WebP images up to 8 MB each.");
+        continue;
+      }
+      const src = URL.createObjectURL(file);
+      overlayUrls.current.add(src);
+      try {
+        const image = new Image();
+        image.src = src;
+        await image.decode();
+        if (
+          !mounted.current ||
+          generation !== sourceGeneration.current ||
+          image.naturalWidth * image.naturalHeight > 4_000_000
+        )
+          throw new Error("Use an overlay below 4 megapixels.");
+        const id = crypto.randomUUID();
+        overlayImages.current.set(id, image);
+        next.push({
+          id,
+          src,
+          x: 0.05,
+          y: 0.05,
+          width: 0.3,
+          opacity: 1,
+          start: 0,
+          end: duration,
+        });
+      } catch {
+        URL.revokeObjectURL(src);
+        overlayUrls.current.delete(src);
+        if (mounted.current)
+          setNotice(
+            "The image could not be loaded. Use an image below 4 megapixels.",
+          );
+      }
+    }
+    overlayLoading.current = false;
+    if (mounted.current && generation === sourceGeneration.current)
+      setOverlays((old) => [...old, ...next].slice(0, 6));
+  }
+  const aiCurrent: VideoEditorState = {
+    sourceDuration,
+    format,
+    speed,
+    volume,
+    rotation: rotation as 0 | 90 | 180 | 270,
+    flip,
+    start,
+    duration,
+    brightness,
+    contrast,
+    saturation,
+    template: template as VideoEditorState["template"],
+    title,
+    news,
+    captions,
+  };
+  function applyAi(changes: VideoEditorChanges) {
+    const preset = videoTemplates.find((t) => t.id === changes.template);
+    const next = {
+      ...(preset
+        ? {
+            format: preset.format,
+            news: preset.news,
+            brightness: preset.brightness,
+            contrast: preset.contrast,
+            saturation: preset.saturation,
+            speed: preset.speed,
+          }
+        : {}),
+      ...changes,
+    };
+    if (next.duration !== undefined && next.duration > maxDuration) {
+      setNotice(
+        `Local video export supports clips up to ${maxDuration} seconds.`,
+      );
+      return;
+    }
+    setAiUndo({ state: aiCurrent, overlays });
+    restoreAi(next);
+    if (next.duration !== undefined && !next.captions)
+      setCaptions((old) =>
+        old
+          .filter((c) => c.start < next.duration!)
+          .map((c) => ({ ...c, end: Math.min(c.end, next.duration!) })),
+      );
+    if (next.duration !== undefined)
+      setOverlays((old) =>
+        old
+          .filter((o) => o.start < next.duration!)
+          .map((o) => ({ ...o, end: Math.min(o.end, next.duration!) })),
+      );
+  }
+  function restoreAi(next: VideoEditorChanges) {
+    if (next.template !== undefined) setTemplate(next.template);
+    if (next.format !== undefined) setFormat(next.format);
+    if (next.speed !== undefined) setSpeed(next.speed);
+    if (next.volume !== undefined) setVolume(next.volume);
+    if (next.rotation !== undefined) setRotation(next.rotation);
+    if (next.flip !== undefined) setFlip(next.flip);
+    if (next.start !== undefined) setStart(next.start);
+    if (next.duration !== undefined) setDuration(next.duration);
+    if (next.brightness !== undefined) setBrightness(next.brightness);
+    if (next.contrast !== undefined) setContrast(next.contrast);
+    if (next.saturation !== undefined) setSaturation(next.saturation);
+    if (next.title !== undefined) setTitle(next.title);
+    if (next.news !== undefined) setNews(next.news);
+    if (next.captions !== undefined) setCaptions(next.captions);
+  }
   const canRender =
     !!asset &&
     !!status?.configured &&
     validRange &&
     validCaptions &&
+    !overlays.length &&
+    brightness === 1 &&
+    contrast === 1 &&
+    saturation === 1 &&
     (!news ||
       (cleanText(title).length > 0 &&
         cleanText(title).length <= 100 &&
@@ -221,12 +423,18 @@ export function VideoEditor({
       setNotice("Choose an MP4, WebM or MOV video.");
       return;
     }
-    if (status && file.size > status.limits.uploadBytes) {
+    if (file.size > (status?.limits.uploadBytes ?? 256 * 1024 * 1024)) {
       setNotice(
-        `Choose a video smaller than ${Math.floor(status.limits.uploadBytes / 1024 / 1024)} MB.`,
+        `Choose a video smaller than ${Math.floor((status?.limits.uploadBytes ?? 256 * 1024 * 1024) / 1024 / 1024)} MB.`,
       );
       return;
     }
+    setAiUndo(null);
+    sourceGeneration.current += 1;
+    overlayUrls.current.forEach((url) => URL.revokeObjectURL(url));
+    overlayUrls.current.clear();
+    overlayImages.current.clear();
+    setOverlays([]);
     setSelected(file);
     setAsset(null);
     setSource(URL.createObjectURL(file));
@@ -265,7 +473,7 @@ export function VideoEditor({
         action={
           <span className="template-chip">
             <Film size={14} aria-hidden="true" />
-            News report
+            Local editing templates
           </span>
         }
       />
@@ -285,7 +493,6 @@ export function VideoEditor({
                   setPlayhead(event.currentTarget.currentTime)
                 }
                 src={source}
-                controls
                 playsInline
                 onLoadedMetadata={(event) => {
                   const length = event.currentTarget.duration;
@@ -307,6 +514,7 @@ export function VideoEditor({
                   width: "100%",
                   height: "100%",
                   objectFit: "contain",
+                  visibility: "hidden",
                   transform: `scaleX(${flip ? -1 : 1}) rotate(${rotation}deg)`,
                   scale:
                     rotation % 180 !== 0
@@ -320,73 +528,50 @@ export function VideoEditor({
                 <span>Your video goes here.</span>
               </div>
             )}
-            {captions
-              .filter(
-                (c) => playhead - start >= c.start && playhead - start < c.end,
-              )
-              .slice(0, 1)
-              .map((c, i) => (
-                <div
-                  key={i}
-                  style={{
-                    position: "absolute",
-                    top: "50%",
-                    left: "4%",
-                    right: "4%",
-                    color: "white",
-                    background: "rgba(0,0,0,.7)",
-                    padding: "8px",
-                    textAlign: "center",
-                    whiteSpace: "normal",
-                    overflowWrap: "anywhere",
-                    pointerEvents: "none",
-                    fontSize: "3.5cqw",
-                  }}
-                >
-                  {c.text}
-                </div>
-              ))}
-            {news ? (
-              <div
-                style={{
-                  position: "absolute",
-                  pointerEvents: "none",
-                  left: 0,
-                  top: "70%",
-                  width: "100%",
-                  height: "24%",
-                  background: "rgba(255,0,0,.42)",
-                  color: "white",
-                  overflow: "hidden",
-                  fontFamily: "Arial, sans-serif",
-                }}
-              >
-                <div
-                  style={{
-                    position: "absolute",
-                    left: `${(36 / dimensions.width) * 100}%`,
-                    top: "8.333%",
-                    fontSize: `${(24 / dimensions.width) * 100}cqw`,
-                  }}
-                >
-                  {dateLabel}
-                </div>
-                <div
-                  style={{
-                    position: "absolute",
-                    left: `${(36 / dimensions.width) * 100}%`,
-                    right: "5%",
-                    top: "29.167%",
-                    fontSize: `${((format === "portrait" ? 32 : 36) / dimensions.width) * 100}cqw`,
-                    lineHeight: 1.25,
-                    overflowWrap: "anywhere",
-                  }}
-                >
-                  {cleanText(title)}
-                </div>
-              </div>
+            {source ? (
+              <canvas
+                ref={canvasRef}
+                className="video-composite-preview"
+                aria-label="Edited video preview"
+              />
             ) : null}
           </div>
+          {source ? (
+            <div className="video-playhead">
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => {
+                  const v = videoRef.current;
+                  if (v) {
+                    if (v.paused)
+                      void v
+                        .play()
+                        .catch(() => setNotice("Playback unavailable."));
+                    else v.pause();
+                  }
+                }}
+              >
+                Play / pause
+              </Button>
+              <input
+                aria-label="Video playhead"
+                type="range"
+                min="0"
+                max={sourceDuration || 1}
+                step=".05"
+                value={playhead}
+                disabled={busy}
+                onChange={(e) => {
+                  if (videoRef.current) {
+                    videoRef.current.currentTime = Number(e.target.value);
+                    setPlayhead(Number(e.target.value));
+                  }
+                }}
+              />
+              <output>{playhead.toFixed(1)}s</output>
+            </div>
+          ) : null}
           <div className="canvas-footer">
             <LockKeyhole size={13} aria-hidden="true" />
             Local preview
@@ -395,9 +580,8 @@ export function VideoEditor({
             ) : null}
           </div>
           <p className="review-help">
-            Preview layout is approximate. The downloaded video is the final
-            result. Local export works on your device. Keep this tab open until
-            it finishes.
+            Preview and local export use the same layout. Local export works on
+            your device. Keep this tab open until it finishes.
           </p>
         </Card>
         <Card className="surface video-controls">
@@ -423,7 +607,7 @@ export function VideoEditor({
               ? "Edit and export on your device. Sign in for workspace uploads."
               : status
                 ? status.configured
-                  ? `Private render setup enabled. Jobs wait for an available worker. Output up to ${maxDuration} seconds; upload up to ${Math.floor(status.limits.uploadBytes / 1024 / 1024)} MB.`
+                  ? `Private render setup enabled. Jobs wait for an available worker. Output up to ${maxDuration} seconds; upload up to ${Math.floor((status?.limits.uploadBytes ?? 256 * 1024 * 1024) / 1024 / 1024)} MB.`
                   : "Server rendering is not configured. You can still edit and export locally below."
                 : "Checking render service…"}
           </p>
@@ -453,6 +637,182 @@ export function VideoEditor({
             <Upload size={17} aria-hidden="true" />
             {asset ? "Uploaded" : "Upload to workspace"}
           </Button>
+          <EditorAiPanel key={source}
+            kind="video"
+            current={aiCurrent}
+            disabled={busy || !source || !validRange}
+            preview={preview}
+            onApply={(changes) => applyAi(changes as VideoEditorChanges)}
+          />
+          {aiUndo ? (
+            <Button
+              variant="outline"
+              disabled={busy}
+              onClick={() => {
+                restoreAi(aiUndo.state);
+                setOverlays(aiUndo.overlays);
+                setAiUndo(null);
+              }}
+            >
+              Undo AI edit
+            </Button>
+          ) : null}
+          <section aria-label="Video template gallery">
+            <h3>Start with a template</h3>
+            <p className="review-help">
+              Original Orbit layouts. Every setting remains editable.
+            </p>
+            <div className="video-template-gallery">
+              {videoTemplates.map((t) => (
+                <button
+                  type="button"
+                  key={t.id}
+                  disabled={busy}
+                  aria-pressed={template === t.id}
+                  onClick={() => {
+                    setTemplate(t.id);
+                    setFormat(t.format);
+                    setNews(t.news);
+                    setBrightness(t.brightness);
+                    setContrast(t.contrast);
+                    setSaturation(t.saturation);
+                    setSpeed(t.speed);
+                    if (t.id === "captions" && duration > 0 && !captions.length)
+                      setCaptions([
+                        {
+                          text: "Your opening line",
+                          start: 0,
+                          end: Math.min(3, duration),
+                        },
+                      ]);
+                  }}
+                >
+                  <strong>{t.name}</strong>
+                  <small>{t.description}</small>
+                </button>
+              ))}
+            </div>
+          </section>
+          <details className="small-details">
+            <summary>Colour adjustments</summary>
+            {(
+              [
+                ["Brightness", brightness, setBrightness, 0.5, 1.5],
+                ["Contrast", contrast, setContrast, 0.5, 1.5],
+                ["Saturation", saturation, setSaturation, 0, 2],
+              ] as const
+            ).map(([name, value, setter, min, max]) => (
+              <label className="field" key={name}>
+                {name}
+                <input
+                  aria-label={`Video ${name.toLowerCase()}`}
+                  type="range"
+                  min={min}
+                  max={max}
+                  step=".05"
+                  value={value}
+                  disabled={busy}
+                  onChange={(e) => setter(Number(e.target.value))}
+                />
+                <output>{Math.round(value * 100)}%</output>
+              </label>
+            ))}
+          </details>
+          <details className="small-details">
+            <summary>Image overlays · {overlays.length}/6</summary>
+            <p className="review-help">
+              Add logos, product images or picture-in-picture stills. Times use
+              the trimmed clip before speed adjustment. Later layers appear on
+              top.
+            </p>
+            <label className="field">
+              Add overlay images
+              <input
+                aria-label="Add video image overlays"
+                type="file"
+                multiple
+                accept="image/png,image/jpeg,image/webp"
+                disabled={busy || !validRange || overlays.length >= 6}
+                onChange={(e) => {
+                  void addOverlays(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            <div className="video-overlay-list">
+              {overlays.map((o, i) => (
+                <div className="video-overlay-row" key={o.id}>
+                  <strong>Image layer {i + 1}</strong>
+                  <div className="two-fields">
+                    {(
+                      ["x", "y", "width", "opacity", "start", "end"] as const
+                    ).map((field) => (
+                      <label className="field" key={field}>
+                        {
+                          {
+                            x: "Left (%)",
+                            y: "Top (%)",
+                            width: "Width (%)",
+                            opacity: "Opacity (%)",
+                            start: "From (seconds)",
+                            end: "To (seconds)",
+                          }[field]
+                        }
+                        <input
+                          aria-label={`Layer ${i + 1} ${field}`}
+                          type="number"
+                          min={field === "width" ? 5 : 0}
+                          max={
+                            field === "start" || field === "end"
+                              ? duration
+                              : 100
+                          }
+                          step={field === "start" || field === "end" ? 0.1 : 1}
+                          value={
+                            field === "start" || field === "end"
+                              ? o[field]
+                              : Math.round(o[field] * 100)
+                          }
+                          disabled={busy}
+                          onChange={(e) => {
+                            const value =
+                              Number(e.target.value) /
+                              (field === "start" || field === "end" ? 1 : 100);
+                            setOverlays((old) =>
+                              old.map((row) =>
+                                row.id === o.id
+                                  ? { ...row, [field]: value }
+                                  : row,
+                              ),
+                            );
+                          }}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => {
+                      URL.revokeObjectURL(o.src);
+                      overlayUrls.current.delete(o.src);
+                      overlayImages.current.delete(o.id);
+                      setOverlays((old) =>
+                        old.filter((row) => row.id !== o.id),
+                      );
+                    }}
+                  >
+                    Remove layer
+                  </Button>
+                </div>
+              ))}
+            </div>
+            {!validOverlays ? (
+              <p role="alert">
+                Keep image layer timings inside the trimmed clip.
+              </p>
+            ) : null}
+          </details>
           <div className="two-fields">
             <label className="field">
               Speed
@@ -706,8 +1066,8 @@ export function VideoEditor({
           <p className="review-help">
             Selected clip: {duration > 0 ? (duration / speed).toFixed(1) : "0"}{" "}
             seconds after speed adjustment. Speed, volume, rotate and flip are
-            applied by local export; the server preset uses trim, format, title
-            and captions.
+            applied by local export with image layers and colour. The server
+            preset uses trim, format, title and captions.
           </p>
           <Button
             className="full-button"
@@ -716,6 +1076,7 @@ export function VideoEditor({
               !source ||
               !validRange ||
               !validCaptions ||
+              !validOverlays ||
               (news && (!cleanText(title) || !dateLabel))
             }
             onClick={() =>
@@ -724,6 +1085,7 @@ export function VideoEditor({
                   [...operations.current].find(
                     (controller) => controller.signal === signal,
                   ) ?? null;
+                videoRef.current?.pause();
                 setExportProgress(0);
                 try {
                   const blob = await exportLocalVideo(
@@ -738,6 +1100,10 @@ export function VideoEditor({
                       rotation,
                       flip,
                       captions,
+                      overlays,
+                      brightness,
+                      contrast,
+                      saturation,
                       ...(news
                         ? { news: { title: cleanText(title), date: dateLabel } }
                         : {}),
@@ -788,8 +1154,9 @@ export function VideoEditor({
             </>
           ) : null}
           <p className="review-help">
-            Local export uses your browser encoder: MP4 where supported,
-            otherwise WebM. No upload required. Timed captions are manual; AI
+            Image layers and colour adjustments require local export. Local
+            export uses your browser encoder: MP4 where supported, otherwise
+            WebM. No upload required. Timed captions are manual; AI
             transcription is not enabled here.
           </p>
           <Button

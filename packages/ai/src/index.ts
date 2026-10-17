@@ -62,3 +62,4 @@ export type { AiGenerationInput, AiProviderFailure } from "./huggingface.js";
 export { HuggingFaceImageEditor, ImageEditError, validateImageEdit, HF_IMAGE_MODEL, HF_IMAGE_ENDPOINT } from "./huggingface-image.js";
 export { GroqVideoPlanner, HuggingFaceVideoPlanner, parseVideoPlan, validateVideoPlanInput } from "./huggingface-video-plan.js";
 export type { VideoPlan } from "./huggingface-video-plan.js";
+export {EditorPlanner,validateEditorInput,parseEditorPlan} from './editor-planner.js';

@@ -1,18 +1,19 @@
 "use client";
 import { useEffect, useId, useRef, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
-import { malaysiaDateKey, monthGrid } from "../../app/orbit/calendar-data";
+import { monthGrid } from "../../app/orbit/calendar-data";
 import "./date-picker.css";
+import {dateKeyInZone} from "../../app/orbit/device-preferences";
 
-/** Date-only keys stay in Malaysia calendar time, without UTC conversion of user input. */
-export function DatePicker({ value, onChange, label = "Choose date", disabled = false, withTime = false }: {
-  value: string; onChange: (value: string) => void; label?: string; disabled?: boolean; withTime?: boolean;
+/** Date-only keys stay in the selected calendar timezone without UTC shifting user input. */
+export function DatePicker({ value, onChange, label = "Choose date", disabled = false, withTime = false, timeZone = "Asia/Kuala_Lumpur", timeZoneLabel = "Kuala Lumpur" }: {
+  value: string; onChange: (value: string) => void; label?: string; disabled?: boolean; withTime?: boolean; timeZone?: string; timeZoneLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const initial = (value || malaysiaDateKey(new Date())).slice(0, 10);
+  const initial = (value || dateKeyInZone(new Date(),timeZone)).slice(0, 10);
   const [month, setMonth] = useState(() => new Date(`${initial}T12:00:00Z`));
   const root = useRef<HTMLDivElement>(null), trigger = useRef<HTMLButtonElement>(null);
-  const id = useId(), today = malaysiaDateKey(new Date()), selected = value.slice(0, 10);
+  const id = useId(), today = dateKeyInZone(new Date(),timeZone), selected = value.slice(0, 10);
   const year = month.getUTCFullYear(), index = month.getUTCMonth();
   const days = monthGrid(year, index);
   const close = () => { setOpen(false); trigger.current?.focus({ preventScroll: true }); };
@@ -41,7 +42,7 @@ export function DatePicker({ value, onChange, label = "Choose date", disabled = 
         const next = buttons.indexOf(event.target) + offset;
         if (buttons[next]) { event.preventDefault(); buttons[next].focus(); }
       }}>{days.map(day => <button type="button" key={day.key} aria-label={new Intl.DateTimeFormat("en", { dateStyle: "full", timeZone: "UTC" }).format(new Date(`${day.key}T12:00:00Z`))} aria-pressed={day.key===selected} aria-current={day.key===today ? "date" : undefined} data-current-month={day.current} onClick={() => select(day.key)}>{day.day}</button>)}</div>
-      {withTime ? <label className="ios-date-time">Malaysia time<input aria-label={`${label} clock`} type="time" value={value.slice(11,16) || "09:00"} onChange={event => onChange(`${selected || today}T${event.target.value || "09:00"}`)}/></label> : null}
+      {withTime ? <label className="ios-date-time">{timeZoneLabel} time<input aria-label={`${label} clock`} type="time" value={value.slice(11,16) || "09:00"} onChange={event => onChange(`${selected || today}T${event.target.value || "09:00"}`)}/></label> : null}
       <footer><button type="button" onClick={() => { setMonth(new Date(`${today}T12:00:00Z`)); select(today); }}>Today</button><button type="button" onClick={() => { onChange(""); close(); }}>Clear</button>{withTime ? <button type="button" onClick={close}>Done</button> : null}</footer>
     </section> : null}
   </div>;
