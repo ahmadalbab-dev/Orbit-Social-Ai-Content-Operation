@@ -17,9 +17,9 @@ export class ImageAiService {
     try { return await new HuggingFaceImageEditor(process.env.HF_TOKEN!).edit(body); }
     catch { throw new ServiceUnavailableException("AI image editing did not complete. Check provider credit and inference access, then retry later."); }
   }
-  async reserveAttempt(identity: RequestIdentity) {
+  async reserveAttempt(identity: RequestIdentity, configured = Boolean(process.env.HF_TOKEN)) {
     requireRole(identity);
-    if (!process.env.HF_TOKEN) throw new ServiceUnavailableException("AI editing is not configured");
+    if (!configured) throw new ServiceUnavailableException("AI editing is not configured");
     await this.billing.requirePaidAccess(identity.workspaceId);
     const limit = Number(process.env.AI_MONTHLY_GENERATION_LIMIT ?? 100);
     if (!Number.isSafeInteger(limit) || limit < 1) throw new ServiceUnavailableException("AI quota is not configured");

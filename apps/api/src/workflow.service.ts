@@ -1,8 +1,9 @@
 import { BillingService } from "./billing.service";
 import { aiServiceFailure } from "./ai-errors";
+import { textAiConfig } from "./text-ai.config";
 import { createHash } from "node:crypto";
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
-import { HuggingFaceContentProvider, OpenAiContentProvider, validateAiGenerationInput, socialDraftLimitViolation, type UsageRecord, type UsageStore } from "@sma/ai";
+import { GroqContentProvider, HuggingFaceContentProvider, OpenAiContentProvider, validateAiGenerationInput, socialDraftLimitViolation, type UsageRecord, type UsageStore } from "@sma/ai";
 import { Prisma, type ContentItem, type Platform } from "@sma/database";
 import { socialPlatforms, type ContentVariant, type SocialPlatform } from "@sma/types";
 import { z } from "zod";
@@ -45,7 +46,8 @@ export class WorkflowService {
     const body = parse(z.object({brandId:z.string().min(1).max(100),topic:z.string().trim().min(1).max(10000),platforms:z.array(z.enum(socialPlatforms)).min(1).max(8).refine(p=>new Set(p).size===p.length),mode:z.enum(["caption","ideas","rewrite","hashtags","script"]).optional(),language:z.string().max(80).optional()}).strict(),input);
     const brand = await this.db.brand.findFirst({where:{id:body.brandId,workspaceId:identity.workspaceId}});
     if (!brand) throw new NotFoundException("Brand not found");
-    if (!process.env.HF_TOKEN && !process.env.OPENAI_API_KEY) throw new ServiceUnavailableException("Platform AI is not configured");
+    const config = textAiConfig();
+    if (!config.configured) throw new ServiceUnavailableException("Platform AI is not configured");
     // Both provider routes use the same bounded Studio input. Reject local input
     // before quota reservation so a saved oversized profile cannot spend attempts.
     let generationInput: ReturnType<typeof validateAiGenerationInput>;
@@ -75,7 +77,7 @@ export class WorkflowService {
       };
       const workspace = await this.db.workspace.findUniqueOrThrow({where:{id:identity.workspaceId}});
       const options={monthlyBudgetUsd:Number(workspace.monthlyAiBudgetUsd)};
-      const provider = process.env.HF_TOKEN ? new HuggingFaceContentProvider(store,{...options,apiKey:process.env.HF_TOKEN,model:process.env.HF_MODEL}) : new OpenAiContentProvider(store,{...options,apiKey:process.env.OPENAI_API_KEY!,model:process.env.OPENAI_DEFAULT_MODEL});
+      const provider = config.provider === "groq" ? new GroqContentProvider(store,{...options,apiKey:config.apiKey!,model:config.model}) : config.provider === "huggingface" ? new HuggingFaceContentProvider(store,{...options,apiKey:config.apiKey!,model:config.model}) : new OpenAiContentProvider(store,{...options,apiKey:config.apiKey!,model:config.model});
       const result=await provider.generateVariants(generationInput);
       const variants=parse(variantsSchema,result.variants);
       const item=await this.db.contentItem.create({data:{workspaceId:identity.workspaceId,brandId:brand.id,title:body.topic,body:variants[0].copy,platform:variants[0].platform.toUpperCase() as Platform,metadata:json({variants,generationMode:"ai"}),revisions:{create:{revision:1,variants:json(variants),actorId:identity.userId}}}});

@@ -3,6 +3,7 @@ import { WorkflowService } from "./workflow.service";
 import { DatabaseService } from "./database.service";
 import { IdentityOnly, Public, type RequestIdentity } from "./security";
 import { WorkspaceService } from "./workspace.service";
+import { textAiConfig } from "./text-ai.config";
 type Request = {identity:RequestIdentity};
 @Controller()
 export class AppController {
@@ -11,7 +12,7 @@ export class AppController {
   @Public() @Get("ready") async ready() { try {await this.db.readiness();return {status:"ready",dependencies:{database:"connected"},livePublishing:false};}catch{throw new ServiceUnavailableException("Database not ready");} }
   @IdentityOnly() @Get("workspaces") listWorkspaces(@Req() req:Request) {return this.workspaces.list(req.identity);}
   @IdentityOnly() @Post("workspaces") createWorkspace(@Req() req:Request,@Body() body:unknown) {return this.workspaces.create(req.identity,body);}
-  @Get("ai/status") aiStatus(){return {configured:Boolean(process.env.HF_TOKEN||process.env.OPENAI_API_KEY),provider:process.env.HF_TOKEN?"huggingface":process.env.OPENAI_API_KEY?"openai":null};}
+  @Get("ai/status") aiStatus(){const {configured,provider}=textAiConfig();return {configured,provider,verified:false};}
   @Get("integrations/status") integrationStatus(){return {connectorMode:"disabled",livePublishing:false,providers:Object.fromEntries(["facebook","instagram","threads"].map(p=>[p,{configured:false,requiresOwnerAuthorization:true}]))};}
   @Get("brands") brands(@Req() req:Request){return this.workflow.listBrands(req.identity.workspaceId);}
   @Get("content") list(@Req() req:Request){return this.workflow.list(req.identity.workspaceId);}

@@ -5,6 +5,8 @@ import { AiBudgetExceededError, type UsageRecord, type UsageStore } from "./inde
 
 export const HF_CHAT_ENDPOINT = "https://router.huggingface.co/v1/chat/completions";
 export const DEFAULT_HF_MODEL = "Qwen/Qwen3-235B-A22B-Instruct-2507";
+export const GROQ_CHAT_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
+export const DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b";
 export const aiModes = ["caption", "ideas", "rewrite", "hashtags", "script"] as const;
 const platforms = ["facebook", "instagram", "linkedin", "tiktok", "youtube", "x", "threads", "pinterest"] as const;
 const inputSchema = z.object({
@@ -99,16 +101,16 @@ const completionSchema = z.object({
 export class HuggingFaceContentProvider {
   private readonly model: string;
   private readonly maxOutputTokens: number;
-  constructor(private readonly store: UsageStore, private readonly options: {apiKey:string;model?:string;monthlyBudgetUsd?:number;maxOutputTokens?:number;fetch?:typeof fetch}) {
+  constructor(private readonly store: UsageStore, private readonly options: {apiKey:string;model?:string;monthlyBudgetUsd?:number;maxOutputTokens?:number;fetch?:typeof fetch;provider?:"groq"}) {
     if (!options.apiKey.trim() || /[\r\n]/.test(options.apiKey)) throw new AiProviderError("unconfigured");
-    this.model = options.model ?? DEFAULT_HF_MODEL;
+    this.model = options.model ?? (options.provider === "groq" ? DEFAULT_GROQ_MODEL : DEFAULT_HF_MODEL);
     if (!/^[\w.-]+\/[\w.-]+(?::[\w-]+)?$/.test(this.model)) throw new AiProviderError("unconfigured");
     this.maxOutputTokens = options.maxOutputTokens ?? 3000;
     if (!Number.isSafeInteger(this.maxOutputTokens) || this.maxOutputTokens < 128 || this.maxOutputTokens > 6000 || (options.monthlyBudgetUsd !== undefined && (!Number.isFinite(options.monthlyBudgetUsd) || options.monthlyBudgetUsd < 0))) throw new AiProviderError("unconfigured");
   }
   async generateVariants(value: AiGenerationInput) {
     const input = validateAiGenerationInput(value);
-    const requestHash = createHash("sha256").update(JSON.stringify({version:1,provider:"huggingface",model:this.model,input})).digest("hex");
+    const requestHash = createHash("sha256").update(JSON.stringify({version:1,provider:this.options.provider ?? "huggingface",model:this.model,input})).digest("hex");
     const cached = await this.store.find(input.workspaceId, requestHash);
     if (cached) return {variants:parseSocialDrafts(JSON.stringify({variants:cached}), input.platforms),usage:{requestHash,model:this.model,inputTokens:0,outputTokens:0,estimatedCostUsd:0,cached:true} satisfies UsageRecord};
     // Durable, atomic generation quotas must also be enforced by the API before calling this provider.
@@ -116,10 +118,10 @@ export class HuggingFaceContentProvider {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 45000);
     try {
-      const response = await (this.options.fetch ?? fetch)(HF_CHAT_ENDPOINT, {
+      const response = await (this.options.fetch ?? fetch)(this.options.provider === "groq" ? GROQ_CHAT_ENDPOINT : HF_CHAT_ENDPOINT, {
         method:"POST",redirect:"error",signal:controller.signal,
         headers:{Authorization:`Bearer ${this.options.apiKey.trim()}`,"Content-Type":"application/json"},
-        body:JSON.stringify({model:this.model,messages:socialMessages(input),response_format:{type:"json_object"},max_tokens:this.maxOutputTokens,temperature:0.6,stream:false})
+        body:JSON.stringify({model:this.model,messages:socialMessages(input),response_format:{type:"json_object"},...(this.options.provider === "groq" ? {max_completion_tokens:this.maxOutputTokens,...(/^openai\/gpt-oss-(?:20|120)b$/.test(this.model)?{include_reasoning:false,reasoning_effort:"low"}:{})} : {max_tokens:this.maxOutputTokens}),temperature:0.6,stream:false})
       });
       if (!response.ok) {
         await response.body?.cancel();
@@ -138,5 +140,12 @@ export class HuggingFaceContentProvider {
       // Never expose upstream response text, request body, URL or credentials.
       throw new AiProviderError("unavailable");
     } finally { clearTimeout(timeout); }
+  }
+}
+
+/** Groq uses its own fixed endpoint and key; never falls back to paid HF routing. */
+export class GroqContentProvider extends HuggingFaceContentProvider {
+  constructor(store: UsageStore, options: {apiKey:string;model?:string;monthlyBudgetUsd?:number;maxOutputTokens?:number;fetch?:typeof fetch}) {
+    super(store, {...options, provider: "groq"});
   }
 }

@@ -61,6 +61,6 @@ describe("actionable AI failures after dispatch", () => {
     vi.spyOn(HuggingFaceVideoPlanner.prototype, "plan").mockRejectedValue(new AiProviderError("timeout"));
     const error = await service.plan(identity, { brief: "Introduce a product", duration: 10 }).catch(error => error);
     expect(error.getResponse()).toMatchObject({ code: "AI_TIMEOUT", message: "AI took too long. Try again later." });
-    expect(reserveAttempt).toHaveBeenCalledExactlyOnceWith(identity);
+    expect(reserveAttempt).toHaveBeenCalledExactlyOnceWith(identity,true);
   });
 });
