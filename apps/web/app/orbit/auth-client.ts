@@ -45,7 +45,7 @@ export async function passwordAuth(
       {
         method: "POST",
         headers: { apikey: config.key, "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim(), password }),
         signal: AbortSignal.timeout(20000),
         redirect: "error",
       },
@@ -54,14 +54,26 @@ export async function passwordAuth(
     throw Error("Cannot reach the sign-in service. Please try again later.");
   }
   const body = await response.json().catch(() => ({}));
-  if (!response.ok)
-    throw Error(
-      response.status === 429
-        ? "Too many attempts. Wait before trying again."
-        : kind === "signin"
-          ? "Could not sign in. Check your email, password and email confirmation."
-          : "Could not complete sign-up. Check your details or contact support.",
-    );
+  if (!response.ok) {
+    // Translate only documented codes. Never reflect provider messages or credentials.
+    const code = body?.code ?? body?.error_code;
+    const message = response.status === 429 || code === "over_email_send_rate_limit"
+      ? "Too many attempts. Wait a few minutes before trying again."
+      : code === "email_not_confirmed"
+        ? "Confirm your email before signing in. Check your inbox and spam folder."
+        : kind === "signin" && code === "invalid_credentials"
+          ? "Email or password is incorrect. New to Orbit? Create an account first."
+          : kind === "signup" && code === "weak_password"
+            ? "Choose a stronger password with at least 8 characters."
+            : kind === "signup" && ["email_address_not_authorized", "email_address_not_authorized_to_send"].includes(code)
+              ? "We couldn't send a confirmation email. Please contact support to finish account setup."
+              : kind === "signup" && ["signup_disabled", "email_provider_disabled"].includes(code)
+                ? "Account registration is currently unavailable. Please contact support."
+                : kind === "signin"
+                  ? "Could not sign in. Check your email and password, or create an account if you're new."
+                  : "Could not complete sign-up. Check your details or contact support.";
+    throw Error(message);
+  }
   if (
     typeof body.access_token === "string" &&
     typeof body.expires_in === "number" &&

@@ -35,3 +35,24 @@ describe("customer authentication boundaries",()=>{
   setApiSession(null);await expect(api("/content")).rejects.toThrow("Sign in");
  });
 });
+
+describe("safe authentication guidance",()=>{
+ for (const [kind,code,message] of [
+  ["signin","invalid_credentials","Create an account first"],
+  ["signin","email_not_confirmed","Confirm your email"],
+  ["signup","weak_password","stronger password"],
+  ["signup","email_address_not_authorized","confirmation email"],
+  ["signup","signup_disabled","registration is currently unavailable"],
+  ["signin","over_email_send_rate_limit","Wait a few minutes"],
+ ] as const) {
+  it(`maps ${code} without reflecting provider text`,async()=>{
+   vi.stubGlobal("fetch",vi.fn().mockResolvedValue(Response.json({code,message:"provider-private-value"},{status:400})));
+   await expect(passwordAuth(kind,"test@example.com","password",{url:"https://project.supabase.co",key:publicKey})).rejects.toThrow(message);
+  });
+ }
+ it("trims email but preserves password characters",async()=>{
+  const fetcher=vi.fn().mockResolvedValue(Response.json({access_token:"verified",expires_in:3600}));vi.stubGlobal("fetch",fetcher);
+  await passwordAuth("signin","  test@example.com  "," password ",{url:"https://project.supabase.co",key:publicKey});
+  expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({email:"test@example.com",password:" password "});
+ });
+});

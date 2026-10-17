@@ -557,3 +557,328 @@ html[data-theme=light] .orbit-nav.reference-dock .reference-dock-icon[aria-curre
 .session-compact+.orbit-shell .app-content{padding-top:30px}.workspace-session .small-details{margin-top:18px}
 .workspace-session input,.workspace-session select{background:var(--card);color:var(--foreground)}
 @media(max-width:600px){.session-compact{padding:90px 18px 0}.session-controls{align-items:end}.session-controls label{display:grid;gap:4px}.session-controls select{max-width:58vw}.workspace-session{margin-top:24px}.workspace-session.session-compact{margin-top:0}}
+/* Orbit account entry: a compact, shared layout for sign-in, sign-up and recovery. */
+.orbit-auth {
+  min-height: 100dvh;
+  background: var(--background);
+  color: var(--foreground);
+  padding: 24px max(20px, env(safe-area-inset-right))
+    max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+}
+.auth-frame {
+  width: 100%;
+  max-width: 440px;
+  min-width: 0;
+  margin: auto;
+}
+.auth-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.auth-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--foreground);
+  font: 650 15px var(--mono);
+  letter-spacing: -0.5px;
+  text-decoration: none;
+}
+.auth-topbar .icon-button {
+  height: 44px;
+  width: 44px;
+}
+.auth-orbit-visual {
+  height: 200px;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  pointer-events: none;
+  margin: 0 -16px;
+  background: radial-gradient(
+    ellipse at 50% 60%,
+    color-mix(in srgb, var(--primary) 9%, transparent),
+    transparent 66%
+  );
+  mask-image: linear-gradient(transparent, #000 18%, #000 76%, transparent);
+}
+.auth-orbit-visual .orbit-field {
+  position: absolute;
+  z-index: 0;
+  opacity: 1;
+}
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  min-width: 0;
+}
+.auth-heading {
+  text-align: center;
+  margin: 0 0 28px;
+}
+.auth-eyebrow {
+  margin: 0 0 12px;
+  color: var(--soft);
+  font: 500 10px var(--mono);
+  letter-spacing: 2.2px;
+}
+.auth-heading h1 {
+  margin: 0;
+  font: 650 clamp(25px, 5vw, 31px)/1.2 var(--mono);
+  letter-spacing: -1.3px;
+  text-wrap: balance;
+}
+.auth-heading > p:last-child {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--soft);
+  margin: 14px auto 0;
+  max-width: 330px;
+  text-wrap: balance;
+}
+.auth-form.session-form {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+.auth-form .field {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 0;
+}
+.auth-form > input,
+.auth-password-field {
+  margin-bottom: 10px;
+}
+.auth-form input,
+.auth-card .session-form input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  font-size: 16px;
+  line-height: 1.5;
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--foreground);
+  border-radius: 10px;
+  padding: 11px 14px;
+}
+.auth-form input::placeholder {
+  color: var(--soft);
+  opacity: 0.75;
+  font-size: 14px;
+}
+.auth-password-field {
+  position: relative;
+}
+.auth-password-field input {
+  padding-right: 52px;
+}
+.auth-password-field button {
+  position: absolute;
+  right: 2px;
+  top: 2px;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--soft);
+}
+.auth-password-field button:hover {
+  color: var(--foreground);
+  background: var(--muted);
+}
+.auth-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 0;
+  background: transparent;
+  border: 0;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+.auth-link:hover {
+  color: var(--primary);
+}
+.auth-forgot {
+  justify-self: end;
+  margin-top: -10px;
+}
+.auth-form .auth-submit {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 8px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: 1px solid transparent;
+  font-size: 15px;
+  font-weight: 650;
+}
+.auth-submit:not(:disabled):hover {
+  filter: brightness(1.08);
+}
+.auth-password-hint {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--soft);
+  margin: -7px 0 7px;
+}
+.auth-switch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  column-gap: 8px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--soft);
+}
+.auth-preview-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  margin-top: 8px;
+  text-decoration: none;
+  color: var(--soft);
+  font-size: 12px;
+}
+.auth-preview-link:hover {
+  color: var(--foreground);
+}
+.auth-notice {
+  margin: 0 0 4px;
+  padding: 12px 14px;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.auth-setup {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 14px;
+  padding: 12px;
+  background: var(--muted);
+  border-radius: 10px;
+  color: var(--soft);
+}
+.auth-setup svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.auth-setup p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.auth-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  max-width: 400px;
+  margin: 30px auto 0;
+  color: var(--soft);
+  font-size: 10px;
+  line-height: 1.6;
+}
+.auth-footer nav {
+  display: flex;
+  gap: 18px;
+}
+.auth-footer a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  text-decoration: none;
+}
+.auth-footer a:hover {
+  text-decoration: underline;
+}
+.auth-card > div > h2 {
+  font-size: 19px;
+  letter-spacing: -0.5px;
+}
+.auth-card .session-form {
+  gap: 14px;
+}
+.auth-card .session-form label {
+  gap: 7px;
+  font-size: 13px;
+}
+.auth-card .session-form .orbit-button {
+  min-height: 48px;
+  border-radius: 999px;
+}
+.auth-card > div > .text-action {
+  min-height: 44px;
+  padding: 8px 0;
+  font-size: 13px;
+}
+@media (min-width: 1000px) {
+  .orbit-auth {
+    padding-top: 36px;
+    padding-bottom: 36px;
+  }
+  .auth-orbit-visual {
+    height: 210px;
+  }
+}
+@media (max-width: 480px) {
+  .orbit-auth {
+    padding-top: max(20px, env(safe-area-inset-top));
+    place-items: start center;
+  }
+  .auth-orbit-visual {
+    height: 180px;
+    margin-top: -8px;
+  }
+  .auth-heading {
+    margin-bottom: 24px;
+  }
+  .auth-topbar {
+    padding: 0 2px;
+  }
+  .auth-footer {
+    margin-top: 18px;
+  }
+  .auth-brand {
+    font-size: 13px;
+  }
+  .auth-card {
+    max-width: 360px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .orbit-auth * {
+    scroll-behavior: auto;
+  }
+}

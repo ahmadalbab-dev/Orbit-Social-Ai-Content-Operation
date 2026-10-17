@@ -1,11 +1,19 @@
 "use client";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { LogOut, Plus, ShieldCheck } from "lucide-react";
+import {
+  ArrowRight,
+  Eye,
+  EyeOff,
+  LogOut,
+  Plus,
+  ShieldCheck,
+} from "lucide-react";
 import Home from "./page-client";
 import { api, setApiSession } from "./session-api";
 import { passwordAuth, publicAuthConfig, revokeSession } from "./auth-client";
 import { OrbitMark } from "./design-ui";
-import { AppearanceToggle } from "./appearance";
+import { AppearanceToggle, useAppearance } from "./appearance";
+import { OrbitField } from "./orbit-field";
 import { Button } from "./ui";
 import { SessionRenewal } from "./session-renewal";
 import { PasswordRecovery } from "./password-recovery";
@@ -19,6 +27,8 @@ export function WorkspaceApp() {
   const [busy, setBusy] = useState(false);
   const [recovering, setRecovering] = useState(false);
   const [signup, setSignup] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const { motion } = useAppearance();
   const configured = !!publicAuthConfig();
   const selectedRef = useRef("");
   const tokenRef = useRef("");
@@ -111,23 +121,8 @@ export function WorkspaceApp() {
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Sign-in failed.");
     } finally {
-      form.reset();
-      setBusy(false);
-    }
-  }
-  async function internal(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    setBusy(true);
-    setNotice("");
-    try {
-      await connect(String(new FormData(form).get("token") ?? "").trim());
-    } catch (error) {
-      setNotice(
-        error instanceof Error ? error.message : "Session verification failed.",
-      );
-    } finally {
-      form.reset();
+      const password = form.elements.namedItem("password");
+      if (password instanceof HTMLInputElement) password.value = "";
       setBusy(false);
     }
   }
@@ -177,174 +172,231 @@ export function WorkspaceApp() {
     setNotice("");
     void revokeSession(previous);
   }
-  return (
-    <>
-      <section
-        className={`workspace-session ${token && selected ? "session-compact" : ""}`}
-        id="workspace-session"
-        aria-label="Workspace session"
-      >
-        {!token ? (
-          <>
-            <div className="session-brand">
-              <OrbitMark />
-              <strong>
-                orbit<span className="word-dot">.</span>
-              </strong>
-              <AppearanceToggle />
-            </div>
-            <h1>Your content. Your workspace.</h1>
-            <a className="text-action" href="/preview">
-              Explore the v1 design preview
+  if (!token)
+    return (
+      <main className="orbit-auth" id="workspace-session">
+        <div className="auth-frame">
+          <header className="auth-topbar">
+            <a
+              href="/"
+              className="auth-brand"
+              aria-label="Orbit AI Studio home"
+            >
+              <OrbitMark small />
+              <span>Orbit AI Studio</span>
             </a>
-            <p>
-              Sign in to keep drafts and brand profiles together across your
-              devices.
-            </p>
-            {configured ? (
-              recovering ? (
-                <PasswordRecovery onCancel={() => setRecovering(false)} />
-              ) : (
-                <>
-                  <form onSubmit={auth} className="session-form">
-                    <label className="field">
-                      Email
-                      <input
-                        name="email"
-                        type="email"
-                        autoComplete="email"
-                        required
-                        maxLength={254}
-                      />
-                    </label>
-                    <label className="field">
-                      Password
-                      <input
-                        name="password"
-                        type="password"
-                        autoComplete={
-                          signup ? "new-password" : "current-password"
-                        }
-                        required
-                        minLength={signup ? 8 : 1}
-                        maxLength={256}
-                      />
-                    </label>
-                    <Button disabled={busy}>
-                      {busy
-                        ? "Connecting…"
-                        : signup
-                          ? "Create account"
-                          : "Sign in"}
-                    </Button>
-                  </form>
-                  <button
-                    className="text-action"
+            <AppearanceToggle />
+          </header>
+          <div className="auth-orbit-visual" aria-hidden="true">
+            <OrbitField paused={!motion} />
+          </div>
+          <section className="auth-card" aria-labelledby="auth-title">
+            <div className="auth-heading">
+              <p className="auth-eyebrow">A LITTLE SPACE TO CREATE</p>
+              <h1 id="auth-title">
+                {recovering
+                  ? "Find your way back."
+                  : signup
+                    ? "Make room for your ideas."
+                    : "Welcome to Orbit."}
+              </h1>
+              <p>
+                {recovering
+                  ? "Let's get you back to your workspace."
+                  : signup
+                    ? "Create your account. Bring your ideas to life."
+                    : "Sign in to your content, your channels, your space."}
+              </p>
+            </div>
+            {recovering && configured ? (
+              <PasswordRecovery
+                onCancel={() => {
+                  setRecovering(false);
+                  setNotice("");
+                }}
+              />
+            ) : (
+              <>
+                <form
+                  onSubmit={auth}
+                  className="session-form auth-form"
+                  aria-label={
+                    signup ? "Create Orbit account" : "Sign in to Orbit"
+                  }
+                >
+                  <label className="field" htmlFor="orbit-auth-email">
+                    Email address
+                  </label>
+                  <input
+                    id="orbit-auth-email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    inputMode="email"
+                    placeholder="you@example.com"
+                    required
+                    maxLength={254}
                     disabled={busy}
-                    onClick={() => {
-                      setSignup(!signup);
-                      setNotice("");
-                    }}
-                  >
-                    {signup
-                      ? "Already have an account? Sign in"
-                      : "Create an Orbit account"}
-                  </button>
-                  {!signup ? (
-                    <button
-                      className="text-action"
+                  />
+                  <label className="field" htmlFor="orbit-auth-password">
+                    {signup ? "Create a password" : "Password"}
+                  </label>
+                  <div className="auth-password-field">
+                    <input
+                      id="orbit-auth-password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete={
+                        signup ? "new-password" : "current-password"
+                      }
+                      placeholder={
+                        signup ? "At least 8 characters" : "Your password"
+                      }
+                      required
+                      minLength={signup ? 8 : 1}
+                      maxLength={256}
                       disabled={busy}
+                      aria-describedby={
+                        signup ? "auth-password-hint" : undefined
+                      }
+                    />
+                    <button
+                      type="button"
+                      aria-label={
+                        showPassword ? "Hide password" : "Show password"
+                      }
+                      aria-pressed={showPassword}
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+                    </button>
+                  </div>
+                  {signup ? (
+                    <p className="auth-password-hint" id="auth-password-hint">
+                      Use at least 8 characters.
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      className="auth-link auth-forgot"
+                      disabled={busy || !configured}
                       onClick={() => {
                         setRecovering(true);
                         setNotice("");
+                        setShowPassword(false);
                       }}
                     >
                       Forgot password?
                     </button>
+                  )}
+                  {notice ? (
+                    <p role="status" className="action-notice auth-notice">
+                      {notice}
+                    </p>
                   ) : null}
-                </>
-              )
-            ) : (
-              <div className="surface session-setup">
-                <ShieldCheck size={20} />
-                <p>
-                  Customer sign-in is awaiting operator setup. Configure the
-                  public Supabase URL and publishable key, and the backend JWT
-                  verifier, before inviting customers.
-                </p>
-              </div>
+                  <Button
+                    className="auth-submit"
+                    disabled={busy || !configured}
+                  >
+                    {busy
+                      ? "Connecting…"
+                      : signup
+                        ? "Create account"
+                        : "Sign in"}
+                    {!busy ? <ArrowRight size={18} aria-hidden="true" /> : null}
+                  </Button>
+                </form>
+                {!configured ? (
+                  <div className="auth-setup" role="status">
+                    <ShieldCheck size={17} aria-hidden="true" />
+                    <p>Sign-in is being set up. Please check back shortly.</p>
+                  </div>
+                ) : null}
+                <div className="auth-switch">
+                  <span>
+                    {signup ? "Already have an account?" : "New to Orbit?"}
+                  </span>
+                  <button
+                    type="button"
+                    className="auth-link"
+                    disabled={busy}
+                    onClick={() => {
+                      setSignup(!signup);
+                      setShowPassword(false);
+                      setNotice("");
+                    }}
+                  >
+                    {signup ? "Sign in" : "Create an account"}
+                  </button>
+                </div>
+              </>
             )}
-            <details className="small-details">
-              <summary>Internal alpha access</summary>
-              <p>
-                For authorised testers with a server-issued access token. Tokens
-                stay in memory and are cleared when you sign out or reload.
-              </p>
-              <form className="session-form" onSubmit={internal}>
-                <label className="field">
-                  Access token
-                  <input
-                    name="token"
-                    type="password"
-                    autoComplete="off"
-                    required
-                    maxLength={10000}
-                  />
-                </label>
-                <Button disabled={busy}>Verify session</Button>
-              </form>
-            </details>
-          </>
-        ) : (
-          <>
-            <div className="session-controls">
-              <label className="field">
-                Workspace
-                <select
-                  value={selected}
-                  onChange={(e) => select(e.target.value)}
-                  disabled={busy}
-                >
-                  <option value="" disabled>
-                    Choose a workspace
-                  </option>
-                  {workspaces.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                      {w.role ? ` · ${w.role}` : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button className="text-action" onClick={signout}>
-                <LogOut size={17} />
-                Sign out
-              </button>
-            </div>
-            <details className="small-details" open={!workspaces.length}>
-              <summary>
-                <Plus size={15} />
-                Create workspace
-              </summary>
-              <form className="session-form" onSubmit={create}>
-                <label className="field">
-                  Workspace name
-                  <input name="name" required minLength={2} maxLength={100} />
-                </label>
-                <Button disabled={busy}>Create workspace</Button>
-              </form>
-            </details>
-          </>
-        )}
+            <a className="auth-preview-link" href="/preview">
+              Explore Orbit before signing in{" "}
+              <ArrowRight size={15} aria-hidden="true" />
+            </a>
+          </section>
+          <footer className="auth-footer">
+            <span>Your ideas. Every channel.</span>
+            <nav aria-label="Legal">
+              <a href="/privacy">Privacy</a>
+              <a href="/terms">Terms</a>
+            </nav>
+          </footer>
+        </div>
+      </main>
+    );
+  return (
+    <>
+      <section
+        className={`workspace-session ${selected ? "session-compact" : ""}`}
+        id="workspace-session"
+        aria-label="Workspace session"
+      >
+        <div className="session-controls">
+          <label className="field">
+            Workspace
+            <select
+              value={selected}
+              onChange={(e) => select(e.target.value)}
+              disabled={busy}
+            >
+              <option value="" disabled>
+                Choose a workspace
+              </option>
+              {workspaces.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name}
+                  {w.role ? ` · ${w.role}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="text-action" onClick={signout}>
+            <LogOut size={17} />
+            Sign out
+          </button>
+        </div>
+        <details className="small-details" open={!workspaces.length}>
+          <summary>
+            <Plus size={15} />
+            Create workspace
+          </summary>
+          <form className="session-form" onSubmit={create}>
+            <label className="field">
+              Workspace name
+              <input name="name" required minLength={2} maxLength={100} />
+            </label>
+            <Button disabled={busy}>Create workspace</Button>
+          </form>
+        </details>
         {notice ? (
           <p role="status" className="action-notice">
             {notice}
           </p>
         ) : null}
       </section>
-      {token && selected ? (
-        <Home key={selected} workspaceId={selected} />
-      ) : null}
+      {selected ? <Home key={selected} workspaceId={selected} /> : null}
     </>
   );
 }

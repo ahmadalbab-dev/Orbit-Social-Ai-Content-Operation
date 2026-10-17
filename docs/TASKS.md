@@ -104,3 +104,10 @@ Requires real test identity:
 - Phone acceptance on live authenticated Studio. Publishing, billing and cloud video rendering remain disabled.
 
 - Hosted acceptance: API readiness 200, trusted web CORS origin exact match, root sign-in page 200, correct API/Auth origins in shipped browser bundle, and direct anon Data API table read denied (401). CI exposed a cancellation-test timing race; the mock now waits until rendering listens for abort, with additional start/abort assertions and no production worker change. All 10 media tests passed locally.
+
+## Compact account entry, 17 October 2026
+
+- Replaced oversized sign-in/signup view with a 400px responsive form, reused animated Orbit hero, distinct registration/recovery links and password visibility control. Removed the internal-token entry from customer UI.
+- Failed login retains the email and clears only the password. Documented provider error codes map to fixed safe guidance; raw provider messages are never reflected. Email whitespace is trimmed without changing password characters.
+- Investigation at the reported failure found zero registered Auth users; no password reset, email-confirmation bypass or account fabrication was performed. Actual registration/confirmation and live AI generation still require the user's own account.
+- Added phone/desktop browser checks for form size, mobile input sizing, signup/recovery navigation and a fully mocked invalid-credentials response. Browser tests use isolated public fixture configuration, never live credentials.
