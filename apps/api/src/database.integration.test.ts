@@ -46,6 +46,22 @@ describe.skipIf(process.env.ORBIT_DATABASE_TESTS !== "true")("PostgreSQL workspa
     vi.unstubAllEnvs();
     if(mediaRoot) await rm(mediaRoot,{recursive:true,force:true});
   });
+  it("reuses parameterized statements across independent runtime clients", async () => {
+    // Exercises the same constructor used in production. Transaction poolers can
+    // assign either client to the same backend between these transactions.
+    const second = new DatabaseService();
+    try {
+      await second.$connect();
+      for (let value = 0; value < 4; value++) {
+        const results = await Promise.all([db, second].map(client =>
+          client.$transaction(tx => tx.$queryRaw<{ value: number }[]>`SELECT ${value}::int AS value`),
+        ));
+        expect(results).toEqual([[{ value }], [{ value }]]);
+      }
+    } finally {
+      await second.$disconnect();
+    }
+  });
   it("persists drafts and invalidates approval/schedule after a revision", async () => {
     const brand = await workflow.createBrand(owner, { name: "Orbit test", voice: "Santai", audience: "Creators" });
     const draft = await workflow.manual(owner, { brandId: brand.id, topic: "KL hari ini", platforms: ["facebook"] });
