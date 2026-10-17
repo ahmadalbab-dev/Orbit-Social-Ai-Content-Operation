@@ -29,8 +29,8 @@ test('video preview exports a real edited clip locally without uploading it', as
   expect(uploads).toEqual([]);
 });
 
-test('custom video calendar supports choosing a date and keyboard dismissal', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+for (const width of [390, 1440]) test(`custom video calendar supports choosing a date and keyboard dismissal at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 });
   await page.goto('/preview');
   await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
   await page.getByRole('button', { name: 'Video Editor', exact: true }).click();
@@ -38,6 +38,9 @@ test('custom video calendar supports choosing a date and keyboard dismissal', as
   await trigger.click();
   const dialog = page.getByRole('dialog', { name: 'Video date calendar', exact: true });
   await expect(dialog).toBeVisible();
+  const bounds = await dialog.boundingBox();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
   const date = dialog.locator('.ios-date-days button[data-current-month="true"]').filter({ hasText: /^15$/ });
   const chosen = await date.getAttribute('aria-label');
   await date.click();
