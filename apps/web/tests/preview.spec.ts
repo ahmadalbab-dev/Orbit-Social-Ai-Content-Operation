@@ -5,6 +5,21 @@ async function navigate(page: Page, name: string) {
   await page.getByRole("navigation", { name: "Workspace", exact: true }).getByRole("button", { name, exact: true }).click();
 }
 
+test("desktop launcher keeps navigation open while focus transfers from its hidden button", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/preview');
+  for (const destination of ['Workspace Settings', 'Video Editor', 'Overview']) {
+    const launcher = page.getByRole('button', { name: 'Open navigation', exact: true });
+    await launcher.focus();
+    await launcher.click();
+    const navigation = page.getByRole('navigation', { name: 'Workspace', exact: true });
+    await expect(navigation).toBeVisible();
+    await expect.poll(() => navigation.evaluate(node => node.contains(document.activeElement))).toBe(true);
+    await navigation.getByRole('button', { name: destination, exact: true }).click();
+    await expect(navigation).toBeHidden();
+  }
+});
+
 test("phone preview navigates without backend calls or fake access", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const remoteCalls: string[] = [];
