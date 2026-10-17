@@ -1,4 +1,5 @@
 import { BillingService } from "./billing.service";
+import { aiServiceFailure } from "./ai-errors";
 import { createHash } from "node:crypto";
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import { HuggingFaceContentProvider, OpenAiContentProvider, validateAiGenerationInput, socialDraftLimitViolation, type UsageRecord, type UsageStore } from "@sma/ai";
@@ -79,7 +80,7 @@ export class WorkflowService {
       const variants=parse(variantsSchema,result.variants);
       const item=await this.db.contentItem.create({data:{workspaceId:identity.workspaceId,brandId:brand.id,title:body.topic,body:variants[0].copy,platform:variants[0].platform.toUpperCase() as Platform,metadata:json({variants,generationMode:"ai"}),revisions:{create:{revision:1,variants:json(variants),actorId:identity.userId}}}});
       return present(item);
-    } catch(error) { if(error instanceof BadRequestException) throw error; throw new ServiceUnavailableException("AI generation did not complete; retry later"); }
+    } catch(error) { if(error instanceof BadRequestException) throw error; throw aiServiceFailure(error, "AI generation did not complete; retry later"); }
     // A dispatched attempt remains metered even if the provider fails. Otherwise
     // repeated malformed outputs could bypass the platform spending allowance.
   }

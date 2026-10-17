@@ -21,4 +21,23 @@ describe("brief-only video AI planning", () => {
     const fetcher = vi.fn().mockRejectedValue(Error("hf_secret provider raw text"));
     await expect(new HuggingFaceVideoPlanner("hf_test", undefined, fetcher).plan({ brief: "x", duration: 5 })).rejects.toThrow("AI is temporarily unavailable");
   });
+  it("distinguishes a provider deadline from an unavailable service", async () => {
+    const fetcher = vi.fn((_url, options) => new Promise<Response>((_resolve, reject) => {
+      options!.signal!.addEventListener("abort", () => reject(Error("private timeout details")), { once: true });
+    }));
+    const controller = new AbortController();
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(controller.signal);
+    try {
+      const pending = new HuggingFaceVideoPlanner("hf_test", undefined, fetcher).plan({ brief: "x", duration: 5 });
+      const assertion = expect(pending).rejects.toMatchObject({ code: "timeout" });
+      controller.abort();
+      await assertion;
+    } finally { timeout.mockRestore(); }
+  });
+  it("cancels failed response bodies without exposing the response text", async () => {
+    const cancel = vi.fn();
+    const response = new Response(new ReadableStream({ cancel }), { status: 429 });
+    await expect(new HuggingFaceVideoPlanner("hf_test", undefined, vi.fn().mockResolvedValue(response)).plan({ brief: "x", duration: 5 })).rejects.toMatchObject({ code: "rate_limited" });
+    expect(cancel).toHaveBeenCalledOnce();
+  });
 });

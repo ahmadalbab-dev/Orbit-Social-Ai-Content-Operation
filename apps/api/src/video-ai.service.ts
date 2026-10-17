@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, ServiceUnavailableException } from "@n
 import { HuggingFaceVideoPlanner, validateVideoPlanInput } from "@sma/ai";
 import { ImageAiService } from "./image-ai.service";
 import type { RequestIdentity } from "./security";
+import { aiServiceFailure } from "./ai-errors";
 @Injectable()
 export class VideoAiService {
   constructor(private readonly quota: ImageAiService) {}
@@ -14,6 +15,6 @@ export class VideoAiService {
     catch { throw new ServiceUnavailableException("AI video planning is not configured"); }
     await this.quota.reserveAttempt(identity);
     try { return await provider.plan(brief); }
-    catch { throw new ServiceUnavailableException("AI video plan did not complete. Check inference access and retry later."); }
+    catch (error) { throw aiServiceFailure(error, "AI video plan did not complete. Check inference access and retry later."); }
   }
 }
