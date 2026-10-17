@@ -59,3 +59,6 @@ export function estimateCost(model: string, inputTokens: number, outputTokens: n
 
 export { HuggingFaceContentProvider, AiProviderError, HF_CHAT_ENDPOINT, DEFAULT_HF_MODEL, aiModes, parseSocialDrafts, socialMessages, readBoundedAiJson, validateAiGenerationInput, socialDraftLimitViolation } from "./huggingface.js";
 export type { AiGenerationInput, AiProviderFailure } from "./huggingface.js";
+export { HuggingFaceImageEditor, ImageEditError, validateImageEdit, HF_IMAGE_MODEL, HF_IMAGE_ENDPOINT } from "./huggingface-image.js";
+export { HuggingFaceVideoPlanner, parseVideoPlan, validateVideoPlanInput } from "./huggingface-video-plan.js";
+export type { VideoPlan } from "./huggingface-video-plan.js";

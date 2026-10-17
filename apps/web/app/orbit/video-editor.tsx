@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  CalendarDays,
   Download,
   Film,
   LockKeyhole,
@@ -13,7 +12,10 @@ import {
 } from "lucide-react";
 import { Button, Card } from "./ui";
 import { SectionHeading } from "./design-ui";
+import { exportLocalVideo } from "./local-video-export";
+import { VideoAiPlanPanel } from "./video-ai-plan-panel";
 import { malaysiaDateKey } from "./calendar-data";
+import { DatePicker } from "../../components/ui/date-picker";
 import {
   cancelRender,
   listRenders,
@@ -55,7 +57,21 @@ const failures: Record<string, string> = {
   RENDER_TIMEOUT: "The render took too long. Try a shorter clip.",
 };
 
-export function VideoEditor({ active = true, preview = false }: { active?: boolean; preview?: boolean }) {
+export function VideoEditor({
+  active = true,
+  preview = false,
+}: {
+  active?: boolean;
+  preview?: boolean;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const localExport = useRef<AbortController | null>(null);
+  const [exportProgress, setExportProgress] = useState<number | null>(null);
+  const [speed, setSpeed] = useState(1);
+  const [volume, setVolume] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const [flip, setFlip] = useState(false);
+  const [playhead, setPlayhead] = useState(0);
   const [source, setSource] = useState("");
   const [selected, setSelected] = useState<File | null>(null);
   const [asset, setAsset] = useState<MediaAsset | null>(null);
@@ -152,6 +168,12 @@ export function VideoEditor({ active = true, preview = false }: { active?: boole
       if (mounted.current) setBusy(false);
     }
   }
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = speed;
+      videoRef.current.volume = volume;
+    }
+  }, [speed, volume, source]);
   const maxDuration = Math.min(status?.limits.maxDuration ?? 120, 120);
   const dateLabel = date
     ? new Intl.DateTimeFormat("ms-MY", {
@@ -212,6 +234,11 @@ export function VideoEditor({ active = true, preview = false }: { active?: boole
     setStart(0);
     setDuration(0);
     setCaptions([]);
+    setSpeed(1);
+    setVolume(1);
+    setRotation(0);
+    setFlip(false);
+    setPlayhead(0);
     setNotice("");
   }
   async function download(job: RenderJob, signal: AbortSignal) {
@@ -253,6 +280,10 @@ export function VideoEditor({ active = true, preview = false }: { active?: boole
           >
             {source ? (
               <video
+                ref={videoRef}
+                onTimeUpdate={(event) =>
+                  setPlayhead(event.currentTarget.currentTime)
+                }
                 src={source}
                 controls
                 playsInline
@@ -272,7 +303,16 @@ export function VideoEditor({ active = true, preview = false }: { active?: boole
                     "This browser cannot preview this file. Try an MP4 with H.264 video.",
                   );
                 }}
-                style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "contain",
+                  transform: `scaleX(${flip ? -1 : 1}) rotate(${rotation}deg)`,
+                  scale:
+                    rotation % 180 !== 0
+                      ? Math.min(dimensions.aspect, 1 / dimensions.aspect)
+                      : 1,
+                }}
               />
             ) : (
               <div className="video-placeholder">
@@ -280,6 +320,32 @@ export function VideoEditor({ active = true, preview = false }: { active?: boole
                 <span>Your video goes here.</span>
               </div>
             )}
+            {captions
+              .filter(
+                (c) => playhead - start >= c.start && playhead - start < c.end,
+              )
+              .slice(0, 1)
+              .map((c, i) => (
+                <div
+                  key={i}
+                  style={{
+                    position: "absolute",
+                    top: "50%",
+                    left: "4%",
+                    right: "4%",
+                    color: "white",
+                    background: "rgba(0,0,0,.7)",
+                    padding: "8px",
+                    textAlign: "center",
+                    whiteSpace: "normal",
+                    overflowWrap: "anywhere",
+                    pointerEvents: "none",
+                    fontSize: "3.5cqw",
+                  }}
+                >
+                  {c.text}
+                </div>
+              ))}
             {news ? (
               <div
                 style={{
@@ -329,8 +395,9 @@ export function VideoEditor({ active = true, preview = false }: { active?: boole
             ) : null}
           </div>
           <p className="review-help">
-            Preview layout is approximate. The downloaded MP4 is the final
-            result. Local files must be selected again after leaving this tab.
+            Preview layout is approximate. The downloaded video is the final
+            result. Local export works on your device. Keep this tab open until
+            it finishes.
           </p>
         </Card>
         <Card className="surface video-controls">
@@ -352,11 +419,13 @@ export function VideoEditor({ active = true, preview = false }: { active?: boole
             </p>
           ) : null}
           <p className="review-help">
-            {preview ? "Local preview. Sign in for uploads and MP4 rendering." : status
-              ? status.configured
-                ? `Private render setup enabled. Jobs wait for an available worker. Output up to ${maxDuration} seconds; upload up to ${Math.floor(status.limits.uploadBytes / 1024 / 1024)} MB.`
-                : "Rendering is not configured by the workspace operator yet."
-              : "Checking render service…"}
+            {preview
+              ? "Edit and export on your device. Sign in for workspace uploads."
+              : status
+                ? status.configured
+                  ? `Private render setup enabled. Jobs wait for an available worker. Output up to ${maxDuration} seconds; upload up to ${Math.floor(status.limits.uploadBytes / 1024 / 1024)} MB.`
+                  : "Server rendering is not configured. You can still edit and export locally below."
+                : "Checking render service…"}
           </p>
           <Button
             className="full-button"
@@ -384,6 +453,72 @@ export function VideoEditor({ active = true, preview = false }: { active?: boole
             <Upload size={17} aria-hidden="true" />
             {asset ? "Uploaded" : "Upload to workspace"}
           </Button>
+          <div className="two-fields">
+            <label className="field">
+              Speed
+              <select
+                aria-label="Video speed"
+                disabled={busy}
+                value={speed}
+                onChange={(e) => setSpeed(Number(e.target.value))}
+              >
+                {[0.5, 0.75, 1, 1.25, 1.5, 2].map((v) => (
+                  <option key={v} value={v}>
+                    {v}×
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              Volume
+              <input
+                aria-label="Video volume"
+                type="range"
+                min="0"
+                max="1"
+                step=".05"
+                disabled={busy}
+                value={volume}
+                onChange={(e) => setVolume(Number(e.target.value))}
+              />
+              <output>
+                {Math.round(volume * 100)}%{volume === 0 ? " · Muted" : ""}
+              </output>
+            </label>
+          </div>
+          <div className="review-actions">
+            <Button
+              variant="outline"
+              disabled={busy || !source}
+              onClick={() => setRotation((v) => (v + 90) % 360)}
+            >
+              Rotate 90°
+            </Button>
+            <Button
+              variant="outline"
+              disabled={busy || !source}
+              onClick={() => setFlip((v) => !v)}
+            >
+              Flip {flip ? "on" : "off"}
+            </Button>
+            <Button
+              variant="outline"
+              disabled={busy || !source}
+              onClick={() => {
+                const video = videoRef.current;
+                if (video) {
+                  video.currentTime = start;
+                  void video
+                    .play()
+                    .catch(() =>
+                      setNotice("Tap play on the preview to start."),
+                    );
+                }
+              }}
+            >
+              Preview from trim
+            </Button>
+          </div>
           <label className="field">
             Format
             <select
@@ -459,23 +594,32 @@ export function VideoEditor({ active = true, preview = false }: { active?: boole
                   onChange={(event) => setTitle(event.target.value)}
                 />
               </label>
-              <label className="field">
-                <CalendarDays size={15} aria-hidden="true" />
-                Date
-                <input
-                  aria-label="Video date"
-                  type="date"
+              <div className="field">
+                <span>Date</span>
+                <DatePicker
+                  label="Video date"
                   disabled={busy}
                   value={date}
-                  onChange={(event) => setDate(event.target.value)}
+                  onChange={setDate}
                 />
-              </label>
+              </div>
               <p className="review-help">
                 Transparent red panel with the date above the title. Font and
                 opacity use the News report preset.
               </p>
             </>
           ) : null}
+          <VideoAiPlanPanel
+            key={`${source}:${start}:${duration}`}
+            duration={duration}
+            disabled={busy || !source || !validRange}
+            preview={preview}
+            onApply={(plan) => {
+              setTitle(plan.title);
+              setCaptions(plan.captions);
+              setNews(true);
+            }}
+          />
           <details className="small-details">
             <summary>Timed captions</summary>
             <p>Times are relative to the trimmed clip. Up to 20 captions.</p>
@@ -559,6 +703,95 @@ export function VideoEditor({ active = true, preview = false }: { active?: boole
               </p>
             ) : null}
           </details>
+          <p className="review-help">
+            Selected clip: {duration > 0 ? (duration / speed).toFixed(1) : "0"}{" "}
+            seconds after speed adjustment. Speed, volume, rotate and flip are
+            applied by local export; the server preset uses trim, format, title
+            and captions.
+          </p>
+          <Button
+            className="full-button"
+            disabled={
+              busy ||
+              !source ||
+              !validRange ||
+              !validCaptions ||
+              (news && (!cleanText(title) || !dateLabel))
+            }
+            onClick={() =>
+              action(async (signal) => {
+                localExport.current =
+                  [...operations.current].find(
+                    (controller) => controller.signal === signal,
+                  ) ?? null;
+                setExportProgress(0);
+                try {
+                  const blob = await exportLocalVideo(
+                    source,
+                    {
+                      start,
+                      duration,
+                      width: dimensions.width,
+                      height: dimensions.height,
+                      speed,
+                      volume,
+                      rotation,
+                      flip,
+                      captions,
+                      ...(news
+                        ? { news: { title: cleanText(title), date: dateLabel } }
+                        : {}),
+                    },
+                    signal,
+                    (value) => {
+                      if (mounted.current) setExportProgress(value);
+                    },
+                  );
+                  if (signal.aborted) return;
+                  const url = URL.createObjectURL(blob),
+                    link = document.createElement("a");
+                  link.href = url;
+                  link.download = `orbit-edited.${blob.type.includes("mp4") ? "mp4" : "webm"}`;
+                  document.body.appendChild(link);
+                  link.click();
+                  link.remove();
+                  setTimeout(() => URL.revokeObjectURL(url), 30000);
+                  setNotice(
+                    `Edited ${blob.type.includes("mp4") ? "MP4" : "WebM"} exported. On iPhone use Safari downloads or Files.`,
+                  );
+                } finally {
+                  if (mounted.current) setExportProgress(null);
+                  localExport.current = null;
+                }
+              })
+            }
+          >
+            <Download size={17} />
+            {exportProgress !== null
+              ? `Exporting ${Math.round(exportProgress)}%`
+              : "Export edited video locally"}
+          </Button>
+          {exportProgress !== null ? (
+            <>
+              <progress
+                aria-label="Local video export progress"
+                value={exportProgress}
+                max={100}
+                style={{ width: "100%" }}
+              />
+              <Button
+                variant="outline"
+                onClick={() => localExport.current?.abort()}
+              >
+                Cancel local export
+              </Button>
+            </>
+          ) : null}
+          <p className="review-help">
+            Local export uses your browser encoder: MP4 where supported,
+            otherwise WebM. No upload required. Timed captions are manual; AI
+            transcription is not enabled here.
+          </p>
           <Button
             className="full-button"
             disabled={busy || !canRender}

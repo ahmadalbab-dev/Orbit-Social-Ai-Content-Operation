@@ -12,9 +12,10 @@ test("light default keeps the auth form compact while widening only the hero", a
   const hero = await page.locator(".auth-orbit-visual").boundingBox();
   expect(form?.width).toBeLessThanOrEqual(400);
   expect(hero!.width).toBeGreaterThan(900);
-  await expect(
-    page.locator(".auth-orbit-visual .orbit-ai-signature"),
-  ).toHaveText("ai studio");
+  const artwork = page.locator(".auth-orbit-visual canvas");
+  await expect(artwork).toHaveAttribute("data-scene", "orbit");
+  await expect(artwork).toHaveAttribute("data-scene", "ai-studio", { timeout: 12000 });
+  await expect(page.locator(".orbit-ai-signature")).toHaveCount(0);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

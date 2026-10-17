@@ -894,10 +894,6 @@ html[data-theme=light] .orbit-nav.reference-dock .reference-dock-icon[aria-curre
 .orbit-artwork { position:absolute;inset:0;z-index:-2;pointer-events:none; }
 .auth-orbit-visual .orbit-artwork { z-index:0; }
 .orbit-artwork .orbit-field { z-index:0; }
-.orbit-ai-signature { position:absolute;top:var(--signature-top,210px);left:var(--signature-left,50%);width:var(--signature-width,40%);display:flex;justify-content:center;gap:.055em;color:var(--primary);font:600 clamp(14px,2vw,25px) var(--mono);letter-spacing:.1em;line-height:1.2;text-transform:lowercase; }
-.orbit-ai-signature span { display:inline-block;animation:orbit-signature 4.8s ease-in-out infinite both; }
-@keyframes orbit-signature { 0%,75%,100%{opacity:.9;transform:translateY(0);filter:blur(0)} 18%{opacity:.45;transform:translateY(-3px);filter:blur(.4px)} 34%{opacity:1;transform:translateY(0);filter:blur(0)} }
-.orbit-artwork[data-paused=true] .orbit-ai-signature span { animation:none; }
 /* One compact launcher across desktop, touch and keyboard navigation. */
 .navigation-dock { display:flex;position:fixed;right:max(16px,env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));z-index:40;width:46px;min-height:46px;align-items:center;justify-content:flex-end; }
 .navigation-dock .nav-launcher { display:grid;place-items:center;position:relative;inset:auto;width:46px;height:46px;min-height:46px!important;padding:0;border:1px solid var(--line);border-radius:50%;background:var(--glass);color:var(--primary);box-shadow:0 6px 24px #30253d20;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px); }
@@ -907,8 +903,8 @@ html[data-theme=light] .orbit-nav.reference-dock .reference-dock-icon[aria-curre
 .navigation-dock .orbit-nav.reference-dock { position:relative;inset:auto;transform:none;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));width:min(430px,calc(100vw - 32px));gap:8px;padding:10px;border-radius:26px; }
 .navigation-dock .orbit-nav.reference-dock .reference-dock-icon { width:100%;height:46px;min-height:46px; }
 .navigation-dock[data-expanded=true] .orbit-nav.reference-dock { animation:dock-open .24s ease both;transform-origin:bottom right; }
-@media(max-width:480px){.auth-orbit-visual{height:205px;margin:0;width:calc(100vw - 24px)}.orbit-ai-signature{font-size:14px}}
-@media(prefers-reduced-motion:reduce){.orbit-ai-signature span,.navigation-dock[data-expanded=true] .orbit-nav.reference-dock{animation:none!important;transition:none!important}}
+@media(max-width:480px){.auth-orbit-visual{height:205px;margin:0;width:calc(100vw - 24px)}}
+@media(prefers-reduced-motion:reduce){.navigation-dock[data-expanded=true] .orbit-nav.reference-dock{animation:none!important;transition:none!important}}
 /* Expanded desktop menus retain their readable labels. */
 .navigation-dock .orbit-nav.reference-dock { display:flex;width:max-content;max-width:calc(100vw - 32px); }
 .orbit-shell .navigation-dock .orbit-nav.reference-dock .reference-dock-icon { width:auto;min-height:44px;height:44px; }
@@ -917,3 +913,32 @@ html[data-theme=light] .orbit-nav.reference-dock .reference-dock-icon[aria-curre
  .orbit-shell .navigation-dock .orbit-nav.reference-dock .reference-dock-icon{display:grid;width:100%;min-width:0;padding:0;}
  .orbit-shell .navigation-dock .orbit-nav .reference-dock-icon .reference-dock-label{display:none;}
 }
+/* Workflow examples type on screen; lights describe the example animation only. */
+.workflow-code-line { display:block;min-height:1.9em;white-space:pre; }
+.workflow-code-line>span:last-child { overflow-wrap:normal; }
+.workflow-type-cursor { display:inline-block;color:var(--primary);animation:workflow-caret .8s steps(2,end) infinite; }
+.workflow-terminal-lights { display:inline-flex;align-items:center;gap:6px; }
+.workflow-terminal-lights i { display:block;width:7px;height:7px;border-radius:50%;background:var(--line); }
+.workflow-code-panel[data-state=waiting] .workflow-terminal-lights i:first-child { background:#cd8b63; }
+.workflow-code-panel[data-state=writing] .workflow-terminal-lights i:nth-child(2) { background:#c79343;animation:workflow-status-pulse 1.3s ease-in-out infinite; }
+.workflow-code-panel[data-state=ready] .workflow-terminal-lights i:last-child { background:#6fb59a;animation:workflow-status-pulse 3s ease-in-out infinite; }
+.workflow-code-panel .workflow-indicator { animation:none;background:var(--soft);box-shadow:none; }
+.workflow-code-panel[data-state=writing] .workflow-indicator { background:#c79343;animation:workflow-status-pulse 1.3s ease-in-out infinite; }
+.workflow-code-panel[data-state=ready] .workflow-indicator { background:#6fb59a;animation:workflow-status-pulse 3s ease-in-out infinite; }
+.workflow-stages li { position:relative;padding-left:15px; }
+.workflow-stages li::before { content:"";position:absolute;left:0;top:20px;width:6px;height:6px;border-radius:50%;background:var(--line); }
+.workflow-stages li[data-state=active]::before { background:#c79343;animation:workflow-status-pulse 1.3s ease-in-out infinite; }
+.workflow-stages li[data-state=complete]::before { background:#6fb59a; }
+@keyframes workflow-status-pulse { 0%,100%{opacity:.5;box-shadow:0 0 0 0 transparent}50%{opacity:1;box-shadow:0 0 0 4px color-mix(in srgb,currentColor 10%,transparent)} }
+@keyframes workflow-caret { 50%{opacity:0} }
+/* Workflow explanations remain readable beside and below their titles. */
+.orbit-shell .workflow-list button { grid-template-columns:26px 26px minmax(0,1fr) 22px;gap:12px 18px;padding:22px 0; }
+.orbit-shell .workflow-list button>.workflow-number { grid-column:1;grid-row:1/3; }
+.orbit-shell .workflow-list button>svg:first-of-type { grid-column:2;grid-row:1/3; }
+.orbit-shell .workflow-list button>strong { grid-column:3;grid-row:1; }
+.orbit-shell .workflow-list button>span:not(.workflow-number) { display:block;grid-column:3;grid-row:2;font-size:clamp(15px,1.3vw,18px);line-height:1.55;color:var(--soft); }
+.orbit-shell .workflow-list button>svg:last-child { grid-column:4;grid-row:1/3; }
+@media(max-width:600px){.orbit-shell .workflow-list button{grid-template-columns:20px 24px minmax(0,1fr) 18px;gap:8px 10px}.workflow-terminal-lights{gap:4px}.workflow-terminal-lights i{width:5px;height:5px}}
+@media(prefers-reduced-motion:reduce){.workflow-type-cursor,.workflow-indicator,.workflow-terminal-lights i,.workflow-stages li::before{animation:none!important}}
+/* Editing helpers share the same quiet, readable controls as Studio. */
+.image-ai-panel,.video-ai-plan-panel{padding:20px 0;border-top:1px solid var(--line);margin-top:20px}.image-ai-panel h3,.video-ai-plan-panel h3{display:flex;align-items:center;gap:9px;font-size:17px;margin:0 0 10px}.image-ai-panel p,.video-ai-plan-panel p{font-size:14px;line-height:1.6;color:var(--soft)}.image-ai-panel button,.video-ai-plan-panel button{margin:6px 6px 6px 0}.status-badge::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;animation:orbit-state-pulse 2.5s ease-in-out infinite}.status-badge.simulating::before,.status-badge.processing::before{animation-duration:1.2s}.connection-indicator span{animation:orbit-state-pulse 3s ease-in-out infinite}@keyframes orbit-state-pulse{0%,100%{opacity:1}50%{opacity:.35}}@media(prefers-reduced-motion:reduce){.status-badge::before,.connection-indicator span{animation:none!important}}

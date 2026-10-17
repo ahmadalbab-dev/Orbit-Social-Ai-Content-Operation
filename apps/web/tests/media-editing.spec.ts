@@ -1,0 +1,51 @@
+import { expect, test } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
+import { readFile } from 'node:fs/promises';
+const clip = fileURLToPath(new URL('./fixtures/clip.mp4', import.meta.url));
+
+test('video preview exports a real edited clip locally without uploading it', async ({ page }) => {
+  test.setTimeout(45000);
+  const uploads: string[] = [];
+  page.on('request', request => { if (request.method() === 'POST') uploads.push(request.url()); });
+  await page.goto('/preview');
+  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+  await page.getByRole('button', { name: 'Video Editor', exact: true }).click();
+  await page.getByLabel('Choose video', { exact: true }).setInputFiles(clip);
+  await expect(page.getByRole('button', { name: 'Export edited video locally', exact: true })).toBeEnabled();
+  await page.getByLabel('Video format', { exact: true }).selectOption('landscape');
+  await page.getByLabel('Trim length seconds', { exact: true }).fill('1');
+  await page.getByLabel('Video speed', { exact: true }).selectOption('2');
+  const received = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export edited video locally', exact: true }).click();
+  const download = await received;
+  expect(download.suggestedFilename()).toMatch(/^orbit-edited\.(mp4|webm)$/);
+  const path = await download.path();
+  expect(path).toBeTruthy();
+  const bytes = await readFile(path!);
+  expect(bytes.byteLength).toBeGreaterThan(1000);
+  const isMp4 = bytes.subarray(4, 8).toString() === 'ftyp';
+  const isWebm = bytes.subarray(0, 4).toString('hex') === '1a45dfa3';
+  expect(isMp4 || isWebm).toBe(true);
+  expect(uploads).toEqual([]);
+});
+
+test('custom video calendar supports choosing a date and keyboard dismissal', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/preview');
+  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+  await page.getByRole('button', { name: 'Video Editor', exact: true }).click();
+  const trigger = page.getByRole('button', { name: 'Video date', exact: true });
+  await trigger.click();
+  const dialog = page.getByRole('dialog', { name: 'Video date calendar', exact: true });
+  await expect(dialog).toBeVisible();
+  const date = dialog.locator('.ios-date-days button[data-current-month="true"]').filter({ hasText: /^15$/ });
+  const chosen = await date.getAttribute('aria-label');
+  await date.click();
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toContainText('15');
+  await trigger.click();
+  await expect(dialog.getByRole('button', { name: chosen!, exact: true })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});

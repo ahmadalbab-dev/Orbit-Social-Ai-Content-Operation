@@ -40,3 +40,16 @@ describe("same-origin workspace relay",()=>{
   vi.stubEnv("NEXT_PUBLIC_API_URL",origin);const fetcher=vi.fn();expect((await relayWorkspace(request(),["workspaces"],fetcher)).status).toBe(503);expect(fetcher).not.toHaveBeenCalled();
  });
 });
+
+it('relays only the approved AI media operations and preserves binary image output', async () => {
+  vi.stubEnv('NEXT_PUBLIC_API_URL', 'https://api.orbit.test'); vi.stubEnv('NODE_ENV', 'production');
+  const bytes = new Uint8Array([137,80,78,71,13,10,26,10]);
+  const fetcher = vi.fn(async () => new Response(bytes, { headers: { 'Content-Type': 'image/png' } }));
+  const response = await relayWorkspace(request('media/image-edit', { method: 'POST', body: '{}' }), ['media', 'image-edit'], fetcher);
+  expect(response.status).toBe(200);
+  expect(response.headers.get('content-type')).toBe('image/png');
+  expect(new Uint8Array(await response.arrayBuffer())).toEqual(bytes);
+  expect(fetcher).toHaveBeenCalledWith('https://api.orbit.test/v1/media/image-edit', expect.any(Object));
+  const planned = await relayWorkspace(request('media/video-plan', { method: 'POST', body: '{}' }), ['media', 'video-plan'], vi.fn(async () => Response.json({ title: 'Fixture', captions: [], scenes: [] })));
+  expect(planned.status).toBe(200);
+});
