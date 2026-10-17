@@ -75,3 +75,14 @@ test.describe("touch navigation", () => {
     ).toBe(true);
   });
 });
+
+test("desktop launcher click opens navigation without selecting an overlapping item", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/preview");
+  await page.getByRole("button", { name: "Open navigation", exact: true }).click();
+  await expect(page.locator(".navigation-dock")).toHaveAttribute("data-expanded", "true");
+  await expect(page.getByRole("heading", { name: "More ideas. Less busywork." })).toBeVisible();
+  await page.getByRole("button", { name: "Content Studio", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Create once. Review every channel." })).toBeVisible();
+  await expect(page.locator(".navigation-dock")).toHaveAttribute("data-expanded", "false");
+});
