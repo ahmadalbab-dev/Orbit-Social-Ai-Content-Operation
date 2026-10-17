@@ -41,7 +41,20 @@ describe("Hugging Face commercial content provider", () => {
   });
   it("never forwards provider error text or credentials", async () => {
     const usageStore=store(); const fetcher=vi.fn().mockResolvedValue(new Response("sensitive upstream hf_private",{status:401}));
-    await expect(new HuggingFaceContentProvider(usageStore,{apiKey:"hf_private",fetch:fetcher}).generateVariants(input)).rejects.toThrow("temporarily unavailable");
+    await expect(new HuggingFaceContentProvider(usageStore,{apiKey:"hf_private",fetch:fetcher}).generateVariants(input)).rejects.toThrow("provider access was denied");
+    expect(usageStore.save).not.toHaveBeenCalled();
+  });
+  it.each([
+    [401,"access_denied"], [403,"access_denied"], [402,"credits_unavailable"],
+    [404,"model_unavailable"], [400,"request_rejected"], [422,"request_rejected"],
+    [429,"rate_limited"], [503,"unavailable"],
+  ])("classifies provider HTTP %s without returning upstream data", async (status, code) => {
+    const usageStore = store();
+    const fetcher = vi.fn().mockResolvedValue(new Response("private provider response", { status: Number(status) }));
+    const error = await new HuggingFaceContentProvider(usageStore, { apiKey: "hf_private", fetch: fetcher }).generateVariants(input).catch(error => error);
+    expect(error).toBeInstanceOf(AiProviderError);
+    expect(error.code).toBe(code);
+    expect(error.message).not.toContain("private provider response");
     expect(usageStore.save).not.toHaveBeenCalled();
   });
   it("rejects malformed, truncated, incomplete or extra-platform outputs", async () => {

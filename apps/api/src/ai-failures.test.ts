@@ -22,7 +22,7 @@ function studio() {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
 describe("actionable AI failures after dispatch", () => {
-  it.each(["timeout", "rate_limited", "invalid_response", "unconfigured"] as const)("preserves safe %s guidance in Studio without losing metering", async code => {
+  it.each(["timeout", "rate_limited", "invalid_response", "unconfigured", "access_denied", "credits_unavailable", "model_unavailable", "request_rejected"] as const)("preserves safe %s guidance in Studio without losing metering", async code => {
     vi.stubEnv("HF_TOKEN", "fixture");
     const failure = new AiProviderError(code);
     failure.message = "raw upstream text containing private credentials";

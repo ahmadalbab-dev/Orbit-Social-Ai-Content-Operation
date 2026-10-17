@@ -34,12 +34,21 @@ const variantSchema = z.object({
   callToAction: z.string().trim().max(240)
 }).strict();
 const outputSchema = z.object({ variants: z.array(variantSchema).min(1).max(8) }).strict();
-export type AiProviderFailure = "unconfigured" | "unavailable" | "rate_limited" | "invalid_response" | "timeout";
+export type AiProviderFailure = "unconfigured" | "unavailable" | "rate_limited" | "invalid_response" | "timeout" | "access_denied" | "credits_unavailable" | "model_unavailable" | "request_rejected";
 export class AiProviderError extends Error {
   constructor(public readonly code: AiProviderFailure) {
-    super({unconfigured:"AI is not configured. Contact your workspace administrator.", unavailable:"AI is temporarily unavailable. Try again later.", rate_limited:"AI is busy. Try again shortly.", invalid_response:"AI returned an invalid draft. Try a shorter, clearer brief.", timeout:"AI took too long. Try again later."}[code]);
+    super({unconfigured:"AI is not configured. Contact your workspace administrator.", unavailable:"AI is temporarily unavailable. Try again later.", rate_limited:"AI is busy. Try again shortly.", invalid_response:"AI returned an invalid draft. Try a shorter, clearer brief.", timeout:"AI took too long. Try again later.",access_denied:"AI provider access was denied. Your workspace administrator needs to check the platform inference permissions.",credits_unavailable:"AI provider credits are unavailable. Your workspace administrator needs to check the platform provider billing.",model_unavailable:"The configured AI model is unavailable. Your workspace administrator needs to check the platform model settings.",request_rejected:"The AI provider rejected the model or request format. Your workspace administrator needs to check the platform AI configuration."}[code]);
     this.name = "AiProviderError";
   }
+}
+
+/** Classify only the HTTP status; upstream response bodies never reach customers. */
+export function aiProviderResponseError(status: number) {
+  if (status === 401 || status === 403) return new AiProviderError("access_denied");
+  if (status === 402) return new AiProviderError("credits_unavailable");
+  if (status === 404) return new AiProviderError("model_unavailable");
+  if (status === 400 || status === 422) return new AiProviderError("request_rejected");
+  return new AiProviderError(status === 429 ? "rate_limited" : "unavailable");
 }
 
 export function parseSocialDrafts(text: string, selected: readonly string[]): ContentVariant[] {
@@ -114,7 +123,7 @@ export class HuggingFaceContentProvider {
       });
       if (!response.ok) {
         await response.body?.cancel();
-        throw new AiProviderError(response.status === 429 ? "rate_limited" : "unavailable");
+        throw aiProviderResponseError(response.status);
       }
       const result = completionSchema.safeParse(await readBoundedAiJson(response));
       if (!result.success) throw new AiProviderError("invalid_response");

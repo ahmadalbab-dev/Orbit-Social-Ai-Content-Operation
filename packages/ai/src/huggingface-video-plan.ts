@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AiProviderError, DEFAULT_HF_MODEL, HF_CHAT_ENDPOINT, readBoundedAiJson } from "./huggingface.js";
+import { AiProviderError, aiProviderResponseError, DEFAULT_HF_MODEL, HF_CHAT_ENDPOINT, readBoundedAiJson } from "./huggingface.js";
 const inputSchema = z.object({ brief: z.string().trim().min(1).max(3000), duration: z.number().finite().positive().max(600) }).strict();
 export function validateVideoPlanInput(input: unknown) { return inputSchema.parse(input); }
 const segment = (max: number) => z.object({ text: z.string().trim().min(1).max(max), start: z.number().finite().min(0), end: z.number().finite().positive() }).strict();
@@ -37,7 +37,7 @@ export class HuggingFaceVideoPlanner {
       });
       if (!response.ok) {
         await response.body?.cancel();
-        throw new AiProviderError(response.status === 429 ? "rate_limited" : "unavailable");
+        throw aiProviderResponseError(response.status);
       }
       const value = await readBoundedAiJson(response, 24000) as { choices?: { message?: { content?: unknown } }[] };
       const content = value?.choices?.[0]?.message?.content;
