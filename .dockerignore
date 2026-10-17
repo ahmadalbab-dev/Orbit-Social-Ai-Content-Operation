@@ -1,0 +1,24 @@
+.git
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/coverage
+**/test-results
+**/playwright-report
+**/*.log
+**/*.tsbuildinfo
+**/.env
+**/.env.*
+!**/.env.example
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/secrets
+**/private-media
+**/media-data
+.tools
+.playwright-cli
+My SOCMED
+apps/vanilla-auth

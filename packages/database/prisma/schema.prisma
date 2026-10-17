@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -75,6 +76,10 @@ model Workspace {
   name String
   slug String
   monthlyAiBudgetUsd Decimal @default(10) @db.Decimal(10, 4)
+  mediaBytes Int @default(0)
+  mediaRenderSlots Int @default(50)
+  billingAccount BillingAccount?
+  mediaRenders MediaRender[]
   memberships Membership[]
   brands Brand[]
   socialAccounts SocialAccount[]
@@ -181,6 +186,8 @@ model ContentItem {
   platform Platform
   status ContentStatus @default(DRAFT)
   metadata Json?
+  revision Int @default(1)
+  revisions ContentRevision[]
   media ContentMedia[]
   schedules Schedule[]
   approvals Approval[]
@@ -201,6 +208,7 @@ model MediaAsset {
   bytes Int
   checksum String
   content ContentMedia[]
+  renders MediaRender[]
   createdAt DateTime @default(now())
   @@unique([workspaceId, checksum])
 }
@@ -221,6 +229,7 @@ model Schedule {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
   scheduledFor DateTime
+  contentRevision Int @default(1)
   timezone String @default("UTC")
   jobs PublishingJob[]
   createdAt DateTime @default(now())
@@ -253,6 +262,7 @@ model Approval {
   id String @id @default(uuid())
   contentItemId String
   reviewerId String?
+  contentRevision Int @default(1)
   contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
   status ApprovalStatus @default(PENDING)
   note String?
@@ -281,6 +291,7 @@ model AiUsage {
   workspaceId String
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   requestHash String
+  variants Json?
   model String
   inputTokens Int
   outputTokens Int
@@ -318,4 +329,81 @@ model Webhook {
   lastDeliveryAt DateTime?
   createdAt DateTime @default(now())
   @@index([workspaceId])
+}
+
+model ContentRevision {
+  id String @id @default(uuid())
+  contentItemId String
+  revision Int
+  variants Json
+  actorId String
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@unique([contentItemId, revision])
+}
+
+model AiQuota {
+  id String @id @default(uuid())
+  workspaceId String
+  period String
+  used Int @default(0)
+  @@unique([workspaceId, period])
+}
+
+
+enum MediaRenderStatus {
+  QUEUED
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+model MediaRender {
+  id String @id @default(uuid())
+  workspaceId String
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  assetId String
+  asset MediaAsset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  status MediaRenderStatus @default(QUEUED)
+  options Json
+  outputKey String?
+  errorCode String?
+  attempts Int @default(0)
+  leaseToken String?
+  leaseUntil DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status, createdAt])
+  @@index([workspaceId, createdAt])
+}
+
+// One Stripe test customer and one subscription projection per workspace.
+model BillingAccount {
+  id String @id @default(uuid())
+  workspaceId String @unique
+  organizationId String
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  customerId String? @unique
+  subscriptionId String? @unique
+  plan String?
+  priceId String?
+  status String @default("none")
+  cancelAtPeriodEnd Boolean @default(false)
+  currentPeriodEnd DateTime?
+  paidThrough DateTime?
+  pendingRequestId String?
+  pendingPlan String?
+  pendingSince DateTime?
+  checkoutSessionId String?
+  reconciledAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// IDs only: never persist the webhook body, card data or secrets.
+model BillingEvent {
+  id String @id
+  type String
+  createdAt DateTime @default(now())
 }

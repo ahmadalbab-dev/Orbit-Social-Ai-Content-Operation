@@ -1,30 +1,27 @@
-import { Body, Controller, Get, Headers, Param, Post, Put } from "@nestjs/common";
-import type { ContentVariant, SocialPlatform } from "@sma/types";
+import { Body, Controller, Get, Param, Post, Put, Req, ServiceUnavailableException } from "@nestjs/common";
 import { WorkflowService } from "./workflow.service";
-
+import { DatabaseService } from "./database.service";
+import { IdentityOnly, Public, type RequestIdentity } from "./security";
+import { WorkspaceService } from "./workspace.service";
+import { textAiConfig } from "./text-ai.config";
+type Request = {identity:RequestIdentity};
 @Controller()
 export class AppController {
-  constructor(private readonly workflow: WorkflowService) {}
-  @Get("health") health() { return { status: "ok", service: "social-media-automation-api", timestamp: new Date().toISOString() }; }
-  @Get("ready") ready() { return { status: "ready", dependencies: { database: "configured", redis: "configured" } }; }
-  @Get("integrations/status") integrationStatus() {
-    const metaConfigured = Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET && process.env.META_REDIRECT_URI);
-    const threadsConfigured = Boolean(process.env.THREADS_APP_ID && process.env.THREADS_APP_SECRET && process.env.THREADS_REDIRECT_URI);
-    const tiktokConfigured = Boolean(process.env.TIKTOK_CLIENT_KEY && process.env.TIKTOK_CLIENT_SECRET && process.env.TIKTOK_REDIRECT_URI);
-    return {
-      connectorMode: process.env.SOCIAL_CONNECTOR_MODE ?? "mock",
-      providers: {
-        facebook: { configured: metaConfigured, requiresOwnerAuthorization: true },
-        instagram: { configured: metaConfigured, requiresOwnerAuthorization: true },
-        threads: { configured: threadsConfigured, requiresOwnerAuthorization: true },
-        tiktok: { configured: tiktokConfigured, requiresOwnerAuthorization: true },
-      },
-    };
-  }
-  @Get("content") list(@Headers("x-workspace-id") workspaceId = "demo-workspace") { return this.workflow.list(workspaceId); }
-  @Post("brands") createBrand(@Headers("x-workspace-id") workspaceId = "demo-workspace", @Body() body: { name: string; voice: string; audience: string }) { return this.workflow.createBrand(workspaceId, body); }
-  @Post("content/generate") generate(@Headers("x-workspace-id") workspaceId = "demo-workspace", @Body() body: { brandId: string; topic: string; platforms: SocialPlatform[] }) { return this.workflow.generate(workspaceId, body); }
-  @Put("content/:id/review") review(@Headers("x-workspace-id") workspaceId = "demo-workspace", @Param("id") id: string, @Body() body: { variants: ContentVariant[] }) { return this.workflow.review(workspaceId, id, body.variants); }
-  @Post("content/:id/schedule") schedule(@Headers("x-workspace-id") workspaceId = "demo-workspace", @Param("id") id: string, @Body() body: { scheduledFor: string }) { return this.workflow.schedule(workspaceId, id, body.scheduledFor); }
-  @Post("content/:id/publish") publish(@Headers("x-workspace-id") workspaceId = "demo-workspace", @Param("id") id: string) { return this.workflow.publish(workspaceId, id); }
+  constructor(private readonly workflow: WorkflowService,private readonly db:DatabaseService,private readonly workspaces:WorkspaceService) {}
+  @Public() @Get("health") health() { return {status:"ok",service:"orbit-api",timestamp:new Date().toISOString()}; }
+  @Public() @Get("ready") async ready() { try {await this.db.readiness();return {status:"ready",dependencies:{database:"connected"},livePublishing:false};}catch{throw new ServiceUnavailableException("Database not ready");} }
+  @IdentityOnly() @Get("workspaces") listWorkspaces(@Req() req:Request) {return this.workspaces.list(req.identity);}
+  @IdentityOnly() @Post("workspaces") createWorkspace(@Req() req:Request,@Body() body:unknown) {return this.workspaces.create(req.identity,body);}
+  @Get("ai/status") aiStatus(){const {configured,provider}=textAiConfig();return {configured,provider,verified:false};}
+  @Get("integrations/status") integrationStatus(){return {connectorMode:"disabled",livePublishing:false,providers:Object.fromEntries(["facebook","instagram","threads"].map(p=>[p,{configured:false,requiresOwnerAuthorization:true}]))};}
+  @Get("brands") brands(@Req() req:Request){return this.workflow.listBrands(req.identity.workspaceId);}
+  @Get("content") list(@Req() req:Request){return this.workflow.list(req.identity.workspaceId);}
+  @Post("brands") createBrand(@Req() req:Request,@Body() body:unknown){return this.workflow.createBrand(req.identity,body);}
+  @Put("brands/:id") updateBrand(@Req() req:Request,@Param("id") id:string,@Body() body:unknown){return this.workflow.updateBrand(req.identity,id,body);}
+  @Post("content/manual") manual(@Req() req:Request,@Body() body:unknown){return this.workflow.manual(req.identity,body);}
+  @Post("content/generate") generate(@Req() req:Request,@Body() body:unknown){return this.workflow.generate(req.identity,body);}
+  @Put("content/:id/review") review(@Req() req:Request,@Param("id") id:string,@Body() body:unknown){return this.workflow.review(req.identity,id,body);}
+  @Post("content/:id/approve") approve(@Req() req:Request,@Param("id") id:string,@Body() body:{expectedRevision:number}){return this.workflow.approve(req.identity,id,body?.expectedRevision);}
+  @Post("content/:id/schedule") schedule(@Req() req:Request,@Param("id") id:string,@Body() body:unknown){return this.workflow.schedule(req.identity,id,body);}
+  @Post("content/:id/publish") publish(@Req() req:Request,@Param("id") id:string,@Body() body:{expectedRevision:number}){return this.workflow.publish(req.identity,id,body?.expectedRevision);}
 }
