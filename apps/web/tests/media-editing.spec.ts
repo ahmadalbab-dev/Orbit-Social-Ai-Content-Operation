@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
-const clip = fileURLToPath(new URL('./fixtures/clip.mp4', import.meta.url));
+const clip = join(__dirname, 'fixtures', 'clip.mp4');
 
 test('video preview exports a real edited clip locally without uploading it', async ({ page }) => {
   test.setTimeout(45000);
