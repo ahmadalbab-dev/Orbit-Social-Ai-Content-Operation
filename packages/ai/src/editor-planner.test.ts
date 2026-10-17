@@ -14,6 +14,7 @@ describe('conversational editor boundary',()=>{
  it.each([{script:'alert(1)'},{caption:'a'.repeat(201)},{brightness:500},{template:'unknown'},{imageUrl:'https://example.com'}])('rejects unsafe or unsupported changes %j',changes=>{
   expect(()=>parseEditorPlan(JSON.stringify({summary:'Edit',changes}),validateEditorInput(image))).toThrow();
  });
+ it('rejects inherited property names',()=>{expect(()=>parseEditorPlan('{"summary":"Edit","changes":{"constructor":"unsafe"}}',validateEditorInput(image))).toThrow();});
  it('rejects overflowing trim and caption timings',()=>{
   const input=validateEditorInput({kind:'video',instruction:'Trim',current:{sourceDuration:20,start:5,duration:10}});
   for(const changes of [{start:15,duration:10},{captions:[{text:'Late',start:0,end:11}]}])expect(()=>parseEditorPlan(JSON.stringify({summary:'Edit',changes}),input)).toThrow();

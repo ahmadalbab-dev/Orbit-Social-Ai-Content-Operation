@@ -30,12 +30,12 @@ export function validEditorChanges(kind:EditorKind,value:unknown,state=false):va
  ratio:(v:unknown)=>choice(v,['original','1:1','4:5','9:16','16:9']),focusX:(v:unknown)=>number(v,0,100),focusY:(v:unknown)=>number(v,0,100),textSize:(v:unknown)=>number(v,60,180),
  textPosition:(v:unknown)=>choice(v,['top','center','bottom']),textColor:color,accent:color,background:color,caption:(v:unknown)=>text(v,200),template:(v:unknown)=>choice(v,['original','product','poster','offer','quote'])
  }:{
- format:(v:unknown)=>choice(v,['portrait','square','landscape']),speed:(v:unknown)=>number(v,0.5,2),volume:(v:unknown)=>number(v,0,1),start:(v:unknown)=>number(v,0,600),duration:(v:unknown)=>number(v,0.1,600),
+ format:(v:unknown)=>choice(v,['portrait','square','landscape']),speed:(v:unknown)=>number(v,0.5,2),volume:(v:unknown)=>number(v,0,1),start:(v:unknown)=>number(v,0,86400),duration:(v:unknown)=>number(v,0.1,120),
  template:(v:unknown)=>choice(v,['clean','news','product','cinematic','captions']),title:(v:unknown)=>text(v,100),news:(v:unknown)=>typeof v==='boolean',
  captions:(v:unknown)=>Array.isArray(v)&&v.length<=20&&v.every(c=>object(c)&&Object.keys(c).every(k=>['text','start','end'].includes(k))&&text(c.text,120)&&number(c.start,0,600)&&number(c.end,0.1,600)&&Number(c.end)>Number(c.start)),
  ...(state?{sourceDuration:(v:unknown)=>number(v,0.1,86400)}:{})
  })};
- return Object.entries(value).every(([k,v])=>!!rules[k]&&rules[k](v));
+ return Object.entries(value).every(([k,v])=>Object.hasOwn(rules,k)&&rules[k](v));
 }
 export function validEditorTiming(current:VideoEditorState,changes:VideoEditorChanges){
  const start=changes.start??current.start??0,duration=changes.duration??current.duration??current.sourceDuration;

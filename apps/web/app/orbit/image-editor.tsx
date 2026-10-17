@@ -36,7 +36,7 @@ export function ImageEditor({ preview = false }: { preview?: boolean }) {
   async function decode(file: File) {
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 25 * 1024 * 1024) throw Error("Choose a PNG, JPEG or WebP under 25 MB.");
     const url = URL.createObjectURL(file), next = new Image();
-    try { next.src = url; await next.decode(); if (next.naturalWidth * next.naturalHeight > 40_000_000) throw Error("Choose an image under 40 megapixels."); return next; }
+    try { next.src = url; await next.decode(); if (next.naturalWidth * next.naturalHeight > 16_000_000) throw Error("Choose an image under 16 megapixels."); return next; }
     finally { URL.revokeObjectURL(url); }
   }
   async function select(file?: File, overlay = false) {
@@ -44,6 +44,9 @@ export function ImageEditor({ preview = false }: { preview?: boolean }) {
     const request = ++generation.current; setLoading(true); setNotice("");
     try {
       const next = await decode(file); if (request !== generation.current) return false;
+      const retained = new Set(slides.flatMap((slide, index) => [...(slide.state.image && (overlay || index !== active) ? [slide.state.image] : []), ...slide.state.overlays.map(item => item.image)]));
+      retained.add(next);
+      if ([...retained].reduce((pixels, item) => pixels + item.naturalWidth * item.naturalHeight, 0) > 40_000_000) throw Error("This carousel is using too much image memory. Use smaller images or remove a slide/layer.");
       snapshot();
       if (overlay) {
         if (state.overlays.length >= 8) throw Error("Use up to eight image layers per slide.");
@@ -74,7 +77,7 @@ export function ImageEditor({ preview = false }: { preview?: boolean }) {
     finally { setExporting(false); }
   }
   const aiCurrent: ImageEditorState = { ratio: state.ratio as ImageEditorState["ratio"], rotation: state.rotation as ImageEditorState["rotation"], flip: state.flip, brightness: state.brightness, contrast: state.contrast, saturation: state.saturation, focusX: state.focusX, focusY: state.focusY, textSize: state.textSize, textPosition: (state.textPosition === "centre" ? "center" : state.textPosition) as ImageEditorState["textPosition"], textColor: state.textColor, caption: state.caption, template: state.template as ImageEditorState["template"], accent: state.accent, background: state.background };
-  function applyAi(changes: ImageEditorChanges) { snapshot(); const base = changes.template ? applyImageTemplate(state, changes.template) : state; patch({ ...base, ...changes, textPosition: changes.textPosition === "center" ? "centre" : changes.textPosition ?? base.textPosition }); setNotice("AI composition applied. Review your slide before exporting."); }
+  function applyAi(changes: ImageEditorChanges) { snapshot(); const base = changes.template ? applyImageTemplate(state, changes.template) : state; patch({ ...base, ...changes, caption: changes.caption ?? state.caption, textPosition: changes.textPosition === "center" ? "centre" : changes.textPosition ?? base.textPosition }); setNotice("AI composition applied. Review your slide before exporting."); }
   const sliders = (controls: { name: string; key: "brightness" | "contrast" | "saturation" | "focusX" | "focusY" | "textSize"; min?: number; max?: number }[]) => controls.map(control => <label className="slider-field" key={control.key}><span>{control.name}<output>{state[control.key]}%</output></span><input aria-label={`Image ${control.name.toLowerCase()}`} type="range" min={control.min ?? 0} max={control.max ?? 200} value={state[control.key]} onChange={event => patch({ [control.key]: Number(event.target.value) })}/></label>);
   return <section className="workspace-view image-composer">
     <SectionHeading number="02" label="Image" title="One idea. Every layer."/>
@@ -88,6 +91,7 @@ export function ImageEditor({ preview = false }: { preview?: boolean }) {
         <p className="image-device-note">Original templates by Orbit. Your files stay on this device unless you choose an AI upload. Keep this page open until exported.</p>
       </Card>
       <Card className="surface video-controls">
+        <EditorAiPanel key={slides[active].id} kind="image" current={aiCurrent} disabled={busy} preview={preview} onApply={applyAi}/>
         <fieldset disabled={busy} className="image-control-fieldset">
           <label className="upload-zone"><ImagePlus size={24}/><strong>{image ? "Replace base image" : "Choose image"}</strong><input type="file" accept="image/png,image/jpeg,image/webp" aria-label="Choose image" onChange={event => { void select(event.target.files?.[0]); event.target.value = ""; }}/></label>
           <div className="two-fields"><label className="field">Crop<select aria-label="Image crop" value={state.ratio} onChange={event => patch({ ratio: event.target.value })}><option value="original">Original</option><option>1:1</option><option>4:5</option><option>9:16</option><option>16:9</option></select></label><label className="field">Export<select aria-label="Image export format" value={format} onChange={event => setFormat(event.target.value)}><option value="png">PNG</option><option value="jpeg">JPEG</option></select></label></div>
@@ -104,7 +108,6 @@ export function ImageEditor({ preview = false }: { preview?: boolean }) {
           {sliders([{ name: "Text size", key: "textSize", min: 60, max: 180 }])}
           </details>
         </fieldset>
-        <EditorAiPanel key={slides[active].id} kind="image" current={aiCurrent} disabled={busy} preview={preview} onApply={applyAi}/>
         <details className="image-pixel-ai"><summary>Generate a new background or visual with AI</summary><ImageAiPanel source={() => canvas.current} disabled={!hasArtwork || loading || exporting} preview={preview} onBusyChange={setAiBusy} onResult={async blob => { const next = await decode(new File([blob], "orbit-ai-result.png", { type: blob.type })); snapshot(); patch(freshComposition(next)); }}/></details>
         <fieldset disabled={busy} className="image-control-fieldset"><Button disabled={!hasArtwork} onClick={() => void download()} aria-label="Export image"><Download size={17}/>{exporting ? "Exporting…" : "Export image"}</Button><Button variant="outline" disabled={slides.length < 2} onClick={() => void download(true)}><Download size={17}/>Export carousel ZIP</Button><Button variant="outline" disabled={!undo} onClick={() => { if (undo) { const previous = undo; setUndo(state); patch(previous); } }}><Undo2 size={17}/>Undo last composition</Button><Button variant="outline" onClick={() => { snapshot(); patch(freshComposition(image)); setSelectedLayer(""); }} aria-label="Reset image edits"><RefreshCw size={17}/>Reset edits</Button></fieldset>
         {notice ? <p role="status" className="action-notice">{notice}</p> : null}
