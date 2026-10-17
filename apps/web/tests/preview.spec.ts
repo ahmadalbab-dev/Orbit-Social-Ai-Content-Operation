@@ -15,7 +15,7 @@ test("phone preview navigates without backend calls or fake access", async ({ pa
   await expect(page.getByRole("button", { name: "Generate AI content" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Start manually" })).toBeDisabled();
   await navigate(page, "Video Editor");
-  await expect(page.getByText("Local preview. Sign in for uploads and MP4 rendering.")).toBeVisible();
+  await expect(page.getByText("Edit and export on your device. Sign in for workspace uploads.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Refresh renders" })).toBeDisabled();
   await navigate(page, "Calendar");
   await expect(page.getByRole("heading", { name: "Make space for your next post." })).toBeVisible();

@@ -10,6 +10,7 @@ if (!process.execArgv.includes('--no-experimental-require-module')) {
   process.exit(result.status ?? 1);
 }
 const require = createRequire(new URL('../apps/api/package.json', import.meta.url));
+assert.equal(typeof require('express').json, 'function', 'API JSON parser runtime dependency is missing');
 for (const name of ['database', 'ai', 'config', 'types', 'social-connectors', 'media']) {
   assert.ok(require(`@sma/${name}`), `Unable to require @sma/${name}`);
 }
