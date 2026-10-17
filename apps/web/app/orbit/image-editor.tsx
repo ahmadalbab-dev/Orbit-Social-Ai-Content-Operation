@@ -1,510 +1,114 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  Download,
-  ImagePlus,
-  RotateCw,
-  FlipHorizontal,
-  RefreshCw,
-} from "lucide-react";
+import { Download, ImagePlus, RotateCw, FlipHorizontal, RefreshCw, Plus, Copy, Trash2, ArrowUp, ArrowDown, Undo2, Layers } from "lucide-react";
 import { Button, Card } from "./ui";
 import { SectionHeading } from "./design-ui";
 import { ImageAiPanel } from "./image-ai-panel";
+import { EditorAiPanel } from "./editor-ai-panel";
+import type { ImageEditorChanges, ImageEditorState } from "./editor-ai-contract";
+import { applyImageTemplate, freshComposition, imageCarouselZip, imageTemplates, renderImageComposition, type ImageComposition, type Overlay } from "./image-composition";
+import "./image-editor.css";
 
-/** Local edits stay on the device; the separate AI panel explicitly requests upload. */
+type Slide = { id: string; name: string; state: ImageComposition };
+const createSlide = (name = "Slide 1"): Slide => ({ id: crypto.randomUUID(), name, state: freshComposition() });
+const downloadBlob = (blob: Blob, name: string) => { const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); };
+const canvasBlob = (canvas: HTMLCanvasElement, format: string) => new Promise<Blob>((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(Error("Export failed. Try a smaller image.")), `image/${format}`, .92));
+
+/** Local composition stays on this device. AI upload happens only on an explicit request. */
 export function ImageEditor({ preview = false }: { preview?: boolean }) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const [aiBusy, setAiBusy] = useState(false);
-  const [image, setImage] = useState<HTMLImageElement | null>(null);
-  const [ratio, setRatio] = useState("original");
-  const [rotation, setRotation] = useState(0);
-  const [flip, setFlip] = useState(false);
-  const [brightness, setBrightness] = useState(100);
-  const [contrast, setContrast] = useState(100);
-  const [saturation, setSaturation] = useState(100);
-  const [focusX, setFocusX] = useState(50);
-  const [focusY, setFocusY] = useState(50);
-  const [textSize, setTextSize] = useState(100);
-  const [textPosition, setTextPosition] = useState("bottom");
-  const [textColor, setTextColor] = useState("#ffffff");
-  const [caption, setCaption] = useState("");
-  const [format, setFormat] = useState("png");
-  const [notice, setNotice] = useState("");
-  const pending = useRef(0);
-  useEffect(
-    () => () => {
-      pending.current++;
-    },
-    [],
-  );
-  function reset() {
-    setRatio("original");
-    setRotation(0);
-    setFlip(false);
-    setBrightness(100);
-    setContrast(100);
-    setSaturation(100);
-    setCaption("");
-    setFocusX(50);
-    setFocusY(50);
-    setTextSize(100);
-    setTextPosition("bottom");
-    setTextColor("#ffffff");
-    setNotice("");
+  const [slides, setSlides] = useState<Slide[]>(() => [createSlide()]);
+  const [active, setActive] = useState(0), [selectedLayer, setSelectedLayer] = useState("");
+  const [aiBusy, setAiBusy] = useState(false), [loading, setLoading] = useState(false), [exporting, setExporting] = useState(false);
+  const [format, setFormat] = useState("png"), [notice, setNotice] = useState("");
+  const [undo, setUndo] = useState<ImageComposition | null>(null);
+  const generation = useRef(0);
+  const state = slides[active].state, image = state.image;
+  const layer = state.overlays.find(item => item.id === selectedLayer);
+  const busy = aiBusy || loading || exporting;
+  const hasArtwork = Boolean(image || state.template !== "original" || state.overlays.length || state.caption);
+  useEffect(() => () => { generation.current++; }, []);
+  useEffect(() => { try { if (canvas.current) renderImageComposition(canvas.current, state); } catch (error) { setNotice(error instanceof Error ? error.message : "Preview is unavailable."); } }, [state]);
+  function patch(changes: Partial<ImageComposition>) { setSlides(items => items.map((slide, index) => index === active ? { ...slide, state: { ...slide.state, ...changes } } : slide)); }
+  function snapshot() { setUndo(state); }
+  function activate(index: number) { if (busy) return; generation.current++; setActive(index); setSelectedLayer(""); setUndo(null); setNotice(""); }
+  async function decode(file: File) {
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 25 * 1024 * 1024) throw Error("Choose a PNG, JPEG or WebP under 25 MB.");
+    const url = URL.createObjectURL(file), next = new Image();
+    try { next.src = url; await next.decode(); if (next.naturalWidth * next.naturalHeight > 40_000_000) throw Error("Choose an image under 40 megapixels."); return next; }
+    finally { URL.revokeObjectURL(url); }
   }
-  async function select(file?: File) {
-    const request = ++pending.current;
+  async function select(file?: File, overlay = false) {
     if (!file) return false;
-    if (
-      !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
-      file.size > 25 * 1024 * 1024
-    ) {
-      setNotice("Choose a PNG, JPEG or WebP under 25 MB.");
-      return false;
-    }
-    const url = URL.createObjectURL(file);
-    const next = new Image();
+    const request = ++generation.current; setLoading(true); setNotice("");
     try {
-      next.src = url;
-      await next.decode();
-      if (request !== pending.current) return false;
-      if (next.naturalWidth * next.naturalHeight > 40_000_000) {
-        setNotice("Choose an image under 40 megapixels.");
-        return false;
-      }
-      reset();
-      setImage(next);
+      const next = await decode(file); if (request !== generation.current) return false;
+      snapshot();
+      if (overlay) {
+        if (state.overlays.length >= 8) throw Error("Use up to eight image layers per slide.");
+        const id = crypto.randomUUID(); patch({ overlays: [...state.overlays, { id, name: file.name, image: next, x: 50, y: 50, width: 40, opacity: 100 }] }); setSelectedLayer(id);
+      } else { patch({ image: next }); }
       return true;
-    } catch {
-      if (request === pending.current)
-        setNotice("This image could not be opened.");
-      return false;
-    } finally {
-      URL.revokeObjectURL(url);
-    }
+    } catch (error) { if (request === generation.current) setNotice(error instanceof Error ? error.message : "This image could not be opened."); return false; }
+    finally { if (request === generation.current) setLoading(false); }
   }
-  useEffect(() => {
-    if (!image || !canvas.current) return;
-    const turned = rotation % 180 !== 0;
-    const iw = turned ? image.naturalHeight : image.naturalWidth;
-    const ih = turned ? image.naturalWidth : image.naturalHeight;
-    const aspect =
-      ratio === "original"
-        ? iw / ih
-        : ratio === "1:1"
-          ? 1
-          : ratio === "4:5"
-            ? 0.8
-            : ratio === "16:9"
-              ? 16 / 9
-              : 9 / 16;
-    const cw = Math.min(iw, ih * aspect),
-      ch = cw / aspect;
-    const scale = Math.min(1, 2048 / Math.max(cw, ch));
-    const target = canvas.current;
-    target.width = Math.max(1, Math.round(cw * scale));
-    target.height = Math.max(1, Math.round(ch * scale));
-    const ctx = target.getContext("2d");
-    if (!ctx) {
-      setNotice("Image editing is unavailable in this browser.");
-      return;
-    }
-    ctx.save();
-    ctx.translate(target.width / 2, target.height / 2);
-    ctx.scale(scale, scale);
-    ctx.translate(
-      (iw - cw) * (0.5 - focusX / 100),
-      (ih - ch) * (0.5 - focusY / 100),
-    );
-    ctx.scale(flip ? -1 : 1, 1);
-    ctx.rotate((rotation * Math.PI) / 180);
-    ctx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`;
-    ctx.drawImage(image, -image.naturalWidth / 2, -image.naturalHeight / 2);
-    ctx.restore();
-    if (caption.trim()) {
-      // Wrap words at a readable size instead of squeezing the entire caption.
-      const size = Math.max(
-        12,
-        Math.round(((target.width / 24) * textSize) / 100),
-      );
-      ctx.font = `bold ${size}px Arial`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      const maxWidth = target.width * 0.88;
-      const lines: string[] = [];
-      for (const paragraph of caption.trim().split("\n")) {
-        let line = "";
-        for (const word of paragraph.split(/\s+/)) {
-          if (ctx.measureText(word).width > maxWidth) {
-            if (line) {
-              lines.push(line);
-              line = "";
-            }
-            let part = "";
-            for (const char of word) {
-              if (part && ctx.measureText(part + char).width > maxWidth) {
-                lines.push(part);
-                part = char;
-              } else part += char;
-            }
-            line = part;
-          } else if (
-            line &&
-            ctx.measureText(line + " " + word).width > maxWidth
-          ) {
-            lines.push(line);
-            line = word;
-          } else line = line ? line + " " + word : word;
-        }
-        if (line) lines.push(line);
+  function updateLayer(changes: Partial<Overlay>) { if (layer) patch({ overlays: state.overlays.map(item => item.id === layer.id ? { ...item, ...changes } : item) }); }
+  function reorderLayer(direction: number) { if (!layer) return; const next = [...state.overlays], index = next.findIndex(item => item.id === layer.id), target = index + direction; if (target < 0 || target >= next.length) return; snapshot(); [next[index], next[target]] = [next[target], next[index]]; patch({ overlays: next }); }
+  function addSlide(duplicate = false) { if (slides.length >= 10) return; const next = createSlide(`Slide ${slides.length + 1}`); if (duplicate) next.state = { ...state, overlays: state.overlays.map(item => ({ ...item, id: crypto.randomUUID() })) }; setSlides(items => [...items, next]); setActive(slides.length); setSelectedLayer(""); setUndo(null); }
+  function reorderSlide(direction: number) { const target = active + direction; if (target < 0 || target >= slides.length) return; const next = [...slides]; [next[active], next[target]] = [next[target], next[active]]; setSlides(next); setActive(target); }
+  async function download(all = false) {
+    if (busy) return; setExporting(true); setNotice("");
+    try {
+      const files: { name: string; bytes: Uint8Array }[] = [];
+      const selected = all ? slides : [slides[active]];
+      for (let i = 0; i < selected.length; i++) {
+        const target = renderImageComposition(document.createElement("canvas"), selected[i].state);
+        if (format === "jpeg") { const context = target.getContext("2d"); if (context) { context.globalCompositeOperation = "destination-over"; context.fillStyle = "white"; context.fillRect(0, 0, target.width, target.height); context.globalCompositeOperation = "source-over"; } }
+        const blob = await canvasBlob(target, format), name = `orbit-slide-${String(all ? i + 1 : active + 1).padStart(2, "0")}.${format === "jpeg" ? "jpg" : "png"}`;
+        if (!all) downloadBlob(blob, name); else files.push({ name, bytes: new Uint8Array(await blob.arrayBuffer()) });
       }
-      const lineHeight = size * 1.4;
-      const visible = lines.slice(
-        0,
-        Math.max(
-          1,
-          Math.min(8, Math.floor((target.height * 0.65) / lineHeight)),
-        ),
-      );
-      if (visible.length < lines.length)
-        visible[visible.length - 1] =
-          visible[visible.length - 1].slice(0, -3) + "…";
-      const height = visible.length * lineHeight + size;
-      const top =
-        textPosition === "top"
-          ? 0
-          : textPosition === "centre"
-            ? (target.height - height) / 2
-            : target.height - height;
-      ctx.fillStyle = "rgba(0,0,0,.65)";
-      ctx.fillRect(0, top, target.width, height);
-      ctx.fillStyle = textColor;
-      visible.forEach((line, index) =>
-        ctx.fillText(
-          line,
-          target.width / 2,
-          top + size / 2 + lineHeight * (index + 0.5),
-        ),
-      );
-    }
-  }, [
-    image,
-    ratio,
-    rotation,
-    flip,
-    brightness,
-    contrast,
-    saturation,
-    caption,
-    focusX,
-    focusY,
-    textSize,
-    textPosition,
-    textColor,
-  ]);
-  function download() {
-    const target = canvas.current;
-    if (!target || !image) return;
-    const exportCanvas = document.createElement("canvas");
-    exportCanvas.width = target.width;
-    exportCanvas.height = target.height;
-    const ctx = exportCanvas.getContext("2d");
-    if (!ctx) return;
-    if (format === "jpeg") {
-      ctx.fillStyle = "white";
-      ctx.fillRect(0, 0, target.width, target.height);
-    }
-    ctx.drawImage(target, 0, 0);
-    exportCanvas.toBlob(
-      (blob) => {
-        if (!blob) {
-          setNotice("Export failed. Try a smaller image.");
-          return;
-        }
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `orbit-image.${format === "jpeg" ? "jpg" : "png"}`;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-        setNotice("Image exported. Your original stays unchanged.");
-      },
-      `image/${format}`,
-      0.92,
-    );
+      if (all) downloadBlob(new Blob([imageCarouselZip(files).buffer as ArrayBuffer], { type: "application/zip" }), "orbit-carousel.zip");
+      setNotice(all ? `${files.length} carousel slides exported as a ZIP in slide order.` : "Image exported. Your original stays unchanged.");
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Export failed."); }
+    finally { setExporting(false); }
   }
-  return (
-    <section className="workspace-view">
-      <SectionHeading
-        number="02"
-        label="Image"
-        title="A fresh look. Your image."
-      />
-      <div className="video-grid">
-        <Card className="surface video-canvas">
-          <div className="image-stage">
-            {!image ? (
-              <div className="video-placeholder">
-                <ImagePlus size={40} />
-                <span>Your image goes here.</span>
-              </div>
-            ) : null}
-            <canvas
-              ref={canvas}
-              hidden={!image}
-              aria-label="Edited image preview"
-            />
-          </div>
-          <div className="canvas-footer">
-            On your device · adjustable crop · up to 2048px
-          </div>
-        </Card>
-        <Card className="surface video-controls">
-          <fieldset
-            disabled={aiBusy}
-            style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}
-          >
-            <label className="upload-zone">
-              <ImagePlus size={24} />
-              <strong>Choose image</strong>
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                aria-label="Choose image"
-                onChange={(e) => void select(e.target.files?.[0])}
-              />
-            </label>
-            <div className="two-fields">
-              <label className="field">
-                Crop
-                <select
-                  aria-label="Image crop"
-                  value={ratio}
-                  onChange={(e) => setRatio(e.target.value)}
-                >
-                  <option value="original">Original</option>
-                  <option>1:1</option>
-                  <option>4:5</option>
-                  <option>9:16</option>
-                  <option>16:9</option>
-                </select>
-              </label>
-              <label className="field">
-                Export
-                <select
-                  aria-label="Image export format"
-                  value={format}
-                  onChange={(e) => setFormat(e.target.value)}
-                >
-                  <option value="png">PNG</option>
-                  <option value="jpeg">JPEG</option>
-                </select>
-              </label>
-            </div>
-            <label className="field">
-              Look preset
-              <select
-                aria-label="Image look preset"
-                value={
-                  brightness === 100 && contrast === 100 && saturation === 100
-                    ? "original"
-                    : brightness === 105 &&
-                        contrast === 115 &&
-                        saturation === 130
-                      ? "vivid"
-                      : brightness === 110 &&
-                          contrast === 90 &&
-                          saturation === 90
-                        ? "soft"
-                        : brightness === 100 &&
-                            contrast === 115 &&
-                            saturation === 0
-                          ? "mono"
-                          : "custom"
-                }
-                onChange={(e) => {
-                  const looks: Record<string, number[]> = {
-                    original: [100, 100, 100],
-                    vivid: [105, 115, 130],
-                    soft: [110, 90, 90],
-                    mono: [100, 115, 0],
-                  };
-                  const v = looks[e.target.value];
-                  setBrightness(v[0]);
-                  setContrast(v[1]);
-                  setSaturation(v[2]);
-                }}
-              >
-                <option value="custom" disabled>
-                  Custom
-                </option>
-                <option value="original">Original</option>
-                <option value="vivid">Vivid</option>
-                <option value="soft">Soft</option>
-                <option value="mono">Monochrome</option>
-              </select>
-            </label>
-            <div className="review-actions">
-              <Button
-                variant="outline"
-                disabled={!image}
-                aria-label="Rotate image"
-                onClick={() => setRotation((v) => (v + 90) % 360)}
-              >
-                <RotateCw size={17} />
-                Rotate
-              </Button>
-              <Button
-                variant="outline"
-                disabled={!image}
-                aria-label="Flip image"
-                onClick={() => setFlip((v) => !v)}
-              >
-                <FlipHorizontal size={17} />
-                Flip
-              </Button>
-            </div>
-            {ratio !== "original" ? (
-              <>
-                {[
-                  {
-                    name: "Horizontal crop focus",
-                    value: focusX,
-                    set: setFocusX,
-                  },
-                  {
-                    name: "Vertical crop focus",
-                    value: focusY,
-                    set: setFocusY,
-                  },
-                ].map((control) => (
-                  <label className="slider-field" key={control.name}>
-                    <span>
-                      {control.name}
-                      <output>{control.value}%</output>
-                    </span>
-                    <input
-                      aria-label={control.name}
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={control.value}
-                      onChange={(e) => control.set(Number(e.target.value))}
-                    />
-                  </label>
-                ))}
-              </>
-            ) : null}
-            {[
-              { name: "Brightness", value: brightness, set: setBrightness },
-              { name: "Contrast", value: contrast, set: setContrast },
-              { name: "Saturation", value: saturation, set: setSaturation },
-            ].map((control) => (
-              <label className="slider-field" key={control.name}>
-                <span>
-                  {control.name}
-                  <output>{control.value}%</output>
-                </span>
-                <input
-                  aria-label={`Image ${control.name.toLowerCase()}`}
-                  type="range"
-                  min="0"
-                  max="200"
-                  value={control.value}
-                  onChange={(e) => control.set(Number(e.target.value))}
-                />
-              </label>
-            ))}
-            <label className="field">
-              Caption
-              <textarea
-                aria-label="Image caption"
-                maxLength={180}
-                value={caption}
-                onChange={(e) => setCaption(e.target.value)}
-              />
-            </label>
-            <div className="two-fields">
-              <label className="field">
-                Text position
-                <select
-                  aria-label="Image text position"
-                  value={textPosition}
-                  onChange={(e) => setTextPosition(e.target.value)}
-                >
-                  <option value="top">Top</option>
-                  <option value="centre">Centre</option>
-                  <option value="bottom">Bottom</option>
-                </select>
-              </label>
-              <label className="field">
-                Text colour
-                <input
-                  aria-label="Image text colour"
-                  type="color"
-                  value={textColor}
-                  onChange={(e) => setTextColor(e.target.value)}
-                />
-              </label>
-            </div>
-            <label className="slider-field">
-              <span>
-                Text size<output>{textSize}%</output>
-              </span>
-              <input
-                aria-label="Image text size"
-                type="range"
-                min="60"
-                max="180"
-                value={textSize}
-                onChange={(e) => setTextSize(Number(e.target.value))}
-              />
-            </label>
-          </fieldset>
-          <ImageAiPanel
-            source={() => canvas.current}
-            disabled={!image}
-            preview={preview}
-            onBusyChange={setAiBusy}
-            onResult={async (blob) => {
-              const loaded = await select(
-                new File([blob], "orbit-ai-result.png", { type: blob.type }),
-              );
-              if (!loaded)
-                throw new Error(
-                  "The AI image could not be decoded. Your current image is unchanged.",
-                );
-            }}
-          />
-          <fieldset
-            disabled={aiBusy}
-            style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}
-          >
-            <Button
-              disabled={!image}
-              onClick={download}
-              aria-label="Export image"
-            >
-              <Download size={17} />
-              Export image
-            </Button>
-            <Button
-              variant="outline"
-              onClick={reset}
-              aria-label="Reset image edits"
-            >
-              <RefreshCw size={17} />
-              Reset edits
-            </Button>
-          </fieldset>
-          {notice ? (
-            <p role="status" className="action-notice">
-              {notice}
-            </p>
-          ) : null}
-        </Card>
-      </div>
-    </section>
-  );
+  const aiCurrent: ImageEditorState = { ratio: state.ratio as ImageEditorState["ratio"], rotation: state.rotation as ImageEditorState["rotation"], flip: state.flip, brightness: state.brightness, contrast: state.contrast, saturation: state.saturation, focusX: state.focusX, focusY: state.focusY, textSize: state.textSize, textPosition: (state.textPosition === "centre" ? "center" : state.textPosition) as ImageEditorState["textPosition"], textColor: state.textColor, caption: state.caption, template: state.template as ImageEditorState["template"], accent: state.accent, background: state.background };
+  function applyAi(changes: ImageEditorChanges) { snapshot(); const base = changes.template ? applyImageTemplate(state, changes.template) : state; patch({ ...base, ...changes, textPosition: changes.textPosition === "center" ? "centre" : changes.textPosition ?? base.textPosition }); setNotice("AI composition applied. Review your slide before exporting."); }
+  const sliders = (controls: { name: string; key: "brightness" | "contrast" | "saturation" | "focusX" | "focusY" | "textSize"; min?: number; max?: number }[]) => controls.map(control => <label className="slider-field" key={control.key}><span>{control.name}<output>{state[control.key]}%</output></span><input aria-label={`Image ${control.name.toLowerCase()}`} type="range" min={control.min ?? 0} max={control.max ?? 200} value={state[control.key]} onChange={event => patch({ [control.key]: Number(event.target.value) })}/></label>);
+  return <section className="workspace-view image-composer">
+    <SectionHeading number="02" label="Image" title="One idea. Every layer."/>
+    <div className="image-template-strip" aria-label="Image templates">{imageTemplates.map(template => <button type="button" className={`image-template ${state.template === template.id ? "is-selected" : ""}`} key={template.id} disabled={busy} aria-pressed={state.template === template.id} onClick={() => { snapshot(); const next = applyImageTemplate(state, template.id); patch(next); }}><span className={`image-template-art template-${template.id}`} style={{ backgroundColor: template.color }}><i/><b>{template.id === "original" ? "+" : template.id === "quote" ? "“" : "Aa"}</b></span><strong>{template.name}</strong><small>{template.tag}</small></button>)}</div>
+    <div className="video-grid">
+      <Card className="surface video-canvas">
+        <div className="image-stage">{!hasArtwork ? <div className="video-placeholder"><ImagePlus size={40}/><span>Start with an image or a template.</span></div> : null}<canvas ref={canvas} hidden={!hasArtwork} aria-label="Edited image preview"/></div>
+        <div className="canvas-footer">Slide {active + 1} of {slides.length} · {state.overlays.length} overlay layers · up to 2048px</div>
+        <div className="image-slide-strip" aria-label="Carousel slides">{slides.map((slide, index) => <button type="button" key={slide.id} disabled={busy} aria-pressed={index === active} aria-label={`Edit slide ${index + 1}`} onClick={() => activate(index)}><span style={{ background: slide.state.accent }}>{index + 1}</span>{slide.name}</button>)}</div>
+        <div className="review-actions image-slide-actions"><Button variant="outline" disabled={busy || slides.length >= 10} onClick={() => addSlide()}><Plus size={16}/>Add slide</Button><Button variant="outline" disabled={busy || slides.length >= 10} onClick={() => addSlide(true)}><Copy size={16}/>Duplicate slide</Button><Button variant="outline" aria-label="Move slide earlier" disabled={busy || active === 0} onClick={() => reorderSlide(-1)}><ArrowUp size={16}/></Button><Button variant="outline" aria-label="Move slide later" disabled={busy || active === slides.length - 1} onClick={() => reorderSlide(1)}><ArrowDown size={16}/></Button><Button variant="outline" aria-label="Remove slide" disabled={busy || slides.length === 1} onClick={() => { setSlides(items => items.filter((_, index) => index !== active)); setActive(Math.max(0, active - 1)); setUndo(null); setSelectedLayer(""); }}><Trash2 size={16}/></Button></div>
+        <p className="image-device-note">Original templates by Orbit. Your files stay on this device unless you choose an AI upload. Keep this page open until exported.</p>
+      </Card>
+      <Card className="surface video-controls">
+        <fieldset disabled={busy} className="image-control-fieldset">
+          <label className="upload-zone"><ImagePlus size={24}/><strong>{image ? "Replace base image" : "Choose image"}</strong><input type="file" accept="image/png,image/jpeg,image/webp" aria-label="Choose image" onChange={event => { void select(event.target.files?.[0]); event.target.value = ""; }}/></label>
+          <div className="two-fields"><label className="field">Crop<select aria-label="Image crop" value={state.ratio} onChange={event => patch({ ratio: event.target.value })}><option value="original">Original</option><option>1:1</option><option>4:5</option><option>9:16</option><option>16:9</option></select></label><label className="field">Export<select aria-label="Image export format" value={format} onChange={event => setFormat(event.target.value)}><option value="png">PNG</option><option value="jpeg">JPEG</option></select></label></div>
+          <section className="image-layers" aria-label="Image overlay layers"><h3><Layers size={18}/>Image layers</h3><label className="image-overlay-upload"><Plus size={16}/>Add image overlay<input type="file" accept="image/png,image/jpeg,image/webp" aria-label="Add image overlay" disabled={state.overlays.length >= 8} onChange={event => { void select(event.target.files?.[0], true); event.target.value = ""; }}/></label>
+          {state.overlays.length ? <><label className="field">Selected layer<select aria-label="Selected image layer" value={selectedLayer} onChange={event => setSelectedLayer(event.target.value)}><option value="">Choose a layer</option>{state.overlays.map((item, index) => <option key={item.id} value={item.id}>{index + 1}. {item.name}</option>)}</select></label>{layer ? <>{([{ key: "x", name: "Horizontal position", max: 100 }, { key: "y", name: "Vertical position", max: 100 }, { key: "width", name: "Layer size", max: 150 }, { key: "opacity", name: "Layer opacity", max: 100 }] as const).map(control => <label className="slider-field" key={control.key}><span>{control.name}<output>{layer[control.key]}%</output></span><input aria-label={control.name} type="range" min={control.key === "width" ? 5 : 0} max={control.max} value={layer[control.key]} onChange={event => updateLayer({ [control.key]: Number(event.target.value) })}/></label>)}<div className="review-actions"><Button variant="outline" disabled={state.overlays[0].id === layer.id} onClick={() => reorderLayer(-1)}>Send backward</Button><Button variant="outline" disabled={state.overlays.at(-1)?.id === layer.id} onClick={() => reorderLayer(1)}>Bring forward</Button><Button variant="outline" aria-label="Remove image layer" onClick={() => { snapshot(); patch({ overlays: state.overlays.filter(item => item.id !== layer.id) }); setSelectedLayer(""); }}><Trash2 size={16}/></Button></div></> : null}</> : <p>Add a logo, product shot or another image above your base.</p>}</section>
+          <details className="image-manual-controls"><summary>Adjust image and text</summary>
+          <label className="field">Look preset<select aria-label="Image look preset" defaultValue="original" onChange={event => { const looks: Record<string, number[]> = { original: [100, 100, 100], vivid: [105, 115, 130], soft: [110, 90, 90], mono: [100, 115, 0] }; const values = looks[event.target.value]; patch({ brightness: values[0], contrast: values[1], saturation: values[2] }); }}><option value="original">Original</option><option value="vivid">Vivid</option><option value="soft">Soft</option><option value="mono">Monochrome</option></select></label>
+          <div className="review-actions"><Button variant="outline" disabled={!image} aria-label="Rotate image" onClick={() => patch({ rotation: (state.rotation + 90) % 360 })}><RotateCw size={17}/>Rotate</Button><Button variant="outline" disabled={!image} aria-label="Flip image" onClick={() => patch({ flip: !state.flip })}><FlipHorizontal size={17}/>Flip</Button></div>
+          {state.ratio !== "original" ? sliders([{ name: "Horizontal crop focus", key: "focusX", max: 100 }, { name: "Vertical crop focus", key: "focusY", max: 100 }]) : null}
+          {sliders([{ name: "Brightness", key: "brightness" }, { name: "Contrast", key: "contrast" }, { name: "Saturation", key: "saturation" }])}
+          <label className="field">Caption<textarea aria-label="Image caption" maxLength={200} value={state.caption} onChange={event => patch({ caption: event.target.value })}/></label>
+          <div className="two-fields"><label className="field">Text position<select aria-label="Image text position" value={state.textPosition} onChange={event => patch({ textPosition: event.target.value })}><option value="top">Top</option><option value="centre">Centre</option><option value="bottom">Bottom</option></select></label><label className="field">Text colour<input aria-label="Image text colour" type="color" value={state.textColor} onChange={event => patch({ textColor: event.target.value })}/></label></div>
+          <label className="field">Template colour<input aria-label="Image template colour" type="color" value={state.background} onChange={event => patch({ accent: event.target.value, background: event.target.value })}/></label>
+          {sliders([{ name: "Text size", key: "textSize", min: 60, max: 180 }])}
+          </details>
+        </fieldset>
+        <EditorAiPanel key={slides[active].id} kind="image" current={aiCurrent} disabled={busy} preview={preview} onApply={applyAi}/>
+        <details className="image-pixel-ai"><summary>Generate a new background or visual with AI</summary><ImageAiPanel source={() => canvas.current} disabled={!hasArtwork || loading || exporting} preview={preview} onBusyChange={setAiBusy} onResult={async blob => { const next = await decode(new File([blob], "orbit-ai-result.png", { type: blob.type })); snapshot(); patch(freshComposition(next)); }}/></details>
+        <fieldset disabled={busy} className="image-control-fieldset"><Button disabled={!hasArtwork} onClick={() => void download()} aria-label="Export image"><Download size={17}/>{exporting ? "Exporting…" : "Export image"}</Button><Button variant="outline" disabled={slides.length < 2} onClick={() => void download(true)}><Download size={17}/>Export carousel ZIP</Button><Button variant="outline" disabled={!undo} onClick={() => { if (undo) { const previous = undo; setUndo(state); patch(previous); } }}><Undo2 size={17}/>Undo last composition</Button><Button variant="outline" onClick={() => { snapshot(); patch(freshComposition(image)); setSelectedLayer(""); }} aria-label="Reset image edits"><RefreshCw size={17}/>Reset edits</Button></fieldset>
+        {notice ? <p role="status" className="action-notice">{notice}</p> : null}
+      </Card>
+    </div>
+  </section>;
 }

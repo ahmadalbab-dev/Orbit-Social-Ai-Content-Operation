@@ -1,4 +1,14 @@
 /** Device-only export. No uploads, provider calls or fabricated render jobs. */
+export interface VideoImageOverlay {
+  id: string;
+  src: string;
+  x: number;
+  y: number;
+  width: number;
+  opacity: number;
+  start: number;
+  end: number;
+}
 export interface LocalVideoEdit {
   start: number;
   duration: number;
@@ -8,6 +18,10 @@ export interface LocalVideoEdit {
   volume: number;
   rotation: number;
   flip: boolean;
+  brightness?: number;
+  contrast?: number;
+  saturation?: number;
+  overlays?: VideoImageOverlay[];
   news?: { title: string; date: string };
   captions: { text: string; start: number; end: number }[];
 }
@@ -46,6 +60,37 @@ export function validateVideoEdit(edit: LocalVideoEdit) {
     edit.width > 2048 ||
     edit.height > 2048 ||
     edit.rotation % 90 !== 0 ||
+    (edit.brightness !== undefined &&
+      (!Number.isFinite(edit.brightness) ||
+        edit.brightness < 0.5 ||
+        edit.brightness > 1.5)) ||
+    (edit.contrast !== undefined &&
+      (!Number.isFinite(edit.contrast) ||
+        edit.contrast < 0.5 ||
+        edit.contrast > 1.5)) ||
+    (edit.saturation !== undefined &&
+      (!Number.isFinite(edit.saturation) ||
+        edit.saturation < 0 ||
+        edit.saturation > 2)) ||
+    (edit.overlays?.length ?? 0) > 6 ||
+    edit.overlays?.some(
+      (o) =>
+        !o.src.startsWith("blob:") ||
+        ![o.x, o.y, o.width, o.opacity, o.start, o.end].every(
+          Number.isFinite,
+        ) ||
+        o.x < 0 ||
+        o.x > 1 ||
+        o.y < 0 ||
+        o.y > 1 ||
+        o.width < 0.05 ||
+        o.width > 1 ||
+        o.opacity < 0 ||
+        o.opacity > 1 ||
+        o.start < 0 ||
+        o.end <= o.start ||
+        o.end > edit.duration,
+    ) ||
     edit.captions.length > 20 ||
     edit.captions.some(
       (c) =>
@@ -96,6 +141,7 @@ export function drawEditedFrame(
   video: HTMLVideoElement,
   edit: LocalVideoEdit,
   elapsed: number,
+  images: ReadonlyMap<string, HTMLImageElement> = new Map(),
 ) {
   const { width: w, height: h } = edit;
   ctx.fillStyle = "#000";
@@ -108,6 +154,7 @@ export function drawEditedFrame(
     edit.rotation,
   );
   ctx.save();
+  ctx.filter = `brightness(${edit.brightness ?? 1}) contrast(${edit.contrast ?? 1}) saturate(${edit.saturation ?? 1})`;
   ctx.translate(w / 2, h / 2);
   ctx.scale(edit.flip ? -1 : 1, 1);
   ctx.rotate((edit.rotation * Math.PI) / 180);
@@ -119,6 +166,22 @@ export function drawEditedFrame(
     fitted.height,
   );
   ctx.restore();
+  ctx.filter = "none";
+  for (const overlay of edit.overlays ?? []) {
+    const image = images.get(overlay.id);
+    if (!image || elapsed < overlay.start || elapsed >= overlay.end) continue;
+    const width = overlay.width * w;
+    ctx.save();
+    ctx.globalAlpha = overlay.opacity;
+    ctx.drawImage(
+      image,
+      overlay.x * w,
+      overlay.y * h,
+      width,
+      (width * image.naturalHeight) / image.naturalWidth,
+    );
+    ctx.restore();
+  }
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   if (edit.news) {
@@ -201,6 +264,16 @@ export async function exportLocalVideo(
     (edit.duration / edit.speed + 20) * 1000,
   );
   try {
+    const images = new Map<string, HTMLImageElement>();
+    await Promise.all(
+      (edit.overlays ?? []).map(async (overlay) => {
+        const image = new Image();
+        image.src = overlay.src;
+        await image.decode();
+        signal.throwIfAborted();
+        images.set(overlay.id, image);
+      }),
+    );
     if (audio) {
       await audio.resume();
       if (audio.state !== "running")
@@ -251,7 +324,7 @@ export async function exportLocalVideo(
       await seek;
     }
     signal.throwIfAborted();
-    drawEditedFrame(ctx, video, edit, 0);
+    drawEditedFrame(ctx, video, edit, 0, images);
     recorder = new MediaRecorder(stream, {
       mimeType: mime,
       videoBitsPerSecond: 4_000_000,
@@ -311,7 +384,7 @@ export async function exportLocalVideo(
       };
       const draw = () => {
         const elapsed = Math.max(0, video.currentTime - edit.start);
-        drawEditedFrame(ctx, video, edit, elapsed);
+        drawEditedFrame(ctx, video, edit, elapsed, images);
         progress(Math.min(99, (elapsed / edit.duration) * 100));
         if (elapsed >= edit.duration - 0.025 || video.ended) {
           complete = true;

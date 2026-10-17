@@ -92,4 +92,74 @@ describe("local video editing", () => {
     );
     expect(ctx.fillText.mock.calls.map((c) => c[0])).not.toContain("Caption");
   });
+  it("renders only active image layers with their geometry and opacity above the footage", () => {
+    const ctx = {
+      fillRect: vi.fn(),
+      save: vi.fn(),
+      restore: vi.fn(),
+      translate: vi.fn(),
+      scale: vi.fn(),
+      rotate: vi.fn(),
+      drawImage: vi.fn(),
+      fillText: vi.fn(),
+      measureText: (t: string) => ({ width: t.length * 10 }),
+    };
+    const image = { naturalWidth: 400, naturalHeight: 200 } as HTMLImageElement;
+    const state = {
+      ...edit,
+      brightness: 1.2,
+      overlays: [
+        {
+          id: "logo",
+          src: "blob:logo",
+          x: 0.1,
+          y: 0.2,
+          width: 0.3,
+          opacity: 0.4,
+          start: 1,
+          end: 3,
+        },
+      ],
+    };
+    const images = new Map([["logo", image]]);
+    drawEditedFrame(
+      ctx as unknown as CanvasRenderingContext2D,
+      { videoWidth: 1920, videoHeight: 1080 } as HTMLVideoElement,
+      state,
+      2,
+      images,
+    );
+    expect(ctx.drawImage).toHaveBeenNthCalledWith(2, image, 72, 256, 216, 108);
+    expect(ctx).toHaveProperty("globalAlpha", 0.4);
+    ctx.drawImage.mockClear();
+    drawEditedFrame(
+      ctx as unknown as CanvasRenderingContext2D,
+      { videoWidth: 1920, videoHeight: 1080 } as HTMLVideoElement,
+      state,
+      3,
+      images,
+    );
+    expect(ctx.drawImage).toHaveBeenCalledTimes(1);
+  });
+  it("rejects remote image sources, unbounded layers and invalid colour settings", () => {
+    const overlay = {
+      id: "logo",
+      src: "blob:logo",
+      x: 0,
+      y: 0,
+      width: 0.3,
+      opacity: 1,
+      start: 0,
+      end: 5,
+    };
+    for (const patch of [
+      { overlays: [{ ...overlay, src: "https://untrusted/image.png" }] },
+      { overlays: [{ ...overlay, end: 6 }] },
+      { overlays: Array(7).fill(overlay) },
+      { brightness: 2 },
+      { saturation: NaN },
+    ]) {
+      expect(() => validateVideoEdit({ ...edit, ...patch })).toThrow();
+    }
+  });
 });
