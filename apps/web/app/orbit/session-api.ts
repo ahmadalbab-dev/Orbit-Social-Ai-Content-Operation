@@ -28,12 +28,19 @@ export async function apiResponse(
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${current.token}`);
   if (workspace) headers.set("x-workspace-id", current.workspaceId);
-  const response = await fetch(destination.href, {
-    ...init,
-    cache: "no-store",
-    headers,
-    redirect: "error",
-  });
+  let response: Response;
+  try {
+    response = await fetch(`/api/workspace${destination.pathname.slice(3)}`, {
+      ...init,
+      cache: "no-store",
+      credentials: "same-origin",
+      headers,
+      redirect: "error",
+      signal: init.signal ?? AbortSignal.timeout(60000),
+    });
+  } catch {
+    throw Error("Cannot reach the workspace service. Please check your connection and try again.");
+  }
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
     if (response.status === 401)

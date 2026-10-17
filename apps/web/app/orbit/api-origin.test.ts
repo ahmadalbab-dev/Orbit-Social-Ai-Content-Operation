@@ -50,4 +50,17 @@ describe("workspace credential destinations", () => {
     await expect(api(path)).rejects.toThrow("Invalid workspace API path");
     expect(fetcher).not.toHaveBeenCalled();
   });
+  it("uses the same-origin relay while retaining bearer and workspace checks",async()=>{
+    vi.stubEnv("NEXT_PUBLIC_API_URL","https://api.example.com");
+    const fetcher=vi.fn().mockResolvedValue(Response.json([]));vi.stubGlobal("fetch",fetcher);
+    setApiSession({token:"private",workspaceId:"workspace-a"});await api("/content");
+    expect(fetcher.mock.calls[0][0]).toBe("/api/workspace/content");
+    expect(new Headers(fetcher.mock.calls[0][1].headers).get("authorization")).toBe("Bearer private");
+    expect(fetcher.mock.calls[0][1].credentials).toBe("same-origin");
+  });
+  it("does not expose raw browser transport errors",async()=>{
+    vi.stubEnv("NEXT_PUBLIC_API_URL","https://api.example.com");vi.stubGlobal("fetch",vi.fn().mockRejectedValue(new TypeError("Failed to fetch private diagnostic")));
+    setApiSession({token:"private",workspaceId:"workspace-a"});await expect(api("/content")).rejects.toThrow("Cannot reach the workspace service");
+  });
+
 });

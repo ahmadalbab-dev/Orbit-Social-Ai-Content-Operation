@@ -882,3 +882,38 @@ html[data-theme=light] .orbit-nav.reference-dock .reference-dock-icon[aria-curre
     scroll-behavior: auto;
   }
 }
+/* The hero can stretch without widening the account form. */
+.auth-orbit-visual {
+  width: min(1100px, calc(100vw - 40px));
+  max-width: none;
+  height: clamp(205px, 24vw, 300px);
+  left: 50%;
+  margin: 0;
+  transform: translateX(-50%);
+}
+.orbit-artwork { position:absolute;inset:0;z-index:-2;pointer-events:none; }
+.auth-orbit-visual .orbit-artwork { z-index:0; }
+.orbit-artwork .orbit-field { z-index:0; }
+.orbit-ai-signature { position:absolute;top:var(--signature-top,210px);left:var(--signature-left,50%);width:var(--signature-width,40%);display:flex;justify-content:center;gap:.055em;color:var(--primary);font:600 clamp(14px,2vw,25px) var(--mono);letter-spacing:.1em;line-height:1.2;text-transform:lowercase; }
+.orbit-ai-signature span { display:inline-block;animation:orbit-signature 4.8s ease-in-out infinite both; }
+@keyframes orbit-signature { 0%,75%,100%{opacity:.9;transform:translateY(0);filter:blur(0)} 18%{opacity:.45;transform:translateY(-3px);filter:blur(.4px)} 34%{opacity:1;transform:translateY(0);filter:blur(0)} }
+.orbit-artwork[data-paused=true] .orbit-ai-signature span { animation:none; }
+/* One compact launcher across desktop, touch and keyboard navigation. */
+.navigation-dock { display:flex;position:fixed;right:max(16px,env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));z-index:40;width:46px;min-height:46px;align-items:center;justify-content:flex-end; }
+.navigation-dock .nav-launcher { display:grid;place-items:center;position:relative;inset:auto;width:46px;height:46px;min-height:46px!important;padding:0;border:1px solid var(--line);border-radius:50%;background:var(--glass);color:var(--primary);box-shadow:0 6px 24px #30253d20;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px); }
+.navigation-dock[data-expanded=false] .orbit-nav.reference-dock { display:none; }
+.navigation-dock[data-expanded=true] { width:auto;max-width:calc(100vw - 32px); }
+.navigation-dock[data-expanded=true] .nav-launcher { display:none; }
+.navigation-dock .orbit-nav.reference-dock { position:relative;inset:auto;transform:none;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));width:min(430px,calc(100vw - 32px));gap:8px;padding:10px;border-radius:26px; }
+.navigation-dock .orbit-nav.reference-dock .reference-dock-icon { width:100%;height:46px;min-height:46px; }
+.navigation-dock[data-expanded=true] .orbit-nav.reference-dock { animation:dock-open .24s ease both;transform-origin:bottom right; }
+@media(max-width:480px){.auth-orbit-visual{height:205px;margin:0;width:calc(100vw - 24px)}.orbit-ai-signature{font-size:14px}}
+@media(prefers-reduced-motion:reduce){.orbit-ai-signature span,.navigation-dock[data-expanded=true] .orbit-nav.reference-dock{animation:none!important;transition:none!important}}
+/* Expanded desktop menus retain their readable labels. */
+.navigation-dock .orbit-nav.reference-dock { display:flex;width:max-content;max-width:calc(100vw - 32px); }
+.orbit-shell .navigation-dock .orbit-nav.reference-dock .reference-dock-icon { width:auto;min-height:44px;height:44px; }
+@media(max-width:700px){
+ .navigation-dock .orbit-nav.reference-dock{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));width:min(430px,calc(100vw - 32px));}
+ .orbit-shell .navigation-dock .orbit-nav.reference-dock .reference-dock-icon{display:grid;width:100%;min-width:0;padding:0;}
+ .orbit-shell .navigation-dock .orbit-nav .reference-dock-icon .reference-dock-label{display:none;}
+}

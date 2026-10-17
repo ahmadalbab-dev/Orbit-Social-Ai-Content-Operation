@@ -40,8 +40,12 @@ export async function passwordAuth(
   if (!config) throw Error("Customer sign-in is not configured yet.");
   let response: Response;
   try {
+    const endpoint = new URL(`${config.url}/auth/v1/${kind === "signup" ? "signup" : "token?grant_type=password"}`);
+    // Supabase validates this against its redirect allowlist. Never use a query-provided destination.
+    if (kind === "signup" && typeof window !== "undefined")
+      endpoint.searchParams.set("redirect_to", `${window.location.origin}/`);
     response = await fetch(
-      `${config.url}/auth/v1/${kind === "signup" ? "signup" : "token?grant_type=password"}`,
+      endpoint.href,
       {
         method: "POST",
         headers: { apikey: config.key, "Content-Type": "application/json" },
@@ -90,11 +94,11 @@ export async function passwordAuth(
   if (kind === "signup") return null;
   throw Error("The sign-in service did not return a valid session.");
 }
-export async function revokeSession(token: string) {
+export async function revokeSession(token: string, scope: "global" | "local" = "global") {
   const config = publicAuthConfig();
   if (!config) return;
   try {
-    await fetch(`${config.url}/auth/v1/logout`, {
+    await fetch(`${config.url}/auth/v1/logout?scope=${scope}`, {
       method: "POST",
       headers: { apikey: config.key, Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(10000),

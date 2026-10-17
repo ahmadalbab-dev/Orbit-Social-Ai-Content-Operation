@@ -18,6 +18,7 @@ import { Button } from "./ui";
 import { SessionRenewal } from "./session-renewal";
 import { PasswordRecovery } from "./password-recovery";
 import type { AuthSession } from "./auth-client";
+import { confirmEmailRedirect } from "./confirmation-client";
 type Workspace = { id: string; name: string; role?: string };
 export function WorkspaceApp() {
   const [token, setToken] = useState("");
@@ -33,6 +34,31 @@ export function WorkspaceApp() {
   const selectedRef = useRef("");
   const tokenRef = useRef("");
   const authGeneration = useRef(0);
+  const confirmation = useRef<Promise<string | null> | null>(null);
+  useEffect(() => {
+    let active = true;
+    const checkConfirmation = () => {
+      // Clear credentials from history before any request. Strict Mode reuses the promise.
+      const fragment = window.location.hash;
+      const params = new URLSearchParams(fragment.slice(1));
+      if (params.has("access_token") || params.has("error_code") || params.has("error")) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        confirmation.current = confirmEmailRedirect(fragment);
+      }
+      if (confirmation.current) {
+        setBusy(true);
+        setSignup(false);
+        setRecovering(false);
+        setNotice("Checking your email confirmation…");
+        void confirmation.current.then(message => {
+          if (active) { setNotice(message ?? ""); setBusy(false); }
+        });
+      }
+    };
+    checkConfirmation();
+    window.addEventListener("hashchange", checkConfirmation);
+    return () => { active = false; window.removeEventListener("hashchange", checkConfirmation); };
+  }, []);
   const [renewal] = useState(
     () =>
       new SessionRenewal(
@@ -111,7 +137,11 @@ export function WorkspaceApp() {
         String(fields.get("password")),
       );
       if (generation !== authGeneration.current) return;
-      if (session)
+      if (signup) {
+        if (session) await revokeSession(session.access_token, "local");
+        setSignup(false);
+        setNotice("Check your inbox and spam folder for your confirmation email. Confirm your email, then sign in here.");
+      } else if (session)
         await connect(session.access_token, session.expires_in, session);
       else
         setNotice(
@@ -188,7 +218,7 @@ export function WorkspaceApp() {
             <AppearanceToggle />
           </header>
           <div className="auth-orbit-visual" aria-hidden="true">
-            <OrbitField paused={!motion} />
+            <OrbitField paused={!motion} centered />
           </div>
           <section className="auth-card" aria-labelledby="auth-title">
             <div className="auth-heading">
