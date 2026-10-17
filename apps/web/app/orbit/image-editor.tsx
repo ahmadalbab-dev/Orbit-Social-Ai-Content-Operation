@@ -76,8 +76,19 @@ export function ImageEditor({ preview = false }: { preview?: boolean }) {
     } catch (error) { setNotice(error instanceof Error ? error.message : "Export failed."); }
     finally { setExporting(false); }
   }
-  const aiCurrent: ImageEditorState = { ratio: state.ratio as ImageEditorState["ratio"], rotation: state.rotation as ImageEditorState["rotation"], flip: state.flip, brightness: state.brightness, contrast: state.contrast, saturation: state.saturation, focusX: state.focusX, focusY: state.focusY, textSize: state.textSize, textPosition: (state.textPosition === "centre" ? "center" : state.textPosition) as ImageEditorState["textPosition"], textColor: state.textColor, caption: state.caption, template: state.template as ImageEditorState["template"], accent: state.accent, background: state.background };
-  function applyAi(changes: ImageEditorChanges) { snapshot(); const base = changes.template ? applyImageTemplate(state, changes.template) : state; patch({ ...base, ...changes, caption: changes.caption ?? state.caption, textPosition: changes.textPosition === "center" ? "centre" : changes.textPosition ?? base.textPosition }); setNotice("AI composition applied. Review your slide before exporting."); }
+  const aiCurrent: ImageEditorState = { ratio: state.ratio as ImageEditorState["ratio"], rotation: state.rotation as ImageEditorState["rotation"], flip: state.flip, brightness: state.brightness, contrast: state.contrast, saturation: state.saturation, focusX: state.focusX, focusY: state.focusY, textSize: state.textSize, textPosition: (state.textPosition === "centre" ? "center" : state.textPosition) as ImageEditorState["textPosition"], textColor: state.textColor, caption: state.caption, template: state.template as ImageEditorState["template"], accent: state.accent, background: state.background, layers: state.overlays.map((layer, index) => ({ index, x: layer.x, y: layer.y, width: layer.width, opacity: layer.opacity })) };
+  function applyAi(changes: ImageEditorChanges) {
+    snapshot();
+    const { layers, ...compositionChanges } = changes;
+    const base = compositionChanges.template ? applyImageTemplate(state, compositionChanges.template) : state;
+    const overlays = state.overlays.map((layer, index) => {
+      const change = layers?.find(item => item.index === index);
+      if (!change) return layer;
+      return { ...layer, x: change.x ?? layer.x, y: change.y ?? layer.y, width: change.width ?? layer.width, opacity: change.opacity ?? layer.opacity };
+    });
+    patch({ ...base, ...compositionChanges, overlays, caption: compositionChanges.caption ?? state.caption, textPosition: compositionChanges.textPosition === "center" ? "centre" : compositionChanges.textPosition ?? base.textPosition });
+    setNotice("AI composition applied. Review your slide before exporting.");
+  }
   const sliders = (controls: { name: string; key: "brightness" | "contrast" | "saturation" | "focusX" | "focusY" | "textSize"; min?: number; max?: number }[]) => controls.map(control => <label className="slider-field" key={control.key}><span>{control.name}<output>{state[control.key]}%</output></span><input aria-label={`Image ${control.name.toLowerCase()}`} type="range" min={control.min ?? 0} max={control.max ?? 200} value={state[control.key]} onChange={event => patch({ [control.key]: Number(event.target.value) })}/></label>);
   return <section className="workspace-view image-composer">
     <SectionHeading number="02" label="Image" title="One idea. Every layer."/>

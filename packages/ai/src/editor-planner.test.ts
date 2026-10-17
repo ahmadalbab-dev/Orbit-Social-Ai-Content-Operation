@@ -19,6 +19,17 @@ describe('conversational editor boundary',()=>{
   const input=validateEditorInput({kind:'video',instruction:'Trim',current:{sourceDuration:20,start:5,duration:10}});
   for(const changes of [{start:15,duration:10},{captions:[{text:'Late',start:0,end:11}]}])expect(()=>parseEditorPlan(JSON.stringify({summary:'Edit',changes}),input)).toThrow();
  });
+ it('moves only existing uploaded layers',()=>{
+  const input=validateEditorInput({...image,current:{layers:[{index:0,x:50,y:50,width:40,opacity:100}]}});
+  const plan=parseEditorPlan(JSON.stringify({summary:'Logo at top right',changes:{layers:[{index:0,x:85,y:15,width:20}]}}),input);
+  expect(plan.changes).toMatchObject({layers:[{index:0,x:85,y:15}]});
+  expect(()=>parseEditorPlan(JSON.stringify({summary:'No invented layer',changes:{layers:[{index:1,x:85}]}}),input)).toThrow();
+  expect(()=>validateEditorInput({...image,current:{layers:[{index:0,src:'https://example.com'}]}})).toThrow();
+ });
+ it('rejects invalid partial video layer timing',()=>{
+  const input=validateEditorInput({kind:'video',instruction:'Move logo',current:{sourceDuration:20,duration:10,layers:[{index:0,x:0,y:0,width:0.3,opacity:1,start:2,end:8}]}});
+  expect(()=>parseEditorPlan(JSON.stringify({summary:'Invalid timing',changes:{layers:[{index:0,start:9}]}}),input)).toThrow();
+ });
  it('returns an unsupported request honestly without changes',()=>{
   expect(parseEditorPlan(JSON.stringify({summary:'Pixel generation needs the image service',changes:{}}),validateEditorInput(image)).changes).toEqual({});
  });

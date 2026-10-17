@@ -346,6 +346,15 @@ export function VideoEditor({
     title,
     news,
     captions,
+    layers: overlays.map(({ x, y, width, opacity, start, end }, index) => ({
+      index,
+      x,
+      y,
+      width,
+      opacity,
+      start,
+      end,
+    })),
   };
   function applyAi(changes: VideoEditorChanges) {
     const preset = videoTemplates.find((t) => t.id === changes.template);
@@ -376,12 +385,30 @@ export function VideoEditor({
           .filter((c) => c.start < next.duration!)
           .map((c) => ({ ...c, end: Math.min(c.end, next.duration!) })),
       );
-    if (next.duration !== undefined)
+    if (next.duration !== undefined || next.layers) {
+      const clipDuration = next.duration ?? duration;
       setOverlays((old) =>
         old
-          .filter((o) => o.start < next.duration!)
-          .map((o) => ({ ...o, end: Math.min(o.end, next.duration!) })),
+          .map((overlay, index) => {
+            const layer = next.layers?.find((row) => row.index === index);
+            if (!layer) return overlay;
+            return {
+              ...overlay,
+              x: layer.x ?? overlay.x,
+              y: layer.y ?? overlay.y,
+              width: layer.width ?? overlay.width,
+              opacity: layer.opacity ?? overlay.opacity,
+              start: layer.start ?? overlay.start,
+              end: layer.end ?? overlay.end,
+            };
+          })
+          .filter((overlay) => overlay.start < clipDuration)
+          .map((overlay) => ({
+            ...overlay,
+            end: Math.min(overlay.end, clipDuration),
+          })),
       );
+    }
   }
   function restoreAi(next: VideoEditorChanges) {
     if (next.template !== undefined) setTemplate(next.template);
@@ -637,7 +664,8 @@ export function VideoEditor({
             <Upload size={17} aria-hidden="true" />
             {asset ? "Uploaded" : "Upload to workspace"}
           </Button>
-          <EditorAiPanel key={source}
+          <EditorAiPanel
+            key={source}
             kind="video"
             current={aiCurrent}
             disabled={busy || !source || !validRange}
