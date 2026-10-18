@@ -33,7 +33,7 @@ for (const size of [{width:1440,height:1000},{width:390,height:844}]) {
     await expect(page.getByRole("button",{name:"Open navigation",exact:true})).toHaveCount(0);
     await expect(page.locator(".current-workspace-name")).toHaveText("Preview workspace");
     const staticBox=await nav.boundingBox();
-    await page.evaluate(()=>window.scrollTo(0,450));
+    await page.evaluate(()=>window.scrollTo({top:450,behavior:"instant"}));
     await expect(row).toHaveAttribute("data-floating","true");
     const floatingBox=await nav.boundingBox();expect(floatingBox!.y).toBeLessThan(30);expect(floatingBox!.height).toBeLessThan(staticBox!.height);
     for(const button of await nav.getByRole("button").all())await expect(button).toBeVisible();

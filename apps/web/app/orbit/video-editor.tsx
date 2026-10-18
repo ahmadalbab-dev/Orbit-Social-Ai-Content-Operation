@@ -551,7 +551,7 @@ export function VideoEditor({
     );
   }
   return (
-    <section className="workspace-view mobile-media-editor">
+    <section className="workspace-view video-composer mobile-media-editor">
       <SectionHeading
         number="02"
         label="Video"

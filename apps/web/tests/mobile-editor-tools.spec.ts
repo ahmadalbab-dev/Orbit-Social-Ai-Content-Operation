@@ -11,7 +11,7 @@ for (const kind of ['Video', 'Image']) test(`${kind} mobile tools scroll sideway
   expect(await strip.evaluate(node => node.scrollWidth > node.clientWidth)).toBe(true);
   await strip.evaluate(node => node.scrollTo({ left: node.scrollWidth }));
   await tools.getByRole('button', { name: 'Music', exact: true }).click();
-  await expect(page.getByLabel('Choose local music', { exact: true })).toBeVisible();
+  await expect(page.locator(kind === 'Image' ? '.image-composer' : '.video-composer').getByLabel('Choose local music', { exact: true })).toBeVisible();
   await expect(page.getByLabel(`Choose ${kind.toLowerCase()}`, { exact: true })).toBeHidden();
   await tools.getByRole('button', { name: 'Adjust & text', exact: true }).click();
   const input = kind === 'Image' ? page.getByLabel('Image caption', { exact: true }) : page.getByLabel('Video title', { exact: true });

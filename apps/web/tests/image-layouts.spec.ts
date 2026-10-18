@@ -5,7 +5,7 @@ test('equal split and photo stack arrange actual uploaded pixels and preserve th
   await page.getByRole('button', { name: 'Video Editor', exact: true }).click();
   await page.getByRole('button', { name: 'Image Editor', exact: true }).click();
   await page.getByRole('button', { name: 'Equal split', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText('Choose a base image');
+  await expect(page.locator('.image-composer .action-notice')).toContainText('Choose a base image');
   const asset = async (color: string) => Buffer.from(await page.evaluate(color => { const canvas = document.createElement('canvas'); canvas.width = 200; canvas.height = 200; const context = canvas.getContext('2d')!; context.fillStyle = color; context.fillRect(0, 0, 200, 200); return canvas.toDataURL('image/png').split(',')[1]; }, color), 'base64');
   await page.getByLabel('Choose image', { exact: true }).setInputFiles({ name: 'hero.png', mimeType: 'image/png', buffer: await asset('#ff0000') });
   await page.getByLabel('Add image overlay', { exact: true }).setInputFiles({ name: 'detail.png', mimeType: 'image/png', buffer: await asset('#0000ff') });

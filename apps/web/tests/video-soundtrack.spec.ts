@@ -48,7 +48,7 @@ test("uploaded music is encoded in the local edited video with measurable audio"
   await page.getByLabel("Video volume", { exact: true }).press("Home");
   await expect(page.getByLabel("Video volume", { exact: true })).toHaveValue("0");
   await page
-    .locator(".video-controls")
+    .locator(".video-composer .video-controls")
     .getByLabel("Choose local music", { exact: true })
     .setInputFiles({
       name: "test-tone.wav",
@@ -57,19 +57,19 @@ test("uploaded music is encoded in the local edited video with measurable audio"
     });
   await expect(
     page
-      .locator(".video-controls")
+      .locator(".video-composer .video-controls")
       .getByLabel("Soundtrack offset", { exact: true }),
   ).toBeVisible();
   await page
-    .locator(".video-controls")
+    .locator(".video-composer .video-controls")
     .getByLabel("Soundtrack offset", { exact: true })
     .fill("0.5");
   await page
-    .locator(".video-controls")
+    .locator(".video-composer .video-controls")
     .getByLabel("Soundtrack fadeIn", { exact: true })
     .fill("0.1");
   await page
-    .locator(".video-controls")
+    .locator(".video-composer .video-controls")
     .getByLabel("Soundtrack fadeOut", { exact: true })
     .fill("0.1");
   const pending = page.waitForEvent("download");
