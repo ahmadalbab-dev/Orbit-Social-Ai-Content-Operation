@@ -30,6 +30,12 @@ test("reload restores the selected workspace from HttpOnly refresh cookie and si
  await selectWorkspaceDestination(page,'Workspace Settings');
  await page.getByRole('region',{name:'Workspace session',exact:true}).getByLabel('Workspace',{exact:true}).selectOption('work-qa');
  await expect(page.locator('.current-workspace-name')).toHaveText('Orbit Verification');
+ // Switching workspace keeps the current Settings route and shows its selected workspace.
+ await expect(page.getByRole('region',{name:'Workspace session',exact:true})).toBeVisible();
+ await expect(page.getByRole('region',{name:'Workspace session',exact:true}).getByLabel('Workspace',{exact:true})).toHaveValue('work-qa');
+ await expect(page).toHaveURL(/view=settings/);
+ // Management controls remain confined to Settings after returning to Home.
+ await selectWorkspaceDestination(page,'Overview');
  await expect(page.getByRole('region',{name:'Workspace session',exact:true})).toBeHidden();
  const refreshCookie=(await context.cookies('http://localhost:3000/api/auth/session')).find(cookie=>cookie.name==='orbit-refresh');expect(refreshCookie?.httpOnly).toBe(true);expect(refreshCookie?.sameSite).toBe('Strict');
  expect(await page.evaluate(()=>document.cookie)).not.toContain('synthetic-refresh');

@@ -45,9 +45,9 @@ for (const size of [{ width: 390, height: 844 }, { width: 320, height: 568 }, { 
     const input = page.getByLabel(kind === 'Image' ? 'Image caption' : 'Video title', { exact: true });
     await input.fill('My mobile edit');
     await page.getByRole('button',{name:'Light mode',exact:true}).click();
-    await page.screenshot({path:testInfo.outputPath(`${kind.toLowerCase()}-${size.width}x${size.height}-light.png`)});
+    await page.screenshot({path:testInfo.outputPath(`${kind.toLowerCase()}-${size.width}x${size.height}-light.png`),animations:'disabled'});
     await page.getByRole('button',{name:'Dark mode',exact:true}).click();
-    await page.screenshot({path:testInfo.outputPath(`${kind.toLowerCase()}-${size.width}x${size.height}-dark.png`)});
+    await page.screenshot({path:testInfo.outputPath(`${kind.toLowerCase()}-${size.width}x${size.height}-dark.png`),animations:'disabled'});
     await selectEditorTool(page, kind, 'Music');
     await expect(page.locator(kind === 'Image' ? '.image-composer' : '.video-composer').getByLabel('Choose local music', { exact: true })).toBeVisible();
     await expect(page.getByLabel(`Choose ${kind.toLowerCase()}`, { exact: true })).toBeHidden();

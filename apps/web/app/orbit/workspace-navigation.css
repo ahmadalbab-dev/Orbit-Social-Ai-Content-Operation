@@ -5,6 +5,17 @@
 .workspace-brand-copy .current-workspace-name{display:block;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:500 11px/1.5 var(--font-body,system-ui),sans-serif;letter-spacing:0;color:var(--soft);margin-top:5px}
 .workspace-header-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px;min-width:0}
 .workspace-header-actions .theme-segment{margin-left:0}
+/* Keep appearance labels intact; use compact icons while the desktop header is constrained. */
+.workspace-header-actions .theme-segment button span{white-space:nowrap}
+@media(min-width:768px){
+ .workspace-header-actions .theme-segment{flex-shrink:0;gap:2px}
+ .workspace-header-actions .theme-segment button{flex-shrink:0;min-width:44px;min-height:44px!important}
+ .workspace-header-actions .profile-button{flex-shrink:0;min-width:44px;min-height:44px!important}
+}
+@media(min-width:768px) and (max-width:1399px){
+ .workspace-header-actions .theme-segment button{width:44px;padding:8px}
+ .workspace-header-actions .theme-segment button span{display:none}
+}
 .workspace-nav-slot{position:relative;min-height:66px;display:flex;align-items:center;justify-content:center}
 .workspace-nav-sentinel{position:absolute;bottom:0;left:0;width:1px;height:1px;pointer-events:none}
 .workspace-navigation{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;padding:6px;background:var(--card);border-radius:24px;box-shadow:inset 0 1px 0 var(--line)}
