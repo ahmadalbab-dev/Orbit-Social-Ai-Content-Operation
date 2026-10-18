@@ -1,3 +1,9 @@
+import {
+  prepareSoundtrack,
+  startSoundtrack,
+  validateSoundtrack,
+  type LocalSoundtrack,
+} from "./local-soundtrack";
 /** Device-only export. No uploads, provider calls or fabricated render jobs. */
 export interface VideoImageOverlay {
   id: string;
@@ -22,6 +28,14 @@ export interface LocalVideoEdit {
   contrast?: number;
   saturation?: number;
   overlays?: VideoImageOverlay[];
+  soundtrack?: LocalSoundtrack | null;
+  titleCard?: {
+    text: string;
+    kicker: string;
+    accent: string;
+    background: string;
+    position: "top" | "bottom";
+  };
   news?: { title: string; date: string };
   captions: { text: string; start: number; end: number }[];
 }
@@ -36,6 +50,7 @@ export function recorderMime(
   ].find(supported);
 }
 export function validateVideoEdit(edit: LocalVideoEdit) {
+  if (edit.soundtrack) validateSoundtrack(edit.soundtrack);
   if (
     ![
       edit.start,
@@ -194,6 +209,30 @@ export function drawEditedFrame(
     const titleLines = lines(ctx, edit.news.title, w - 72).slice(0, 4);
     titleLines.forEach((line, i) => ctx.fillText(line, 36, h * 0.77 + i * 42));
   }
+  if (edit.titleCard?.text) {
+    const card = edit.titleCard,
+      x = w * 0.05,
+      y = card.position === "top" ? h * 0.06 : h * 0.76,
+      cardWidth = w * 0.9;
+    ctx.fillStyle = card.background;
+    ctx.fillRect(x, y, cardWidth, h * 0.17);
+    ctx.fillStyle = card.accent;
+    ctx.fillRect(x, y, w * 0.012, h * 0.17);
+    ctx.font = `bold ${Math.round(w * 0.022)}px Arial`;
+    ctx.fillText(
+      card.kicker,
+      x + w * 0.035,
+      y + h * 0.018,
+      cardWidth - w * 0.07,
+    );
+    ctx.fillStyle = "#fff";
+    ctx.font = `bold ${Math.round(w * 0.038)}px Arial`;
+    lines(ctx, card.text, cardWidth - w * 0.07)
+      .slice(0, 3)
+      .forEach((line, i) =>
+        ctx.fillText(line, x + w * 0.035, y + h * 0.055 + i * w * 0.047),
+      );
+  }
   const caption = edit.captions.find(
     (c) => elapsed >= c.start && elapsed < c.end,
   );
@@ -234,7 +273,10 @@ export async function exportLocalVideo(
     );
   validateVideoEdit(edit);
   signal.throwIfAborted();
-  if (edit.volume > 0 && typeof AudioContext === "undefined")
+  if (
+    (edit.volume > 0 || edit.soundtrack) &&
+    typeof AudioContext === "undefined"
+  )
     throw new Error(
       "Audio export is unavailable. Mute the clip or use a current Safari or Chrome browser.",
     );
@@ -250,13 +292,16 @@ export async function exportLocalVideo(
   video.playbackRate = edit.speed;
   // Create/resume audio during the export button gesture. Audio is routed to the recording, not speakers.
   const audio =
-    edit.volume > 0 && typeof AudioContext !== "undefined"
+    (edit.volume > 0 || edit.soundtrack) && typeof AudioContext !== "undefined"
       ? new AudioContext()
       : null;
   const stream = canvas.captureStream(30);
   let frame = 0;
   let recorder: MediaRecorder | undefined;
   let cleanupRecording = () => {};
+  let musicBuffer: AudioBuffer | null = null;
+  let destination: MediaStreamAudioDestinationNode | null = null;
+  let stopMusic = () => {};
   const deadline = setTimeout(
     () => {
       if (recorder?.state === "recording") recorder.stop();
@@ -282,13 +327,14 @@ export async function exportLocalVideo(
         );
       const input = audio.createMediaElementSource(video),
         gain = audio.createGain(),
-        destination = audio.createMediaStreamDestination();
+        output = audio.createMediaStreamDestination();
+      destination = output;
       gain.gain.value = edit.volume;
       input.connect(gain);
-      gain.connect(destination);
-      destination.stream
-        .getAudioTracks()
-        .forEach((track) => stream.addTrack(track));
+      gain.connect(output);
+      output.stream.getAudioTracks().forEach((track) => stream.addTrack(track));
+      if (edit.soundtrack)
+        musicBuffer = await prepareSoundtrack(audio, edit.soundtrack, signal);
     } else video.muted = true;
     const wait = (event: string) =>
       new Promise<void>((resolve, reject) => {
@@ -393,16 +439,29 @@ export async function exportLocalVideo(
       };
       recorder!.start(500);
       frame = requestAnimationFrame(draw);
-      void video.play().catch(() => {
-        error = new Error("Playback was blocked. Tap Export again.");
-        stop();
-      });
+      void video
+        .play()
+        .then(() => {
+          if (audio && musicBuffer && edit.soundtrack && destination)
+            stopMusic = startSoundtrack(
+              audio,
+              musicBuffer,
+              edit.soundtrack,
+              destination,
+              edit.duration / edit.speed,
+            );
+        })
+        .catch(() => {
+          error = new Error("Playback was blocked. Tap Export again.");
+          stop();
+        });
     });
     const blob = await result;
     progress(100);
     return blob;
   } finally {
     cleanupRecording();
+    stopMusic();
     clearTimeout(deadline);
     cancelAnimationFrame(frame);
     if (recorder?.state === "recording") recorder.stop();

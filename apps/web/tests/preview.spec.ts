@@ -1,24 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
 async function navigate(page: Page, name: string) {
-  await page.getByRole("button", { name: "Open navigation", exact: true }).click();
   await page.getByRole("navigation", { name: "Workspace", exact: true }).getByRole("button", { name, exact: true }).click();
 }
-
-test("desktop launcher keeps navigation open while focus transfers from its hidden button", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto('/preview');
-  for (const destination of ['Workspace Settings', 'Video Editor', 'Overview']) {
-    const launcher = page.getByRole('button', { name: 'Open navigation', exact: true });
-    await launcher.focus();
-    await launcher.click();
-    const navigation = page.getByRole('navigation', { name: 'Workspace', exact: true });
-    await expect(navigation).toBeVisible();
-    await expect.poll(() => navigation.evaluate(node => node.contains(document.activeElement))).toBe(true);
-    await navigation.getByRole('button', { name: destination, exact: true }).click();
-    await expect(navigation).toBeHidden();
-  }
-});
 
 test("phone preview navigates without backend calls or fake access", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -35,7 +19,9 @@ test("phone preview navigates without backend calls or fake access", async ({ pa
   await navigate(page, "Calendar");
   await expect(page.getByRole("heading", { name: "Make space for your next post." })).toBeVisible();
   await navigate(page, "Connections");
-  await expect(page.getByRole("link", { name: "Connect facebook", exact: true })).toHaveAttribute("href", "/");
+  await page.getByRole("button", {name:"Connect facebook",exact:true}).click();
+  await expect(page.getByRole("dialog")).toContainText("This is a design preview");
+  await page.getByRole("button",{name:"Close connection setup",exact:true}).click();
   await page.getByRole("button", {name:"Open profile",exact:true}).click();
   await expect(page.getByRole("button", { name: "Save profile" })).toBeDisabled();
   await navigate(page, "Workspace Settings");

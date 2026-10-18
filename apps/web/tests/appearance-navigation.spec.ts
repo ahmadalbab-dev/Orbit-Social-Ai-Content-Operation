@@ -23,66 +23,34 @@ test("light default keeps the auth form compact while widening only the hero", a
   ).toBe(true);
 });
 
-test("desktop dock expands on hover and supports keyboard dismissal", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto("/preview");
-  const dock = page.locator(".navigation-dock"),
-    launcher = page.getByRole("button", {
-      name: "Open navigation",
-      exact: true,
-    });
-  await expect(dock).toHaveAttribute("data-expanded", "false");
-  await launcher.hover();
-  await expect(dock).toHaveAttribute("data-expanded", "true");
-  await expect(
-    page.getByRole("button", { name: "Content Studio", exact: true }),
-  ).toBeVisible();
-  await page.mouse.move(15, 15);
-  await expect(dock).toHaveAttribute("data-expanded", "false");
-  await launcher.focus();
-  await page.keyboard.press("ArrowUp");
-  await expect(
-    page.getByRole("button", { name: "Overview", exact: true }),
-  ).toBeFocused();
-  await page.keyboard.press("Escape");
-  await expect(launcher).toBeVisible();
-  await expect(launcher).toBeFocused();
-});
-
-test.describe("touch navigation", () => {
-  test.use({ hasTouch: true, isMobile: true });
-  test("touch sized dock opens by tap and returns to compact after selecting", async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto("/preview");
-    await page
-      .getByRole("button", { name: "Open navigation", exact: true })
-      .tap();
-    await page
-      .getByRole("button", { name: "Content Studio", exact: true })
-      .tap();
-    await expect(page.locator(".navigation-dock")).toHaveAttribute(
-      "data-expanded",
-      "false",
-    );
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
-      ),
-    ).toBe(true);
+for (const size of [{width:1440,height:1000},{width:390,height:844}]) {
+  test(`complete navigation moves from header to floating after scroll at ${size.width}px`, async ({page})=>{
+    await page.setViewportSize(size);await page.goto("/preview");
+    const row=page.locator(".workspace-navigation"),nav=page.getByRole("navigation",{name:"Workspace",exact:true});
+    await expect(row).toHaveAttribute("data-floating","false");
+    await expect(nav.getByRole("button")).toHaveCount(6);
+    for(const name of ["Home","Studio","Media","Calendar","Channels","Settings"])await expect(nav.locator(".reference-dock-label",{hasText:name})).toBeVisible();
+    await expect(page.getByRole("button",{name:"Open navigation",exact:true})).toHaveCount(0);
+    await expect(page.locator(".current-workspace-name")).toHaveText("Preview workspace");
+    const staticBox=await nav.boundingBox();
+    await page.evaluate(()=>window.scrollTo(0,450));
+    await expect(row).toHaveAttribute("data-floating","true");
+    const floatingBox=await nav.boundingBox();expect(floatingBox!.y).toBeLessThan(30);expect(floatingBox!.height).toBeLessThan(staticBox!.height);
+    for(const button of await nav.getByRole("button").all())await expect(button).toBeVisible();
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await nav.getByRole("button",{name:"Workspace Settings",exact:true}).click();
+    await expect(page.getByRole("heading",{name:"Your workspace. Your way.",exact:true})).toBeVisible();
+    await expect(row).toHaveAttribute("data-floating","false");
+    await nav.getByRole("button",{name:"Video Editor",exact:true}).click();
+    await expect(nav.getByRole("button",{name:"Video Editor",exact:true})).toHaveAttribute("aria-current","page");
   });
-});
-
-test("desktop launcher click opens navigation without selecting an overlapping item", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto("/preview");
-  await page.getByRole("button", { name: "Open navigation", exact: true }).click();
-  await expect(page.locator(".navigation-dock")).toHaveAttribute("data-expanded", "true");
-  await expect(page.getByRole("heading", { name: "More ideas. Less busywork." })).toBeVisible();
-  await page.getByRole("button", { name: "Content Studio", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Create once. Review every channel." })).toBeVisible();
-  await expect(page.locator(".navigation-dock")).toHaveAttribute("data-expanded", "false");
+}
+test("every page retains the animated Orbit mark and reduced-motion override",async({page})=>{
+ await page.goto("/preview");const ellipse=page.locator(".workspace-brand .orbit-mark ellipse");
+ await expect(ellipse).toHaveCSS("animation-name","orbit-logo-ring");
+ await page.getByRole("button",{name:"Workspace Settings",exact:true}).click();
+ await page.getByRole("checkbox",{name:"Reduce decorative animation"}).check();
+ await expect(ellipse).toHaveCSS("animation-name","none");
+ await page.getByRole("button",{name:"Open profile",exact:true}).click();
+ await expect(ellipse).toBeVisible();await expect(ellipse).toHaveCSS("animation-name","none");
 });

@@ -5,7 +5,6 @@ test('image overlays become exported pixels and carousel ZIP retains independent
   const uploads: string[] = [];
   page.on('request', request => { if (request.method() === 'POST') uploads.push(request.url()); });
   await page.goto('/preview');
-  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
   await page.getByRole('button', { name: 'Video Editor', exact: true }).click();
   await page.getByRole('button', { name: 'Image Editor', exact: true }).click();
   const asset = async (color: string) => Buffer.from(await page.evaluate(color => { const canvas = document.createElement('canvas'); canvas.width = 100; canvas.height = 100; const ctx = canvas.getContext('2d')!; ctx.fillStyle = color; ctx.fillRect(0, 0, 100, 100); return canvas.toDataURL('image/png').split(',')[1]; }, color), 'base64');
@@ -32,7 +31,6 @@ test('image overlays become exported pixels and carousel ZIP retains independent
 test('templates can start a composition on mobile without horizontal overflow', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/preview');
-  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
   await page.getByRole('button', { name: 'Video Editor', exact: true }).click();
   await page.getByRole('button', { name: 'Image Editor', exact: true }).click();
   await page.getByRole('button', { name: /Editorial poster/ }).click();

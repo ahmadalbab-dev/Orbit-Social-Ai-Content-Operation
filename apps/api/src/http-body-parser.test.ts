@@ -7,7 +7,7 @@ import { registerImageBodyParser } from "./http-body-parser";
 @Controller()
 class ParserProbe {
   @Post("workspaces") workspace(@Body() body: unknown) { return body; }
-  @Post("media/image-edit") image(@Body() body: { image: string }) { return { length: body.image.length }; }
+  @Post(["media/image-edit", "media/editor-plan"]) image(@Body() body: { image: string }) { return { length: body.image.length }; }
   @Post("billing/webhook") webhook(@Req() request: { rawBody?: Buffer }) {
     return { raw: request.rawBody?.toString("utf8") };
   }
@@ -31,6 +31,8 @@ describe("route-scoped image JSON parser", () => {
       const image = await post("media/image-edit", JSON.stringify({ image: "x".repeat(150_000) }));
       expect(image.status).toBe(201);
       expect(await image.json()).toEqual({ length: 150_000 });
+      const preview = await post("media/editor-plan", JSON.stringify({image:"x".repeat(150_000)}));
+      expect(preview.status).toBe(201);expect(await preview.json()).toEqual({length:150_000});
       expect((await post("workspaces", JSON.stringify({ name: "x".repeat(150_000) }))).status).toBe(413);
       expect((await post("media/image-edit", JSON.stringify({ image: "x".repeat(3 * 1024 * 1024) }))).status).toBe(413);
       const raw = '{ "event": "fixture", "amount": 10 }\n';

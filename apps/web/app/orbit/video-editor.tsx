@@ -18,6 +18,8 @@ import {
   type LocalVideoEdit,
   type VideoImageOverlay,
 } from "./local-video-export";
+import { SoundtrackControls, useVideoSoundtrack } from "./soundtrack-controls";
+import { type LocalSoundtrack, validateSoundtrack } from "./local-soundtrack";
 import { videoTemplates } from "./video-templates";
 import { EditorAiPanel } from "./editor-ai-panel";
 import type {
@@ -78,6 +80,19 @@ export function VideoEditor({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{
+    id: string;
+    clientX: number;
+    clientY: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const [selectedLayer, setSelectedLayer] = useState<string | null>(null);
+  const [viewZoom, setViewZoom] = useState(1);
+  const [soundtrack, setSoundtrack] = useState<LocalSoundtrack | null>(null);
   const overlayImages = useRef(new Map<string, HTMLImageElement>());
   const overlayUrls = useRef(new Set<string>());
   const overlayLoading = useRef(false);
@@ -230,6 +245,19 @@ export function VideoEditor({
       c.end <= duration,
   );
   const dimensions = formats[format];
+  useVideoSoundtrack(videoRef, soundtrack, {
+    source,
+    start,
+    duration,
+    speed,
+    active: active && !busy,
+  });
+  let validMusic = true;
+  try {
+    if (soundtrack) validateSoundtrack(soundtrack);
+  } catch {
+    validMusic = false;
+  }
   const validOverlays = overlays.every(
     (o) => o.start >= 0 && o.end > o.start && o.end <= duration,
   );
@@ -246,6 +274,29 @@ export function VideoEditor({
     contrast,
     saturation,
     overlays,
+    soundtrack,
+    ...(template === "product" ||
+    template === "cinematic" ||
+    template === "captions"
+      ? {
+          titleCard: {
+            text: cleanText(title),
+            kicker:
+              template === "product"
+                ? "PRODUCT SPOTLIGHT"
+                : template === "cinematic"
+                  ? "ORBIT STORIES"
+                  : "THE STORY",
+            accent: template === "product" ? "#b2ed8c" : "#d1beff",
+            background:
+              template === "cinematic"
+                ? "rgba(0,0,0,.5)"
+                : "rgba(20,18,31,.88)",
+            position:
+              template === "captions" ? ("top" as const) : ("bottom" as const),
+          },
+        }
+      : {}),
     captions,
     ...(news ? { news: { title: cleanText(title), date: dateLabel } } : {}),
   };
@@ -431,6 +482,12 @@ export function VideoEditor({
     !!status?.configured &&
     validRange &&
     validCaptions &&
+    speed === 1 &&
+    volume === 1 &&
+    rotation === 0 &&
+    !flip &&
+    !edit.titleCard &&
+    !soundtrack &&
     !overlays.length &&
     brightness === 1 &&
     contrast === 1 &&
@@ -507,9 +564,11 @@ export function VideoEditor({
       <div className="video-grid">
         <Card className="surface video-canvas">
           <div
+            ref={stageRef}
             className="video-stage"
             style={{
               aspectRatio: dimensions.aspect,
+              ...{ "--video-aspect": dimensions.aspect },
               containerType: "inline-size",
             }}
           >
@@ -558,9 +617,144 @@ export function VideoEditor({
             {source ? (
               <canvas
                 ref={canvasRef}
+                style={{ transform: `scale(${viewZoom})` }}
                 className="video-composite-preview"
                 aria-label="Edited video preview"
               />
+            ) : null}
+            {source ? (
+              <div
+                className="video-layer-handles"
+                style={{ transform: `scale(${viewZoom})` }}
+              >
+                {overlays
+                  .filter(
+                    (o) =>
+                      playhead - start >= o.start && playhead - start < o.end,
+                  )
+                  .map((o, index) => {
+                    const image = overlayImages.current.get(o.id),
+                      height = image
+                        ? (o.width * dimensions.aspect * image.naturalHeight) /
+                          image.naturalWidth
+                        : 0.1;
+                    return (
+                      <button
+                        key={o.id}
+                        type="button"
+                        className="video-layer-handle"
+                        aria-label={`Move video image layer ${overlays.indexOf(o) + 1}`}
+                        aria-pressed={selectedLayer === o.id}
+                        disabled={busy}
+                        style={{
+                          left: `${o.x * 100}%`,
+                          top: `${o.y * 100}%`,
+                          width: `${o.width * 100}%`,
+                          height: `${height * 100}%`,
+                        }}
+                        onPointerDown={(e) => {
+                          const box = stageRef.current?.getBoundingClientRect();
+                          if (!box) return;
+                          videoRef.current?.pause();
+                          setSelectedLayer(o.id);
+                          drag.current = {
+                            id: o.id,
+                            clientX: e.clientX,
+                            clientY: e.clientY,
+                            x: o.x,
+                            y: o.y,
+                            width: box.width * viewZoom,
+                            height: box.height * viewZoom,
+                          };
+                          e.currentTarget.setPointerCapture(e.pointerId);
+                        }}
+                        onPointerMove={(e) => {
+                          const d = drag.current;
+                          if (!d || d.id !== o.id) return;
+                          setOverlays((old) =>
+                            old.map((row) =>
+                              row.id === o.id
+                                ? {
+                                    ...row,
+                                    x: Math.max(
+                                      0,
+                                      Math.min(
+                                        1 - row.width,
+                                        d.x + (e.clientX - d.clientX) / d.width,
+                                      ),
+                                    ),
+                                    y: Math.max(
+                                      0,
+                                      Math.min(
+                                        1 - height,
+                                        d.y +
+                                          (e.clientY - d.clientY) / d.height,
+                                      ),
+                                    ),
+                                  }
+                                : row,
+                            ),
+                          );
+                        }}
+                        onPointerUp={() => {
+                          drag.current = null;
+                        }}
+                        onPointerCancel={() => {
+                          drag.current = null;
+                        }}
+                        onKeyDown={(e) => {
+                          const delta = e.shiftKey ? 0.05 : 0.01;
+                          if (
+                            ![
+                              "ArrowLeft",
+                              "ArrowRight",
+                              "ArrowUp",
+                              "ArrowDown",
+                            ].includes(e.key)
+                          )
+                            return;
+                          e.preventDefault();
+                          setSelectedLayer(o.id);
+                          setOverlays((old) =>
+                            old.map((row) =>
+                              row.id === o.id
+                                ? {
+                                    ...row,
+                                    x: Math.max(
+                                      0,
+                                      Math.min(
+                                        1 - row.width,
+                                        row.x +
+                                          (e.key === "ArrowLeft"
+                                            ? -delta
+                                            : e.key === "ArrowRight"
+                                              ? delta
+                                              : 0),
+                                      ),
+                                    ),
+                                    y: Math.max(
+                                      0,
+                                      Math.min(
+                                        1 - height,
+                                        row.y +
+                                          (e.key === "ArrowUp"
+                                            ? -delta
+                                            : e.key === "ArrowDown"
+                                              ? delta
+                                              : 0),
+                                      ),
+                                    ),
+                                  }
+                                : row,
+                            ),
+                          );
+                        }}
+                      >
+                        <span>{index + 1}</span>
+                      </button>
+                    );
+                  })}
+              </div>
             ) : null}
           </div>
           {source ? (
@@ -598,6 +792,21 @@ export function VideoEditor({
               />
               <output>{playhead.toFixed(1)}s</output>
             </div>
+          ) : null}
+          {source ? (
+            <label className="field video-zoom">
+              View zoom
+              <input
+                aria-label="Video view zoom"
+                type="range"
+                min=".5"
+                max="2"
+                step=".1"
+                value={viewZoom}
+                onChange={(e) => setViewZoom(Number(e.target.value))}
+              />
+              <output>{Math.round(viewZoom * 100)}% · view only</output>
+            </label>
           ) : null}
           <div className="canvas-footer">
             <LockKeyhole size={13} aria-hidden="true" />
@@ -667,6 +876,29 @@ export function VideoEditor({
           <EditorAiPanel
             key={source}
             kind="video"
+            source={() => {
+              const video = videoRef.current;
+              if (!video || video.readyState < 2) return null;
+              const current = latestEdit.current,
+                scale = Math.min(
+                  1,
+                  768 / Math.max(current.width, current.height),
+                );
+              const canvas = document.createElement("canvas");
+              canvas.width = Math.max(1, Math.round(current.width * scale));
+              canvas.height = Math.max(1, Math.round(current.height * scale));
+              const ctx = canvas.getContext("2d");
+              if (!ctx) return null;
+              ctx.scale(scale, scale);
+              drawEditedFrame(
+                ctx,
+                video,
+                current,
+                Math.max(0, video.currentTime - current.start),
+                overlayImages.current,
+              );
+              return canvas;
+            }}
             current={aiCurrent}
             disabled={busy || !source || !validRange}
             preview={preview}
@@ -685,6 +917,11 @@ export function VideoEditor({
               Undo AI edit
             </Button>
           ) : null}
+          <SoundtrackControls
+            value={soundtrack}
+            onChange={setSoundtrack}
+            disabled={busy}
+          />
           <section aria-label="Video template gallery">
             <h3>Start with a template</h3>
             <p className="review-help">
@@ -969,6 +1206,18 @@ export function VideoEditor({
               News report overlay
             </span>
           </label>
+          {!news && template !== "clean" ? (
+            <label className="field">
+              Template headline
+              <input
+                aria-label="Template video headline"
+                maxLength={100}
+                disabled={busy}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+            </label>
+          ) : null}
           {news ? (
             <>
               <label className="field">
@@ -1105,6 +1354,7 @@ export function VideoEditor({
               !validRange ||
               !validCaptions ||
               !validOverlays ||
+              !validMusic ||
               (news && (!cleanText(title) || !dateLabel))
             }
             onClick={() =>
@@ -1129,6 +1379,8 @@ export function VideoEditor({
                       flip,
                       captions,
                       overlays,
+                      soundtrack,
+                      titleCard: edit.titleCard,
                       brightness,
                       contrast,
                       saturation,

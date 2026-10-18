@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowRight, ArrowUpRight, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, ExternalLink, Eye, FilePenLine, Film, Hash, House, Info, LayoutDashboard, Link2, LockKeyhole, MoreHorizontal, PenLine, Play, RefreshCw, Save, Settings, ShieldCheck, Sparkles } from "lucide-react";
 import { Button, Card } from "./ui";
 import { Dock } from "../../components/ui/dock";
@@ -19,36 +19,24 @@ import {dateKeyInZone,scheduledInstant} from "./device-preferences";
 import {useDevicePreferences} from "./use-device-preferences";
 import {WorkspaceSettings} from "./workspace-settings";
 import "./workspace-settings.css";
+import "./workspace-navigation.css";
+import {ConnectionsPanel,type IntegrationStatus} from "./connections-panel";
 
 const channels = ["facebook", "instagram", "threads"] as const;
 type Variant = { platform: string; copy: string; hashtags: string[]; callToAction: string };
 type Content = { id: string; topic: string; status: string; revision: number; source?: string; variants: Variant[]; scheduledFor?: string; approvedRevision?: number };
 import {brandPayload,profileFromBrand,type Profile,type StoredBrand} from "./brand-profile";
 type View = "overview" | "studio" | "video" | "calendar" | "connections" | "settings" | "profile";
-type IntegrationStatus = { providers: Record<string, { credentialsConfigured: boolean; connected?: boolean; accounts?: {name:string;accountType:string|null}[] }> };
 const initialProfile: Profile = {name:"My brand",voice:"Warm, clear and practical",audience:"Creators and businesses",topics:"",language:"Bahasa Melayu"};
 const navigation = [{ id: "overview", label: "Home", accessible: "Overview", icon: House }, { id: "studio", label: "Studio", accessible: "Content Studio", icon: PenLine }, { id: "video", label: "Media", accessible: "Video Editor", icon: Film }, { id: "calendar", label: "Calendar", accessible: "Calendar", icon: CalendarDays }, { id: "connections", label: "Channels", accessible: "Connections", icon: Link2 }, { id: "settings", label: "Settings", accessible: "Workspace Settings", icon: Settings }] as const;
 import {api} from "./session-api";
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : "Please try again.";
 
-export default function Home({workspaceId,preview=false}:{workspaceId:string;preview?:boolean}) {
+export default function Home({workspaceId,workspaceName="Preview workspace",workspaceControls,preview=false}:{workspaceId:string;workspaceName?:string;workspaceControls?:ReactNode;preview?:boolean}) {
   const [view, setView] = useState<View>("overview");
-  const [navExpanded,setNavExpanded]=useState(false);
-  const dockRef=useRef<HTMLDivElement>(null);
-  const launcherRef=useRef<HTMLButtonElement>(null);
-  const focusNavigation=()=>{const buttons=dockRef.current;(buttons?.querySelector<HTMLButtonElement>('nav button[aria-current="page"]')??buttons?.querySelector<HTMLButtonElement>('nav button'))?.focus({preventScroll:true});};
-  const closeUnfocusedNavigation=()=>requestAnimationFrame(()=>{if(dockRef.current&&!dockRef.current.contains(document.activeElement))setNavExpanded(false);});
-  const navHoverTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
-  const cancelNavHover=useCallback(()=>{if(navHoverTimer.current!==null){clearTimeout(navHoverTimer.current);navHoverTimer.current=null;}},[]);
-  useEffect(()=>cancelNavHover,[cancelNavHover]);
-  useEffect(()=>{
-    if(!navExpanded)return;
-    if(window.matchMedia("(max-width:1000px)").matches) focusNavigation();
-    const outside=(event:PointerEvent)=>{if(event.target instanceof Node&&!dockRef.current?.contains(event.target))setNavExpanded(false);};
-    const escape=(event:KeyboardEvent)=>{if(event.key==="Escape"){setNavExpanded(false);requestAnimationFrame(()=>launcherRef.current?.focus({preventScroll:true}));}};
-    document.addEventListener("pointerdown",outside);document.addEventListener("keydown",escape);
-    return()=>{document.removeEventListener("pointerdown",outside);document.removeEventListener("keydown",escape);};
-  },[navExpanded]);
+  const [floating,setFloating]=useState(false);
+  const headerRef=useRef<HTMLElement>(null);
+  useEffect(()=>{const header=headerRef.current;if(!header)return;const observer=new IntersectionObserver(([entry])=>setFloating(!entry.isIntersecting),{threshold:0});observer.observe(header);return()=>observer.disconnect();},[]);
   const [profile, setProfile] = useState<Profile>(initialProfile);
   const [items, setItems] = useState<Content[]>([]);
   const [connection, setConnection] = useState<IntegrationStatus | null>(null);
@@ -67,23 +55,25 @@ export default function Home({workspaceId,preview=false}:{workspaceId:string;pre
     void refresh();
     api<IntegrationStatus>("/integrations/status").then(setConnection).catch(() => setConnection(null));
   }, [refresh,preview]);
-  const go = (next:View) => { cancelNavHover();setView(next); setNavExpanded(false); window.scrollTo({top:0,behavior:"instant"}); };
+  const go = (next:View) => { setView(next); window.scrollTo({top:0,behavior:"instant"}); };
   const openDraft = (id:string) => { setOpenedDraft({id,request:Date.now()}); go("studio"); };
   const saveProfile = async (next: Profile) => { const stored=await api<StoredBrand>(next.id?`/brands/${next.id}`:"/brands",next.id?"PUT":"POST",brandPayload(next)); setProfile(profileFromBrand(stored)); };
-  const ActiveNavIcon=navigation.find(item=>item.id===view)?.icon??House;
   const scheduledCount=items.filter(post=>post.status==="SCHEDULED").length;
   return <main className={`orbit-shell ${paused?"motion-paused":""}`}>
-    <header className="app-header"><button className="brand-word" onClick={()=>go("overview")} aria-label="Orbit home"><OrbitMark small/><span>orbit<span className="word-dot">.</span></span></button><span className="mode-chip"><ShieldCheck size={14} aria-hidden="true"/>{"Review first"}</span><AppearanceToggle/><button className="profile-button" onClick={()=>go("profile")} aria-label="Open profile" aria-current={view==="profile"?"page":undefined} title={profile.name}>{profile.name.slice(0,1).toUpperCase()}</button></header>
-    <div className="navigation-dock" ref={dockRef} data-expanded={navExpanded} onPointerEnter={event=>{if(event.pointerType==="mouse"&&window.matchMedia("(min-width:1001px) and (hover:hover) and (pointer:fine)").matches){cancelNavHover();navHoverTimer.current=setTimeout(()=>{navHoverTimer.current=null;setNavExpanded(true);},180);}}} onPointerLeave={event=>{cancelNavHover();if(event.pointerType==="mouse")closeUnfocusedNavigation();}} onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget))closeUnfocusedNavigation();}}><button className="nav-launcher" ref={launcherRef} aria-label="Open navigation" aria-expanded={navExpanded} aria-controls="orbit-workspace-nav" onPointerDown={cancelNavHover} onKeyDown={event=>{if(event.key==="ArrowUp"||event.key==="ArrowRight"){event.preventDefault();setNavExpanded(true);requestAnimationFrame(focusNavigation);}}} onClick={()=>{cancelNavHover();setNavExpanded(true);requestAnimationFrame(focusNavigation);}} title="Navigation"><ActiveNavIcon size={21} aria-hidden="true"/></button><Dock id="orbit-workspace-nav" className="orbit-nav" aria-label="Workspace" items={navigation.map(item=>({...item,badge:item.id==="calendar"&&scheduledCount?(scheduledCount>99?"99+":String(scheduledCount)):undefined}))} activeId={view} onSelect={id=>{go(id as View);requestAnimationFrame(()=>launcherRef.current?.focus({preventScroll:true}));}}/></div>
+    <header className="app-header workspace-header" ref={headerRef}>
+      <button className="brand-word workspace-brand" onClick={()=>go("overview")} aria-label="Orbit home"><OrbitMark small/><span className="workspace-brand-copy"><span>orbit<span className="word-dot">.</span></span><small className="current-workspace-name" title={workspaceName}>{workspaceName}</small></span></button>
+      <div className="workspace-nav-slot"><div className="workspace-navigation" data-floating={floating}><Dock id="orbit-workspace-nav" className="orbit-nav" aria-label="Workspace" items={navigation.map(item=>({...item,badge:item.id==="calendar"&&scheduledCount?(scheduledCount>99?"99+":String(scheduledCount)):undefined}))} activeId={view} onSelect={id=>go(id as View)}/></div></div>
+      <div className="workspace-header-actions"><AppearanceToggle/><button className="profile-button" onClick={()=>go("profile")} aria-label="Open profile" aria-current={view==="profile"?"page":undefined} title={profile.name}>{profile.name.slice(0,1).toUpperCase()}</button></div>
+    </header>
     <div className="app-content">{notice?<div role="alert" className="alert-message">{notice}<IconButton label="Refresh workspace" onClick={refresh}><RefreshCw size={17}/></IconButton></div>:null}
       <details className="preview-note"><summary><LockKeyhole size={13}/>{preview?"v1 design preview · local tools only":"Private workspace · live posting off"}<Info size={13}/></summary><p>{preview?"Try navigation, Light/Dark mode, image editing and local video previews. AI generation, saved drafts, account connections, server renders and payments require a configured backend and sign-in. Files selected here stay on this device unless you explicitly upload from an authenticated workspace.":"Drafts and brand profiles use the configured backend. Image edits and video previews stay on this device. Video uploads happen only when you choose Upload to workspace; configured workers produce downloadable MP4 files. Live publishing is off."}</p></details>
       <div hidden={view!=="overview"}><Overview profile={profile} items={items} go={go} openDraft={openDraft} paused={paused||view!=="overview"}/></div>
       <div hidden={view!=="studio"}><ContentStudio preview={preview} profile={profile} items={items} onRefresh={refresh} openedDraft={openedDraft}/></div>
       {view==="video"?<MediaEditors preview={preview}/>:null}
       <div hidden={view!=="calendar"}><Calendar items={items} refresh={refresh} openDraft={openDraft}/></div>
-      <div hidden={view!=="connections"}><Connections status={connection} preview={preview}/></div>
+      <div hidden={view!=="connections"}><ConnectionsPanel status={connection} preview={preview}/></div>
       <div hidden={view!=="profile"}><BrandProfile preview={preview} profile={profile} save={saveProfile}/></div>
-      <div hidden={view!=="settings"}><WorkspaceSettings preview={preview}/></div>
+      <div hidden={view!=="settings"}><WorkspaceSettings preview={preview} workspaceControls={workspaceControls}/></div>
       <footer className="orbit-footer"><span className="footer-mark">orbit<span className="word-dot">.</span></span><span>Make room for better content.</span><div><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/data-deletion">Your data</a></div></footer>
     </div>
   </main>;
@@ -172,10 +162,6 @@ function Calendar({items,refresh,openDraft}:{items:Content[];refresh:()=>Promise
   const visible=dated.filter(({key})=>day?key===day:key.startsWith(month.toISOString().slice(0,7))).map(({item})=>item);
   function changeMonth(offset:number){setMonth(new Date(Date.UTC(year,index+offset,1)));setDay("");}
   return <section className="workspace-view"><SectionHeading number="03" label="Calendar" title="Make space for your next post." action={<IconButton label="Refresh calendar" onClick={refresh}><RefreshCw size={19}/></IconButton>}/><div className="calendar-toolbar"><div className="month-control"><IconButton label="Previous month" onClick={()=>changeMonth(-1)}><ChevronLeft size={19}/></IconButton><h2>{new Intl.DateTimeFormat(preferences.locale,{timeZone:"UTC",month:"long",year:"numeric"}).format(month)}</h2><IconButton label="Next month" onClick={()=>changeMonth(1)}><ChevronRight size={19}/></IconButton></div><div className="calendar-filters"><button className={filter==="all"?"selected":""} aria-pressed={filter==="all"} onClick={()=>setFilter("all")}>All</button>{channels.map(p=><IconButton key={p} label={`Filter ${p}`} aria-pressed={filter===p} className={filter===p?"selected":""} onClick={()=>setFilter(p)}><PlatformIcon platform={p}/></IconButton>)}</div></div><Card className="surface calendar-panel"><div className="weekdays">{["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(w=><span key={w}>{w}</span>)}</div><div className="month-grid">{cells.map(cell=>{const count=counts.get(cell.key)??0;return <button key={cell.key} className={`${cell.current?"":"other-month"} ${cell.key===day?"selected":""} ${cell.key===today?"today":""}`} aria-label={`${cell.key}, ${count} scheduled posts`} aria-pressed={day===cell.key} onClick={()=>setDay(old=>old===cell.key?"":cell.key)}><span>{cell.day}</span>{count?<span className="day-post-count">{count}<span className="desktop-only"> post{count>1?"s":""}</span></span>:null}</button>;})}</div></Card><div className="calendar-caption"><span><Clock3 size={13} aria-hidden="true"/>{preferences.city} · {preferences.timeZone.replaceAll("_"," ")}</span><span>Recorded schedules · auto posting off</span></div><div className="schedule-list">{visible.length?visible.map(item=><Card key={item.id} className="surface schedule-row"><div className="schedule-time"><Clock3 size={18} aria-hidden="true"/><strong>{new Intl.DateTimeFormat(preferences.locale,{timeZone:preferences.timeZone,dateStyle:preferences.dateStyle,timeStyle:"short",hour12:preferences.hour12}).format(new Date(item.scheduledFor!))}</strong></div><p>{item.variants[0]?.copy}</p><div className="schedule-channels">{item.variants.map(v=><PlatformBadge key={v.platform} platform={v.platform}/>)}<StatusBadge status={item.status}/></div><button className="text-action" onClick={()=>openDraft(item.id)}>Open draft<ArrowUpRight size={16} aria-hidden="true"/></button></Card>):<EmptyState icon={<CalendarDays size={27}/>} title="A clear calendar." children="Approve a draft, then record a schedule."/>}</div></section>;
-}
-
-function Connections({status,preview=false}:{status:IntegrationStatus|null;preview?:boolean}) {
-  return <section className="workspace-view"><SectionHeading number="04" label="Channels" title="One workspace. Your channels."/><div className="connection-grid">{channels.map(platform=><Card key={platform} className={`surface connection-card ${platform}`}><div className="connection-icon"><PlatformIcon platform={platform} size={44}/></div><h2>{platform}</h2><span className="connection-state"><span/>{status?status.providers[platform]?.connected?"Connected":"Not connected":"Status unavailable"}</span><p>{platform==="facebook"?"Facebook Pages":platform==="instagram"?"Business + Creator":"Threads profiles"}</p><a className="text-action" href={preview?"/":"#workspace-session"} aria-label={`Connect ${platform}`}><Link2 size={16} aria-hidden="true"/>Manage connection</a><small>{status?.providers[platform]?.accounts?.map(a=>`${a.name} · ${a.accountType??"Type unavailable"}`).join(", ")||"Workspace social connection setup required"}</small></Card>)}</div><div className="numbered-section"><div className="section-index"><span>01</span>Setup</div><div className="connection-setup"><h2>Your accounts stay yours.</h2><p>Official Meta authorization. Server-side credentials. Your approval before posting.</p><a className="text-action" href={preview?"/":"#workspace-session"}>Connect accounts<ExternalLink size={16} aria-hidden="true"/></a><details className="small-details"><summary><Info size={14} aria-hidden="true"/>Connection details</summary><p>App settings and profile links do not authorize an account. Commercial OAuth setup must be configured separately from the private Sites preview. Live publishing, automatic refresh and background schedules remain off. Reconnect before token expiry.</p></details></div></div></section>;
 }
 
 function BrandProfile({profile,save,preview=false}:{preview?:boolean;profile:Profile;save:(profile:Profile)=>Promise<void>}) {

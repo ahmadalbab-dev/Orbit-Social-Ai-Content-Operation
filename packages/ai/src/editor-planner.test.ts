@@ -43,3 +43,26 @@ describe('conversational editor boundary',()=>{
   expect(fetcher).not.toHaveBeenCalled();
  });
 });
+
+describe('visual composition context',()=>{
+ it('distinguishes a base photo and its first overlay without inventing assets',()=>{
+  const input=validateEditorInput({kind:'image',instruction:'Make the second image equal size and to the left',current:{hasBaseImage:true,baseScale:1,baseX:50,baseY:50,baseAspectRatio:1,canvasAspectRatio:1,layers:[{index:0,x:50,y:50,width:40,opacity:100}]}});
+  expect(parseEditorPlan(JSON.stringify({summary:'Equal split',changes:{baseScale:0.5,baseX:75,baseY:50,layers:[{index:0,x:25,y:50,width:50}]}}),input).changes).toMatchObject({baseScale:0.5,baseX:75});
+  expect(()=>parseEditorPlan(JSON.stringify({summary:'No context in edits',changes:{hasBaseImage:true}}),input)).toThrow();
+ });
+ it('uses Groq vision only for an explicitly supplied bounded inline preview',async()=>{
+  const plan={summary:'Move the product',changes:{baseX:60}};
+  const fetcher=vi.fn().mockResolvedValue(Response.json({choices:[{message:{content:JSON.stringify(plan)}}]}));
+  const input={...image,previewDataUrl:'data:image/jpeg;base64,/9j/2Q=='};
+  expect(await new EditorPlanner('fixture','groq',undefined,fetcher).plan(input)).toEqual(plan);
+  const body=JSON.parse(fetcher.mock.calls[0][1].body);
+  expect(body.model).toBe('qwen/qwen3.8-27b');expect(body.reasoning_effort).toBe('none');
+  expect(body.messages[1].content[1]).toEqual({type:'image_url',image_url:{url:input.previewDataUrl}});
+  expect(body.messages[1].content[0].text).not.toContain('data:image');
+ });
+ it('rejects remote or oversized previews before dispatch; never sends vision to HF',async()=>{
+  const fetcher=vi.fn();
+  for(const previewDataUrl of ['https://private.test/file','data:image/svg+xml;base64,PHN2Zz4=',`data:image/jpeg;base64,${'a'.repeat(700001)}`])await expect(new EditorPlanner('fixture','groq',undefined,fetcher).plan({...image,previewDataUrl})).rejects.toThrow();
+  await expect(new EditorPlanner('fixture','huggingface',undefined,fetcher).plan({...image,previewDataUrl:'data:image/jpeg;base64,/9j/2Q=='})).rejects.toThrow();expect(fetcher).not.toHaveBeenCalled();
+ });
+});

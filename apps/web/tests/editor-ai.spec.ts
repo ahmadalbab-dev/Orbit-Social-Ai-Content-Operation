@@ -28,7 +28,6 @@ test('AI proposes layer changes, applies them together and restores the composit
   await page.getByLabel('Password', { exact: true }).fill('fixture-only-password');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Orbit home', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
   await page.getByRole('button', { name: 'Video Editor', exact: true }).click();
   await page.getByRole('button', { name: 'Image Editor', exact: true }).click();
   const asset = async (color: string) => Buffer.from(await page.evaluate(color => {

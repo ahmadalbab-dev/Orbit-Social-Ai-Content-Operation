@@ -13,7 +13,7 @@ export class AppController {
   @IdentityOnly() @Get("workspaces") listWorkspaces(@Req() req:Request) {return this.workspaces.list(req.identity);}
   @IdentityOnly() @Post("workspaces") createWorkspace(@Req() req:Request,@Body() body:unknown) {return this.workspaces.create(req.identity,body);}
   @Get("ai/status") aiStatus(){const {configured,provider}=textAiConfig();return {configured,provider,verified:false};}
-  @Get("integrations/status") integrationStatus(){return {connectorMode:"disabled",livePublishing:false,providers:Object.fromEntries(["facebook","instagram","threads"].map(p=>[p,{configured:false,requiresOwnerAuthorization:true}]))};}
+  @Get("integrations/status") integrationStatus(){return {connectorMode:"disabled",livePublishing:false,providers:Object.fromEntries(["facebook","instagram","threads"].map(p=>[p,{configured:false,connected:false,oauthImplemented:false,requiresOwnerAuthorization:true,reason:"Social OAuth integration is not enabled in this deployment."}]))};}
   @Get("brands") brands(@Req() req:Request){return this.workflow.listBrands(req.identity.workspaceId);}
   @Get("content") list(@Req() req:Request){return this.workflow.list(req.identity.workspaceId);}
   @Post("brands") createBrand(@Req() req:Request,@Body() body:unknown){return this.workflow.createBrand(req.identity,body);}

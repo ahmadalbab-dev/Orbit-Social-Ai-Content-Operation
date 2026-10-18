@@ -1,5 +1,5 @@
 import {expect,test,type Page} from "@playwright/test";
-async function settings(page:Page){await page.getByRole("button",{name:"Open navigation",exact:true}).click();await page.getByRole("button",{name:"Workspace Settings",exact:true}).click();}
+async function settings(page:Page){await page.getByRole("button",{name:"Workspace Settings",exact:true}).click();}
 test("profile is separate, system theme reacts and regional settings persist",async({page})=>{
   await page.setViewportSize({width:390,height:844});
   await page.emulateMedia({colorScheme:"light"});await page.goto("/preview");

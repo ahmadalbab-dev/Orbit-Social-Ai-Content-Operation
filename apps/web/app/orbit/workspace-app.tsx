@@ -15,12 +15,15 @@ import { OrbitMark } from "./design-ui";
 import { AppearanceToggle, useAppearance } from "./appearance";
 import { OrbitField } from "./orbit-field";
 import { Button } from "./ui";
+import {browserSession,clearBrowserSession} from "./browser-session";
 import { SessionRenewal } from "./session-renewal";
 import { PasswordRecovery } from "./password-recovery";
 import type { AuthSession } from "./auth-client";
 import { confirmEmailRedirect } from "./confirmation-client";
 type Workspace = { id: string; name: string; role?: string };
 export function WorkspaceApp() {
+  const [restoring,setRestoring]=useState(true);
+  const restoreRequest=useRef<Promise<AuthSession|null>|null>(null);
   const [token, setToken] = useState("");
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [selected, setSelected] = useState("");
@@ -71,6 +74,7 @@ export function WorkspaceApp() {
           });
         },
         () => {
+          void clearBrowserSession().catch(()=>{});
           authGeneration.current++;
           tokenRef.current = "";
           setBusy(false);
@@ -81,6 +85,7 @@ export function WorkspaceApp() {
           setWorkspaces([]);
           setNotice("Your session ended. Sign in again to continue.");
         },
+        async()=>{const session=await browserSession();if(!session)throw Error("Session expired");return session;},
       ),
   );
   useEffect(() => {
@@ -98,6 +103,17 @@ export function WorkspaceApp() {
       window.removeEventListener("online", resume);
     };
   }, [renewal]);
+  useEffect(()=>{
+    let active=true;
+    if(confirmation.current){setRestoring(false);return;}
+    // Share the provider refresh across Strict Mode effect replay.
+    restoreRequest.current??=browserSession();
+    void restoreRequest.current.then(async session=>{
+      if(!active)return;
+      if(session)await connect(session.access_token,session.expires_in,session);
+    }).catch(error=>{if(active)setNotice(error instanceof Error?error.message:"Could not restore session.");}).finally(()=>{if(active)setRestoring(false);});
+    return()=>{active=false;};
+  },[]);
   async function connect(next: string, expires = 3600, session?: AuthSession) {
     const generation = ++authGeneration.current;
     setApiSession({ token: next, workspaceId: "" });
@@ -112,7 +128,8 @@ export function WorkspaceApp() {
       tokenRef.current = next;
       setToken(next);
       setWorkspaces(list);
-      const id = list[0]?.id ?? "";
+      let preferred="";try{preferred=localStorage.getItem("orbit-workspace")??"";}catch{}
+      const id = list.find(item=>item.id===preferred)?.id ?? list[0]?.id ?? "";
       setSelected(id);
       selectedRef.current = id;
       setApiSession({ token: next, workspaceId: id });
@@ -141,8 +158,11 @@ export function WorkspaceApp() {
         if (session) await revokeSession(session.access_token, "local");
         setSignup(false);
         setNotice("Check your inbox and spam folder for your confirmation email. Confirm your email, then sign in here.");
-      } else if (session)
-        await connect(session.access_token, session.expires_in, session);
+      } else if (session) {
+        const saved=session.refresh_token?await browserSession(session.refresh_token):session;
+        if(!saved)throw Error("Could not save your session. Please sign in again.");
+        await connect(saved.access_token,saved.expires_in,saved);
+      }
       else
         setNotice(
           "If this address is eligible, check your email to confirm your account, then return here to sign in.",
@@ -185,23 +205,27 @@ export function WorkspaceApp() {
   function select(id: string) {
     if (!tokenRef.current) return;
     selectedRef.current = id;
+    try{localStorage.setItem("orbit-workspace",id);}catch{}
     setSelected(id);
     setApiSession({ token: tokenRef.current, workspaceId: id });
   }
-  function signout() {
-    setBusy(false);
-    const previous = tokenRef.current;
+  async function signout() {
+    if(busy)return;
+    setBusy(true);
+    const previous=tokenRef.current;
+    try{
+      await clearBrowserSession();
+      await revokeSession(previous,"local");
+    }catch{
+      setNotice("Could not sign out on this device. Check your connection and retry Sign out.");
+      setBusy(false);return;
+    }
     authGeneration.current++;
-    tokenRef.current = "";
-    renewal.stop();
-    selectedRef.current = "";
-    setApiSession(null);
-    setToken("");
-    setSelected("");
-    setWorkspaces([]);
-    setNotice("");
-    void revokeSession(previous);
+    tokenRef.current="";renewal.stop();selectedRef.current="";
+    try{localStorage.removeItem("orbit-workspace");}catch{}
+    setApiSession(null);setToken("");setSelected("");setWorkspaces([]);setNotice("");setBusy(false);
   }
+  if(restoring)return <main className="orbit-auth"><p role="status">Restoring your session…</p></main>;
   if (!token)
     return (
       <main className="orbit-auth" id="workspace-session">
@@ -376,10 +400,9 @@ export function WorkspaceApp() {
         </div>
       </main>
     );
-  return (
-    <>
+  const workspaceControls = (
       <section
-        className={`workspace-session ${selected ? "session-compact" : ""}`}
+        className="workspace-session workspace-management surface"
         id="workspace-session"
         aria-label="Workspace session"
       >
@@ -426,7 +449,6 @@ export function WorkspaceApp() {
           </p>
         ) : null}
       </section>
-      {selected ? <Home key={selected} workspaceId={selected} /> : null}
-    </>
   );
+  return selected ? <Home key={selected} workspaceId={selected} workspaceName={workspaces.find(workspace=>workspace.id===selected)?.name ?? "Your workspace"} workspaceControls={workspaceControls}/> : <main className="workspace-onboarding"><div className="session-brand"><OrbitMark/><h1>Your workspace</h1><AppearanceToggle/></div>{workspaceControls}</main>;
 }

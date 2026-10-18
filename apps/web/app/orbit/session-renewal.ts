@@ -33,7 +33,7 @@ export class SessionRenewal {
     if (!session) return;
     const lifetime = Math.min(session.expires_in, 86400) * 1000;
     this.expiresAt = Date.now() + lifetime;
-    const lead = session.refresh_token ? Math.min(60000, lifetime / 4) : 0;
+    const lead = (session.refresh_token || session.refreshable) ? Math.min(60000, lifetime / 4) : 0;
     this.timer = setTimeout(() => {
       void this.check();
     }, lifetime - lead);
@@ -44,21 +44,22 @@ export class SessionRenewal {
     if (this.pending) return this.pending;
     const session = this.session;
     if (!session) return Promise.resolve();
-    const lead = session.refresh_token
+    const lead = (session.refresh_token || session.refreshable)
       ? Math.min(60000, session.expires_in * 250)
       : 0;
     if (Date.now() < this.expiresAt - lead) return Promise.resolve();
     const generation = this.generation;
     this.pending = (async () => {
       try {
-        if (!session.refresh_token) throw Error("Session expired");
-        const next = await this.refresh(session.refresh_token);
+        if (!session.refresh_token && !session.refreshable) throw Error("Session expired");
+        const next = await this.refresh(session.refresh_token ?? "");
         if (generation !== this.generation) return;
         this.session = next;
         this.onRenew(next);
         this.schedule();
-      } catch {
+      } catch (error) {
         if (generation !== this.generation) return;
+        if(error&&typeof error==='object'&&'retryable' in error&&error.retryable===true){this.timer=setTimeout(()=>{void this.check();},30000);return;}
         this.stop();
         this.onExpire();
       } finally {

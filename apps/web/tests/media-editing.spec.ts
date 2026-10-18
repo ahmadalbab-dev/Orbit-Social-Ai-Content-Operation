@@ -8,7 +8,6 @@ test('video preview exports a real edited clip locally without uploading it', as
   const uploads: string[] = [];
   page.on('request', request => { if (request.method() === 'POST') uploads.push(request.url()); });
   await page.goto('/preview');
-  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
   await page.getByRole('button', { name: 'Video Editor', exact: true }).click();
   await page.getByLabel('Choose video', { exact: true }).setInputFiles(clip);
   await expect(page.getByRole('button', { name: 'Export edited video locally', exact: true })).toBeEnabled();
@@ -32,7 +31,6 @@ test('video preview exports a real edited clip locally without uploading it', as
 for (const width of [390, 1440]) test(`custom video calendar supports choosing a date and keyboard dismissal at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 844 });
   await page.goto('/preview');
-  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
   await page.getByRole('button', { name: 'Video Editor', exact: true }).click();
   const trigger = page.getByRole('button', { name: 'Video date', exact: true });
   await trigger.click();

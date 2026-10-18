@@ -1,4 +1,4 @@
-/** Public Auth API only. Service-role keys and session persistence are intentionally excluded. */
+/** Public Auth API only. Service-role keys are excluded; refresh persistence lives in the same-origin session endpoint. */
 export function publicAuthConfig(
   url = process.env.NEXT_PUBLIC_SUPABASE_URL,
   key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -30,6 +30,7 @@ export type AuthSession = {
   access_token: string;
   expires_in: number;
   refresh_token?: string;
+  refreshable?: boolean;
 };
 export async function passwordAuth(
   kind: "signin" | "signup",

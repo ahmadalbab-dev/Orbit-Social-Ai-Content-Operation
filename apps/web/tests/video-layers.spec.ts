@@ -10,9 +10,6 @@ test("video template and timed image layer export without an upload", async ({
     if (r.method() === "POST") posts.push(r.url());
   });
   await page.goto("/preview");
-  await page
-    .getByRole("button", { name: "Open navigation", exact: true })
-    .click();
   await page.getByRole("button", { name: "Video Editor", exact: true }).click();
   await page
     .getByLabel("Choose video", { exact: true })

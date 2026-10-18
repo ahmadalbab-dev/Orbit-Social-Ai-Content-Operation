@@ -86,3 +86,13 @@ describe("in-memory session renewal", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 });
+
+it('retains the cookie-backed session through a transient failure and renews on retry',async()=>{
+ vi.useFakeTimers();const expired=vi.fn(),renewed=vi.fn();
+ const next={access_token:'new-access',expires_in:120,refreshable:true};
+ const refresh=vi.fn().mockRejectedValueOnce(Object.assign(Error('temporary'),{retryable:true})).mockResolvedValueOnce(next);
+ const manager=new SessionRenewal(renewed,expired,refresh);
+ manager.start({access_token:'old-access',expires_in:120,refreshable:true});
+ await vi.advanceTimersByTimeAsync(90000);expect(expired).not.toHaveBeenCalled();expect(refresh).toHaveBeenCalledOnce();
+ await vi.advanceTimersByTimeAsync(30000);expect(renewed).toHaveBeenCalledWith(next);expect(expired).not.toHaveBeenCalled();manager.stop();
+});
