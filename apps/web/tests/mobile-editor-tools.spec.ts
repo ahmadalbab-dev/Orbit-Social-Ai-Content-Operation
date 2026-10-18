@@ -19,6 +19,13 @@ for (const kind of ['Video', 'Image']) test(`${kind} mobile tools scroll sideway
   await tools.getByRole('button', { name: 'Music', exact: true }).click();
   await tools.getByRole('button', { name: 'Adjust & text', exact: true }).click();
   await expect(input).toHaveValue('My mobile edit');
+  if (kind === 'Video') {
+    await page.getByRole('button', { name: 'Video date', exact: true }).click();
+    const calendar = page.getByRole('dialog', { name: 'Video date calendar', exact: true });
+    await calendar.locator('.ios-date-days button[data-current-month="true"]').filter({ hasText: /^15$/ }).click();
+    await expect(calendar).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Video date', exact: true })).toContainText('15');
+  }
   await input.scrollIntoViewIfNeeded();
   const preview = page.locator(kind === 'Image' ? '.image-interactive-stage' : '.video-stage');
   const bounds = (await preview.boundingBox())!, bar = (await tools.boundingBox())!;
