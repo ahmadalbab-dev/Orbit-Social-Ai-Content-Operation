@@ -87,6 +87,8 @@ jobs:
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - name: Install browser for local-only preview acceptance
-        run: pnpm --filter @sma/web exec playwright install --with-deps chromium
+        run: pnpm --filter @sma/web exec playwright install --with-deps chromium webkit
       - name: Verify phone preview, navigation and local image export
         run: pnpm --filter @sma/web test:e2e
+      - name: Verify WebKit mobile tools and session restoration
+        run: pnpm --filter @sma/web exec playwright test --browser=webkit tests/mobile-editor-tools.spec.ts tests/preview.spec.ts tests/session-persistence.spec.ts tests/auth.spec.ts
