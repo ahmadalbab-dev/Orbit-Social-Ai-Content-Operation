@@ -1,3 +1,4 @@
+import { selectEditorTool } from './editor-helpers';
 import { expect, test } from '@playwright/test';
 
 test('AI proposes layer changes, applies them together and restores the composition with Undo', async ({ page }) => {
@@ -23,22 +24,20 @@ test('AI proposes layer changes, applies them together and restores the composit
     }
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   });
-  await page.goto('/');
-  await page.getByLabel('Email address', { exact: true }).fill('editor@example.test');
-  await page.getByLabel('Password', { exact: true }).fill('fixture-only-password');
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Orbit home', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Video Editor', exact: true }).click();
-  await page.getByRole('button', { name: 'Image Editor', exact: true }).click();
+  await page.route('**/api/auth/session', route => route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({access_token:'fixture-editor-token',expires_in:3600,refreshable:true}) }));
+  await page.goto('/editor/image');
+  await expect(page.locator('.editor-workspace')).toBeVisible();
   const asset = async (color: string) => Buffer.from(await page.evaluate(color => {
     const canvas = document.createElement('canvas'); canvas.width = 100; canvas.height = 100;
     const ctx = canvas.getContext('2d')!; ctx.fillStyle = color; ctx.fillRect(0, 0, 100, 100);
     return canvas.toDataURL('image/png').split(',')[1];
   }, color), 'base64');
   await page.getByLabel('Choose image', { exact: true }).setInputFiles({ name: 'base.png', mimeType: 'image/png', buffer: await asset('#ff0000') });
+  await selectEditorTool(page, 'Image', 'Layers');
   await page.getByLabel('Add image overlay', { exact: true }).setInputFiles({ name: 'layer.png', mimeType: 'image/png', buffer: await asset('#0000ff') });
   const horizontal = page.getByLabel('Horizontal position', { exact: true });
   await expect(horizontal).toHaveValue('50');
+  await selectEditorTool(page, 'Image', 'AI editor');
   await page.getByLabel('AI image editing instruction', { exact: true }).fill('Move my layer to the upper right, make it smaller and half transparent.');
   await page.getByRole('button', { name: 'Prepare AI edit', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Apply AI edit', exact: true })).toBeVisible();
@@ -52,6 +51,7 @@ test('AI proposes layer changes, applies them together and restores the composit
   await expect(page.getByLabel('Layer opacity', { exact: true })).toHaveValue('50');
   const pixel = () => page.getByLabel('Edited image preview', { exact: true }).evaluate(node => Array.from((node as HTMLCanvasElement).getContext('2d')!.getImageData(50, 50, 1, 1).data));
   await expect.poll(pixel).toEqual([255, 0, 0, 255]);
+  await selectEditorTool(page, 'Image', 'Export');
   await page.getByRole('button', { name: 'Undo last composition', exact: true }).click();
   await expect(horizontal).toHaveValue('50');
   await expect(page.getByLabel('Layer opacity', { exact: true })).toHaveValue('100');

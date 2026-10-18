@@ -9,6 +9,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import Home from "./page-client";
+import { EditorWorkspace } from "./editor-workspace";
 import { api, setApiSession } from "./session-api";
 import { passwordAuth, publicAuthConfig, revokeSession } from "./auth-client";
 import { OrbitMark } from "./design-ui";
@@ -21,7 +22,7 @@ import { PasswordRecovery } from "./password-recovery";
 import type { AuthSession } from "./auth-client";
 import { confirmEmailRedirect } from "./confirmation-client";
 type Workspace = { id: string; name: string; role?: string };
-export function WorkspaceApp() {
+export function WorkspaceApp({ editorKind }: { editorKind?: "image" | "video" } = {}) {
   const [restoring,setRestoring]=useState(true);
   const restoreRequest=useRef<Promise<AuthSession|null>|null>(null);
   const [token, setToken] = useState("");
@@ -451,5 +452,6 @@ export function WorkspaceApp() {
         ) : null}
       </section>
   );
+  if (selected && editorKind) return <EditorWorkspace key={selected} kind={editorKind} workspaceName={workspaces.find(workspace=>workspace.id===selected)?.name ?? "Your workspace"}/>;
   return selected ? <Home key={selected} workspaceId={selected} workspaceName={workspaces.find(workspace=>workspace.id===selected)?.name ?? "Your workspace"} workspaceControls={workspaceControls}/> : <main className="workspace-onboarding"><div className="session-brand"><OrbitMark/><h1>Your workspace</h1><AppearanceToggle/></div>{workspaceControls}</main>;
 }

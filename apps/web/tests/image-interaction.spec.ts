@@ -5,9 +5,7 @@ test('touch dragging edits uploaded layers while pinch and fit only affect the v
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });
   const page = await context.newPage(), uploads: string[] = [];
   page.on('request', request => { if (request.method() === 'POST') uploads.push(request.url()); });
-  await page.goto('/preview');
-  await page.getByRole('button', { name: 'Video Editor', exact: true }).click();
-  await page.getByRole('button', { name: 'Image Editor', exact: true }).click();
+  await page.goto('/preview/editor/image');
   const asset = async (color: string) => Buffer.from(await page.evaluate(color => { const canvas = document.createElement('canvas'); canvas.width = 200; canvas.height = 200; const ctx = canvas.getContext('2d')!; ctx.fillStyle = color; ctx.fillRect(0, 0, 200, 200); return canvas.toDataURL('image/png').split(',')[1]; }, color), 'base64');
   await page.getByLabel('Choose image', { exact: true }).setInputFiles({ name: 'base.png', mimeType: 'image/png', buffer: await asset('#ff0000') });
   await page.getByRole('navigation',{name:'Image editing tools'}).getByRole('button',{name:'Layers',exact:true}).click();

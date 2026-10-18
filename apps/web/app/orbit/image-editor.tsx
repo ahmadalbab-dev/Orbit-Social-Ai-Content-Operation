@@ -72,7 +72,11 @@ export function ImageEditor({ preview = false }: { preview?: boolean }) {
   const busy = aiBusy || loading || exporting;
   const hasArtwork = Boolean(image || state.template !== "original" || state.overlays.length || state.caption);
   useEffect(() => () => { generation.current++; }, []);
-  useEffect(() => { try { if (canvas.current) renderImageComposition(canvas.current, state); } catch (error) { setNotice(error instanceof Error ? error.message : "Preview is unavailable."); } }, [state]);
+  useEffect(() => { try { if (canvas.current) {
+    const rendered = renderImageComposition(canvas.current, state);
+    // The selection overlay must use the same fitted rectangle as the canvas.
+    rendered.parentElement?.style.setProperty("--image-aspect", String(rendered.width / rendered.height));
+  } } catch (error) { setNotice(error instanceof Error ? error.message : "Preview is unavailable."); } }, [state]);
   function patch(changes: Partial<ImageComposition>) { setSlides(items => items.map((slide, index) => index === active ? { ...slide, state: { ...slide.state, ...changes } } : slide)); }
   function snapshot() { setUndo(state); }
   function previewPoint(point: CanvasPoint) { return canvas.current ? canvasPercent(point, canvas.current.getBoundingClientRect()) : point; }

@@ -14,8 +14,9 @@ test("phone preview navigates without backend calls or fake access", async ({ pa
   await expect(page.getByRole("button", { name: "Generate AI content" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Start manually" })).toBeDisabled();
   await navigate(page, "Video Editor");
-  await expect(page.getByText("Edit and export on your device. Sign in for workspace uploads.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Refresh renders" })).toBeDisabled();
+  await expect(page.getByRole("link", { name:"Start video editing", exact:true })).toBeVisible();
+  await expect(page.getByRole("link", { name:"Start image editing", exact:true })).toBeVisible();
+  await expect(page.locator(".video-composer")).toHaveCount(0);
   await navigate(page, "Calendar");
   await expect(page.getByRole("heading", { name: "Make space for your next post." })).toBeVisible();
   await navigate(page, "Connections");
@@ -37,9 +38,7 @@ test("local image edits export from preview without sign-in or upload", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   const uploaded: string[] = [];
   page.on("request", request => { if (request.method() === "POST") uploaded.push(request.url()); });
-  await page.goto("/preview");
-  await navigate(page, "Video Editor");
-  await page.getByRole("button", { name: "Image Editor", exact: true }).click();
+  await page.goto("/preview/editor/image");
   const png = await page.evaluate(() => {
     const canvas = document.createElement("canvas"); canvas.width = 64; canvas.height = 64;
     const context = canvas.getContext("2d")!; context.fillStyle = "#9679ed"; context.fillRect(0, 0, 64, 64);

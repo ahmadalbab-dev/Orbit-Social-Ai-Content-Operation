@@ -1,3 +1,4 @@
+import { selectEditorTool } from './editor-helpers';
 import { expect, test } from "@playwright/test";
 import { join } from "node:path";
 import { readFile } from "node:fs/promises";
@@ -32,21 +33,23 @@ test("uploaded music is encoded in the local edited video with measurable audio"
   page.on("request", (r) => {
     if (r.method() === "POST") posts.push(r.url());
   });
-  await page.goto("/preview");
-  await page.getByRole("button", { name: "Video Editor", exact: true }).click();
+  await page.goto("/preview/editor/video");
   await page
     .getByLabel("Choose video", { exact: true })
     .setInputFiles(join(__dirname, "fixtures", "clip.mp4"));
+  await selectEditorTool(page, "Video", "Export");
   await expect(
     page.getByRole("button", {
       name: "Export edited video locally",
       exact: true,
     }),
   ).toBeEnabled();
+  await selectEditorTool(page, "Video", "Adjust & text");
   await page.getByLabel("Trim length seconds", { exact: true }).fill("1");
   await page.getByLabel("Video volume", { exact: true }).focus();
   await page.getByLabel("Video volume", { exact: true }).press("Home");
   await expect(page.getByLabel("Video volume", { exact: true })).toHaveValue("0");
+  await selectEditorTool(page, "Video", "Music");
   await page
     .locator(".video-composer .video-controls")
     .getByLabel("Choose local music", { exact: true })
@@ -72,6 +75,7 @@ test("uploaded music is encoded in the local edited video with measurable audio"
     .locator(".video-composer .video-controls")
     .getByLabel("Soundtrack fadeOut", { exact: true })
     .fill("0.1");
+  await selectEditorTool(page, "Video", "Export");
   const pending = page.waitForEvent("download");
   await page
     .getByRole("button", { name: "Export edited video locally", exact: true })

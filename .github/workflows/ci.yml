@@ -89,6 +89,14 @@ jobs:
       - name: Install browser for local-only preview acceptance
         run: pnpm --filter @sma/web exec playwright install --with-deps chromium webkit
       - name: Verify phone preview, navigation and local image export
-        run: pnpm --filter @sma/web test:e2e
+        run: pnpm --filter @sma/web test:e2e --output=test-results/chromium
       - name: Verify WebKit mobile tools and session restoration
-        run: pnpm --filter @sma/web exec playwright test --browser=webkit tests/mobile-editor-tools.spec.ts tests/preview.spec.ts tests/session-persistence.spec.ts tests/auth.spec.ts
+        run: pnpm --filter @sma/web exec playwright test --browser=webkit --output=test-results/webkit tests/mobile-editor-tools.spec.ts tests/preview.spec.ts tests/session-persistence.spec.ts tests/auth.spec.ts
+      - name: Save editor and navigation visual acceptance artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbit-editor-navigation-browser-results
+          path: apps/web/test-results
+          if-no-files-found: warn
+          retention-days: 7

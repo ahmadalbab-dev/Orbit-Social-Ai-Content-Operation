@@ -36,6 +36,15 @@ test("reload restores the selected workspace from HttpOnly refresh cookie and si
  expect(rotation).toBeGreaterThanOrEqual(2);expect(sessionActions).toContain('establish');
  const storage=await page.evaluate(()=>({local:Object.values(localStorage),session:Object.values(sessionStorage)}));
  expect(JSON.stringify(storage)).not.toMatch(/synthetic-(access|refresh|password)|synthetic-initial-refresh/);
+ await page.goto('/editor/image');
+ await expect(page.locator('.editor-workspace')).toBeVisible();
+ await expect(page.getByRole('navigation',{name:'Workspace',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('form',{name:'Sign in to Orbit'})).toHaveCount(0);
+ await page.reload();await expect(page.locator('.editor-workspace')).toBeVisible();
+ await page.getByRole('link',{name:'Back to media',exact:true}).click();
+ await expect(page).toHaveURL(/\/\?view=video$/);
+ await expect(page.locator('.current-workspace-name')).toHaveText('Orbit Verification');
+ await expect(page.getByRole('link',{name:'Start image editing',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Workspace Settings',exact:true}).click();await page.getByRole('button',{name:'Sign out',exact:true}).click();
  await expect(page.getByRole('form',{name:'Sign in to Orbit'})).toBeVisible();
  await expect.poll(async()=>(await context.cookies('http://localhost:3000/api/auth/session')).some(cookie=>cookie.name==='orbit-refresh')).toBe(false);

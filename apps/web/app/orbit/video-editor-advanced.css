@@ -98,13 +98,13 @@
   padding-top: 16px;
 }
 .video-grid > .video-canvas {
-  position: sticky;
-  top: 12px;
+  position: relative;
+  top: auto;
   z-index: 3;
 }
 @media (max-width: 1000px) {
   .video-grid > .video-canvas {
-    top: 60px;
+    top: auto;
     padding: 10px;
   }
   .video-canvas > .review-help,

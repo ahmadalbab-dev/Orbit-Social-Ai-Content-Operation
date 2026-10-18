@@ -1,16 +1,19 @@
+import { selectEditorTool } from './editor-helpers';
 import { expect, test } from '@playwright/test';
 
 test('equal split and photo stack arrange actual uploaded pixels and preserve the headline', async ({ page }) => {
-  await page.goto('/preview');
-  await page.getByRole('button', { name: 'Video Editor', exact: true }).click();
-  await page.getByRole('button', { name: 'Image Editor', exact: true }).click();
+  await page.goto('/preview/editor/image');
+  await selectEditorTool(page, 'Image', 'Templates');
   await page.getByRole('button', { name: 'Equal split', exact: true }).click();
   await expect(page.locator('.image-composer .action-notice')).toContainText('Choose a base image');
   const asset = async (color: string) => Buffer.from(await page.evaluate(color => { const canvas = document.createElement('canvas'); canvas.width = 200; canvas.height = 200; const context = canvas.getContext('2d')!; context.fillStyle = color; context.fillRect(0, 0, 200, 200); return canvas.toDataURL('image/png').split(',')[1]; }, color), 'base64');
+  await selectEditorTool(page, 'Image', 'Media');
   await page.getByLabel('Choose image', { exact: true }).setInputFiles({ name: 'hero.png', mimeType: 'image/png', buffer: await asset('#ff0000') });
+  await selectEditorTool(page, 'Image', 'Layers');
   await page.getByLabel('Add image overlay', { exact: true }).setInputFiles({ name: 'detail.png', mimeType: 'image/png', buffer: await asset('#0000ff') });
-  await page.getByText('Adjust image and text', { exact: true }).click();
+  await selectEditorTool(page, 'Image', 'Adjust & text');
   await page.getByLabel('Image caption', { exact: true }).fill('Headline from the customer');
+  await selectEditorTool(page, 'Image', 'Templates');
   await page.getByRole('button', { name: 'Equal split', exact: true }).click();
   const pixel = (x: number, y: number) => page.getByLabel('Edited image preview', { exact: true }).evaluate((node, point) => Array.from((node as HTMLCanvasElement).getContext('2d')!.getImageData(point.x, point.y, 1, 1).data), { x, y });
   await expect.poll(() => pixel(50, 100)).toEqual([255, 0, 0, 255]);
@@ -20,6 +23,7 @@ test('equal split and photo stack arrange actual uploaded pixels and preserve th
   await expect(page.getByLabel('Horizontal position', { exact: true })).toHaveValue('68');
   await expect(page.getByLabel('Vertical position', { exact: true })).toHaveValue('61');
   await expect(page.getByLabel('Image caption', { exact: true })).toHaveValue('Headline from the customer');
+  await selectEditorTool(page, 'Image', 'Export');
   await page.getByRole('button', { name: 'Undo last composition', exact: true }).click();
   await expect.poll(() => pixel(50, 100)).toEqual([255, 0, 0, 255]);
   await expect.poll(() => pixel(150, 100)).toEqual([0, 0, 255, 255]);

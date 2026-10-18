@@ -1486,14 +1486,6 @@ export function VideoEditor({
             <Film size={17} aria-hidden="true" />
             {busy ? "Working…" : "Render MP4"}
           </Button>
-</EditorToolPanel>
-          {notice ? (
-            <p role="status" className="action-notice">
-              {notice}
-            </p>
-          ) : null}
-        </Card>
-      </div>
       <div className="numbered-section">
         <div className="section-index">
           <span>01</span>Render queue
@@ -1579,6 +1571,15 @@ export function VideoEditor({
             Refresh renders
           </Button>
         </div>
+      </div>
+
+</EditorToolPanel>
+          {notice ? (
+            <p role="status" className="action-notice">
+              {notice}
+            </p>
+          ) : null}
+        </Card>
       </div>
       <MobileEditorToolbar kind="Video" value={tool} onChange={setTool} tools={videoTools}/>
     </section>

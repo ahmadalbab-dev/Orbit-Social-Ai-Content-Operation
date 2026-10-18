@@ -1,3 +1,4 @@
+import { selectEditorTool } from './editor-helpers';
 import { expect, test } from '@playwright/test';
 import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
@@ -7,13 +8,15 @@ test('video preview exports a real edited clip locally without uploading it', as
   test.setTimeout(45000);
   const uploads: string[] = [];
   page.on('request', request => { if (request.method() === 'POST') uploads.push(request.url()); });
-  await page.goto('/preview');
-  await page.getByRole('button', { name: 'Video Editor', exact: true }).click();
+  await page.goto('/preview/editor/video');
   await page.getByLabel('Choose video', { exact: true }).setInputFiles(clip);
+  await selectEditorTool(page, 'Video', 'Export');
   await expect(page.getByRole('button', { name: 'Export edited video locally', exact: true })).toBeEnabled();
+  await selectEditorTool(page, 'Video', 'Adjust & text');
   await page.getByLabel('Video format', { exact: true }).selectOption('landscape');
   await page.getByLabel('Trim length seconds', { exact: true }).fill('1');
   await page.getByLabel('Video speed', { exact: true }).selectOption('2');
+  await selectEditorTool(page, 'Video', 'Export');
   const received = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export edited video locally', exact: true }).click();
   const download = await received;
@@ -30,9 +33,8 @@ test('video preview exports a real edited clip locally without uploading it', as
 
 for (const width of [390, 1440]) test(`custom video calendar supports choosing a date and keyboard dismissal at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 844 });
-  await page.goto('/preview');
-  await page.getByRole('button', { name: 'Video Editor', exact: true }).click();
-  if(width === 390) await page.getByRole('navigation', {name:'Video editing tools'}).getByRole('button',{name:'Adjust & text',exact:true}).click();
+  await page.goto('/preview/editor/video');
+  await selectEditorTool(page, 'Video', 'Adjust & text');
   const trigger = page.getByRole('button', { name: 'Video date', exact: true });
   await trigger.click();
   const dialog = page.getByRole('dialog', { name: 'Video date calendar', exact: true });

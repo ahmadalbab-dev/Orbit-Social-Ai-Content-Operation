@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowRight, ArrowUpRight, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, ExternalLink, Eye, FilePenLine, Film, Hash, House, Info, LayoutDashboard, Link2, LockKeyhole, MoreHorizontal, PenLine, Play, RefreshCw, Save, Settings, ShieldCheck, Sparkles } from "lucide-react";
 import { Button, Card } from "./ui";
-import { Dock } from "../../components/ui/dock";
+import { WorkspaceNavigation } from "./workspace-navigation";
 import { DatePicker } from "../../components/ui/date-picker";
 import { EmptyState, IconButton, OrbitMark, PlatformBadge, PlatformIcon, SectionHeading, StatusBadge, ToolLink } from "./design-ui";
 import { AppearanceToggle, useAppearance } from "./appearance";
@@ -11,8 +11,7 @@ import { OrbitField } from "./orbit-field";
 import { WorkflowShowcase } from "./workflow-showcase";
 import { AiSetup } from "./ai-setup";
 import {AI_MODES,type AiMode} from "./ai-modes";
-import { ImageEditor } from "./image-editor";
-import { VideoEditor } from "./video-editor";
+import { MediaEntry } from "./media-entry";
 import { BillingPanel } from "./billing-panel";
 import { monthGrid } from "./calendar-data";
 import {dateKeyInZone,scheduledInstant} from "./device-preferences";
@@ -34,9 +33,11 @@ const errorMessage = (error: unknown) => error instanceof Error ? error.message 
 
 export default function Home({workspaceId,workspaceName="Preview workspace",workspaceControls,preview=false}:{workspaceId:string;workspaceName?:string;workspaceControls?:ReactNode;preview?:boolean}) {
   const [view, setView] = useState<View>("overview");
-  const [floating,setFloating]=useState(false);
-  const headerRef=useRef<HTMLElement>(null);
-  useEffect(()=>{const header=headerRef.current;if(!header)return;let frame=0;const update=()=>{frame=0;setFloating(header.getBoundingClientRect().bottom<=0);};const onScroll=()=>{if(!frame)frame=requestAnimationFrame(update);};update();window.addEventListener("scroll",onScroll,{passive:true});window.addEventListener("resize",onScroll);return()=>{window.removeEventListener("scroll",onScroll);window.removeEventListener("resize",onScroll);cancelAnimationFrame(frame);};},[]);
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("view");
+    const allowed: View[] = ["overview", "studio", "video", "calendar", "connections", "settings", "profile"];
+    if (allowed.includes(requested as View)) setView(requested as View);
+  }, []);
   const [profile, setProfile] = useState<Profile>(initialProfile);
   const [items, setItems] = useState<Content[]>([]);
   const [connection, setConnection] = useState<IntegrationStatus | null>(null);
@@ -55,21 +56,28 @@ export default function Home({workspaceId,workspaceName="Preview workspace",work
     void refresh();
     api<IntegrationStatus>("/integrations/status").then(setConnection).catch(() => setConnection(null));
   }, [refresh,preview]);
-  const go = (next:View) => { setView(next); window.scrollTo({top:0,behavior:"instant"}); };
+  const go = (next:View) => {
+    setView(next);
+    const address = new URL(window.location.href);
+    if (next === "overview") address.searchParams.delete("view");
+    else address.searchParams.set("view", next);
+    window.history.replaceState(window.history.state, "", `${address.pathname}${address.search}${address.hash}`);
+    window.scrollTo({top:0,behavior:"instant"});
+  };
   const openDraft = (id:string) => { setOpenedDraft({id,request:Date.now()}); go("studio"); };
   const saveProfile = async (next: Profile) => { const stored=await api<StoredBrand>(next.id?`/brands/${next.id}`:"/brands",next.id?"PUT":"POST",brandPayload(next)); setProfile(profileFromBrand(stored)); };
   const scheduledCount=items.filter(post=>post.status==="SCHEDULED").length;
   return <main className={`orbit-shell ${paused?"motion-paused":""}`}>
-    <header className="app-header workspace-header" ref={headerRef}>
+    <header className="app-header workspace-header">
       <button className="brand-word workspace-brand" onClick={()=>go("overview")} aria-label="Orbit home"><OrbitMark small/><span className="workspace-brand-copy"><span>orbit<span className="word-dot">.</span></span><small className="current-workspace-name" title={workspaceName}>{workspaceName}</small></span></button>
-      <div className="workspace-nav-slot"><div className="workspace-navigation" data-floating={floating}><Dock id="orbit-workspace-nav" className="orbit-nav" aria-label="Workspace" items={navigation.map(item=>({...item,badge:item.id==="calendar"&&scheduledCount?(scheduledCount>99?"99+":String(scheduledCount)):undefined}))} activeId={view} onSelect={id=>go(id as View)}/></div></div>
+      <WorkspaceNavigation items={navigation.map(item=>({...item,badge:item.id==="calendar"&&scheduledCount?(scheduledCount>99?"99+":String(scheduledCount)):undefined}))} activeId={view} onSelect={id=>go(id as View)}/>
       <div className="workspace-header-actions"><AppearanceToggle/><button className="profile-button" onClick={()=>go("profile")} aria-label="Open profile" aria-current={view==="profile"?"page":undefined} title={profile.name}>{profile.name.slice(0,1).toUpperCase()}</button></div>
     </header>
     <div className="app-content">{notice?<div role="alert" className="alert-message">{notice}<IconButton label="Refresh workspace" onClick={refresh}><RefreshCw size={17}/></IconButton></div>:null}
       <details className="preview-note"><summary><LockKeyhole size={13}/>{preview?"v1 design preview · local tools only":"Private workspace · live posting off"}<Info size={13}/></summary><p>{preview?"Try navigation, Light/Dark mode, image editing and local video previews. AI generation, saved drafts, account connections, server renders and payments require a configured backend and sign-in. Files selected here stay on this device unless you explicitly upload from an authenticated workspace.":"Drafts and brand profiles use the configured backend. Image edits and video previews stay on this device. Video uploads happen only when you choose Upload to workspace; configured workers produce downloadable MP4 files. Live publishing is off."}</p></details>
       <div hidden={view!=="overview"}><Overview profile={profile} items={items} go={go} openDraft={openDraft} paused={paused||view!=="overview"}/></div>
       <div hidden={view!=="studio"}><ContentStudio preview={preview} profile={profile} items={items} onRefresh={refresh} openedDraft={openedDraft}/></div>
-      {view==="video"?<MediaEditors preview={preview}/>:null}
+      {view==="video"?<MediaEntry preview={preview}/>:null}
       <div hidden={view!=="calendar"}><Calendar items={items} refresh={refresh} openDraft={openDraft}/></div>
       <div hidden={view!=="connections"}><ConnectionsPanel status={connection} preview={preview}/></div>
       <div hidden={view!=="profile"}><BrandProfile preview={preview} profile={profile} save={saveProfile}/></div>
@@ -142,14 +150,6 @@ function ContentStudio({profile,items,onRefresh,openedDraft,preview=false}:{prev
     </div><aside><Card className="surface review-panel"><div className="panel-label"><ShieldCheck size={19} aria-hidden="true"/><h2>Review</h2>{item?<StatusBadge status={dirty?"DRAFT":item.status}/>:null}</div>{item?<p className="revision-label">Revision {item.revision}{dirty?" · unsaved":""}</p>:null}<p className="review-help">Create a draft, edit its caption, then approve before scheduling.</p><div className="review-actions"><Button variant="outline" disabled={!item||busy||!dirty} onClick={()=>action(async()=>{await save();setNotice("Draft saved. Approval is required again.");})} aria-label="Save draft"><Save size={17} aria-hidden="true"/>Save</Button><Button disabled={!item||busy||(!dirty&&item.status!=="DRAFT")} onClick={approve} aria-label="Approve content"><Check size={17} aria-hidden="true"/>Approve</Button></div><div className="schedule-control"><p className="schedule-date-label"><CalendarDays size={15} aria-hidden="true"/>{preferences.city} · {preferences.timeZone.replaceAll("_"," ")}</p><DatePicker label={`Schedule time ${preferences.city}`} timeZone={preferences.timeZone} timeZoneLabel={preferences.city} withTime disabled={busy} value={time} onChange={setTime}/><Button className="full-button" variant="outline" disabled={!approved||busy||!time} onClick={schedule} aria-label="Record schedule"><CalendarDays size={17} aria-hidden="true"/>Schedule</Button></div><button className="text-action simulation-action" disabled={!approved||busy} onClick={simulate} aria-label="Simulate publishing"><Play size={15} aria-hidden="true"/>Test publishing<ArrowRight size={15} aria-hidden="true"/></button>{notice?<p role="status" className="action-notice">{notice}</p>:null}<details className="small-details"><summary><Info size={14} aria-hidden="true"/>How review works</summary><p>Approval applies to the saved revision. Any edit needs a fresh approval. Live posting is off.</p></details></Card></aside></div>
   </section>;
 }
-
-function MediaEditors({preview=false}:{preview?:boolean}) {
-  const {preferences}=useDevicePreferences();
-  const [kind,setKind]=useState("video");
-  useEffect(()=>setKind(preferences.mediaEditor),[preferences.mediaEditor]);
-  return <><div className="channel-tabs" aria-label="Media editors"><button aria-pressed={kind==="video"} onClick={()=>setKind("video")}>Video</button><button aria-pressed={kind==="image"} aria-label="Image Editor" onClick={()=>setKind("image")}>Image</button></div>{kind==="video"?<VideoEditor preview={preview}/>:null}<div hidden={kind!=="image"}><ImageEditor preview={preview}/></div></>;
-}
-
 
 function Calendar({items,refresh,openDraft}:{items:Content[];refresh:()=>Promise<void>;openDraft:(id:string)=>void}) {
   const {preferences}=useDevicePreferences();

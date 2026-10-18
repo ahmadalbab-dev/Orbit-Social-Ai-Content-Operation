@@ -23,29 +23,43 @@ test("light default keeps the auth form compact while widening only the hero", a
   ).toBe(true);
 });
 
-for (const size of [{width:1440,height:1000},{width:390,height:844}]) {
-  test(`complete navigation moves from header to floating after scroll at ${size.width}px`, async ({page})=>{
-    await page.setViewportSize(size);await page.goto("/preview");
-    const row=page.locator(".workspace-navigation"),nav=page.getByRole("navigation",{name:"Workspace",exact:true});
-    await expect(row).toHaveAttribute("data-floating","false");
-    await expect(nav.getByRole("button")).toHaveCount(6);
-    for(const name of ["Home","Studio","Media","Calendar","Channels","Settings"])await expect(nav.locator(".reference-dock-label",{hasText:name})).toBeVisible();
-    await expect(page.getByRole("button",{name:"Open navigation",exact:true})).toHaveCount(0);
-    await expect(page.locator(".current-workspace-name")).toHaveText("Preview workspace");
-    const staticBox=await nav.boundingBox();
-    await page.evaluate(()=>window.scrollTo({top:450,behavior:"instant"}));
-    await expect(row).toHaveAttribute("data-floating","true");
-    const floatingBox=await nav.boundingBox();expect(floatingBox!.y).toBeLessThan(30);expect(floatingBox!.height).toBeLessThan(staticBox!.height);
-    for(const button of await nav.getByRole("button").all())await expect(button).toBeVisible();
-    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-    await nav.getByRole("button",{name:"Workspace Settings",exact:true}).click();
-    await expect(page.getByRole("heading",{name:"Your workspace. Your way.",exact:true})).toBeVisible();
-    await expect(row).toHaveAttribute("data-floating","false");
-    await nav.getByRole("button",{name:"Video Editor",exact:true}).click();
-    await expect(nav.getByRole("button",{name:"Video Editor",exact:true})).toHaveAttribute("aria-current","page");
-  });
-}
-test("every page retains the animated Orbit mark and reduced-motion override",async({page})=>{
+test('desktop navigation hides on scroll and opens an accessible bottom-right menu', async ({page},testInfo)=>{
+  await page.setViewportSize({width:1440,height:1000});await page.goto('/preview');
+  const nav=page.getByRole('navigation',{name:'Workspace',exact:true});
+  await expect(nav.getByRole('button')).toHaveCount(6);
+  await expect(page.locator('.current-workspace-name')).toHaveText('Preview workspace');
+  await page.evaluate(()=>window.scrollTo({top:500,behavior:'instant'}));
+  const launcher=page.getByRole('button',{name:'Open navigation',exact:true});
+  await expect(launcher).toBeVisible();await expect(launcher).toHaveAttribute('aria-expanded','false');
+  const box=(await launcher.boundingBox())!;expect(box.x).toBeGreaterThan(1200);expect(box.y).toBeGreaterThan(800);
+  await launcher.focus();await page.keyboard.press('Enter');
+  const menu=page.getByRole('navigation',{name:'Workspace menu',exact:true});
+  await expect(menu).toBeVisible();await expect(menu.getByRole('button')).toHaveCount(6);
+  await page.screenshot({path:testInfo.outputPath('desktop-collapsed-menu-open.png')});
+  await page.keyboard.press('Escape');await expect(menu).toBeHidden();await expect(launcher).toBeFocused();
+  await launcher.click();await menu.getByRole('button',{name:'Workspace Settings',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Your workspace. Your way.',exact:true})).toBeVisible();
+  await expect(menu).toBeHidden();
+  await expect(nav.getByRole('button',{name:'Workspace Settings',exact:true})).toBeFocused();
+  await expect(page.getByRole('button',{name:'Open navigation',exact:true})).toBeHidden();
+});
+for(const size of [{width:390,height:844},{width:320,height:568}]) test(`mobile bottom navigation remains static and reserves content at ${size.width}px`,async({page},testInfo)=>{
+  await page.setViewportSize(size);await page.goto('/preview');
+  const nav=page.getByRole('navigation',{name:'Workspace',exact:true});
+  await expect(nav.getByRole('button')).toHaveCount(6);
+  const before=(await nav.boundingBox())!;expect(before.y+before.height).toBeLessThanOrEqual(size.height+1);expect(before.y).toBeGreaterThan(size.height-120);
+  await page.evaluate(()=>window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'}));
+  await page.screenshot({path:testInfo.outputPath(`mobile-navigation-${size.width}px.png`)});
+  const after=(await nav.boundingBox())!;expect(Math.abs(after.y-before.y)).toBeLessThanOrEqual(1);
+  await expect(page.getByRole('button',{name:'Open navigation',exact:true})).toBeHidden();
+  await nav.getByRole('button',{name:'Workspace Settings',exact:true}).click();
+  await page.evaluate(()=>window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'}));
+  const lastLink=page.locator('.orbit-footer').getByRole('link',{name:'Terms',exact:true});await lastLink.scrollIntoViewIfNeeded();
+  const last=(await lastLink.boundingBox())!,bottom=(await nav.boundingBox())!;
+  expect(last.y+last.height).toBeLessThanOrEqual(bottom.y);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+test("every page retains the animated Orbit mark and reduced-motion override",async({page},testInfo)=>{
  await page.goto("/preview");const ellipse=page.locator(".workspace-brand .orbit-mark ellipse");
  await expect(ellipse).toHaveCSS("animation-name","orbit-logo-ring");
  await page.getByRole("button",{name:"Workspace Settings",exact:true}).click();
