@@ -39,16 +39,26 @@ test("reload restores the selected workspace from HttpOnly refresh cookie and si
  await expect(page.getByRole('region',{name:'Workspace session',exact:true})).toBeHidden();
  const refreshCookie=(await context.cookies('http://localhost:3000/api/auth/session')).find(cookie=>cookie.name==='orbit-refresh');expect(refreshCookie?.httpOnly).toBe(true);expect(refreshCookie?.sameSite).toBe('Strict');
  expect(await page.evaluate(()=>document.cookie)).not.toContain('synthetic-refresh');
- await page.reload();await expect(page.locator('.current-workspace-name')).toHaveText('Orbit Verification');
+ async function reloadSavedSession() {
+  const restored = page.waitForResponse(response => response.url().endsWith('/api/auth/session') && response.request().method()==='POST' && response.request().postDataJSON().action==='restore' && response.status()===200);
+  await page.reload({waitUntil:'load'});
+  await (await restored).finished();
+  await expect(page.getByRole('status').filter({hasText:'Restoring your session…'})).toBeHidden();
+ }
+ await reloadSavedSession();
+ await expect(page.locator('.current-workspace-name')).toHaveText('Orbit Verification');
  expect(rotation).toBeGreaterThanOrEqual(2);expect(sessionActions).toContain('establish');
  const storage=await page.evaluate(()=>({local:Object.values(localStorage),session:Object.values(sessionStorage)}));
  expect(JSON.stringify(storage)).not.toMatch(/synthetic-(access|refresh|password)|synthetic-initial-refresh/);
- await page.goto('/editor/image');
+ await selectWorkspaceDestination(page,'Video Editor');
+ const startImage=page.getByRole('link',{name:'Start image editing',exact:true});
+ await expect(startImage).toBeVisible();
+ await Promise.all([page.waitForURL('**/editor/image',{waitUntil:'load'}),startImage.click()]);
  await expect(page.locator('.editor-workspace')).toBeVisible();
  await expect(page.getByRole('navigation',{name:'Workspace',exact:true})).toHaveCount(0);
  await expect(page.getByRole('form',{name:'Sign in to Orbit'})).toHaveCount(0);
- await page.reload();await expect(page.locator('.editor-workspace')).toBeVisible();
- await page.getByRole('link',{name:'Back to media',exact:true}).click();
+ await reloadSavedSession();await expect(page.locator('.editor-workspace')).toBeVisible();
+ await Promise.all([page.waitForURL('**/?view=video',{waitUntil:'load'}),page.getByRole('link',{name:'Back to media',exact:true}).click()]);
  await expect(page).toHaveURL(/\/\?view=video$/);
  await expect(page.locator('.current-workspace-name')).toHaveText('Orbit Verification');
  await expect(page.getByRole('link',{name:'Start image editing',exact:true})).toBeVisible();
