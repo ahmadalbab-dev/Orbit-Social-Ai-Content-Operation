@@ -22,7 +22,8 @@ for (const kind of ['Video', 'Image']) test(`${kind} mobile tools scroll sideway
   await input.scrollIntoViewIfNeeded();
   const preview = page.locator(kind === 'Image' ? '.image-interactive-stage' : '.video-stage');
   const bounds = (await preview.boundingBox())!, bar = (await tools.boundingBox())!;
-  expect(bounds.y).toBeGreaterThanOrEqual(0);
+  const navigation = (await page.getByRole('navigation', { name: 'Workspace', exact: true }).boundingBox())!;
+  expect(bounds.y).toBeGreaterThanOrEqual(navigation.y + navigation.height);
   expect(bounds.y + bounds.height).toBeLessThan(bar.y);
   expect(bar.y + bar.height).toBeLessThanOrEqual(844);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

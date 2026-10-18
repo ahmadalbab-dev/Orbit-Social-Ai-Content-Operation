@@ -13,7 +13,8 @@
  .mobile-media-editor .image-slide-strip{scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
  .mobile-media-editor .image-slide-strip button{flex-shrink:0;scroll-snap-align:start;min-height:44px}
  .mobile-media-editor .image-slide-strip canvas{width:32px;height:40px;object-fit:contain;border-radius:4px}
- .mobile-media-editor .image-preview-card{top:6px}
+ .mobile-media-editor .video-grid > .video-canvas{top:calc(82px + env(safe-area-inset-top,0px))}
+ .video-composer .video-controls{max-height:30dvh}
  .mobile-media-editor .video-canvas{max-width:100%}
  .mobile-media-editor .image-slide-actions{display:none}
  .mobile-media-editor .image-slide-strip span{min-width:18px}
