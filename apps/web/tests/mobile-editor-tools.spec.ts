@@ -15,7 +15,7 @@ for (const size of [{ width: 390, height: 844 }, { width: 320, height: 568 }, { 
     } else {
       const png = await page.evaluate(() => {
         const canvas = document.createElement('canvas');canvas.width = 1600;canvas.height = 400;
-        const ctx=canvas.getContext('2d')!;ctx.fillStyle='#f5c788';ctx.fillRect(0,0,400,600);ctx.fillStyle='#22565b';ctx.fillRect(40,60,320,330);ctx.fillStyle='#f8f0df';ctx.fillRect(80,110,240,230);ctx.fillStyle='#b8543e';ctx.beginPath();ctx.arc(200,225,70,0,Math.PI*2);ctx.fill();return canvas.toDataURL('image/png').split(',')[1];
+        const ctx=canvas.getContext('2d')!;ctx.fillStyle='#f5c788';ctx.fillRect(0,0,1600,400);for(let column=0;column<4;column++){const x=column*400;ctx.fillStyle=column%2?'#b8543e':'#22565b';ctx.fillRect(x+24,24,352,352);ctx.fillStyle='#f8f0df';ctx.fillRect(x+64,64,272,272);ctx.fillStyle=column%2?'#22565b':'#b8543e';ctx.beginPath();ctx.arc(x+200,200,85,0,Math.PI*2);ctx.fill();}return canvas.toDataURL('image/png').split(',')[1];
       });
       await page.getByLabel('Choose image', { exact: true }).setInputFiles({name:'visual-acceptance.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});
       const imageCanvas = page.getByLabel('Edited image preview', { exact: true });

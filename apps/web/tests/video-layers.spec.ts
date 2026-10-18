@@ -32,7 +32,7 @@ test("video template and timed image layer export without an upload", async ({
   await selectEditorTool(page, "Video", "Adjust & text");
   await page.getByLabel("Trim length seconds", { exact: true }).fill("1");
   await selectEditorTool(page, "Video", "Layers");
-  await page.getByText("Image overlays · 0/6", { exact: true }).click();
+  await expect(page.getByLabel("Add video image overlays", { exact: true })).toBeVisible();
   await page
     .getByLabel("Add video image overlays", { exact: true })
     .setInputFiles({

@@ -1,3 +1,4 @@
+import {selectWorkspaceDestination} from './editor-helpers';
 import {expect,test} from "@playwright/test";
 test("reload restores the selected workspace from HttpOnly refresh cookie and signout removes persistence",async({page,context})=>{
  const sessionActions:string[]=[];let rotation=0;
@@ -26,7 +27,7 @@ test("reload restores the selected workspace from HttpOnly refresh cookie and si
  await page.getByLabel('Email address',{exact:true}).fill('tester@example.test');await page.getByLabel('Password',{exact:true}).fill('synthetic-password-only');await page.getByRole('button',{name:'Sign in',exact:true}).click();
  await expect(page.locator('.current-workspace-name')).toHaveText('My Office');
  await expect(page.getByRole('region',{name:'Workspace session',exact:true})).toBeHidden();
- await page.getByRole('button',{name:'Workspace Settings',exact:true}).click();
+ await selectWorkspaceDestination(page,'Workspace Settings');
  await page.getByRole('region',{name:'Workspace session',exact:true}).getByLabel('Workspace',{exact:true}).selectOption('work-qa');
  await expect(page.locator('.current-workspace-name')).toHaveText('Orbit Verification');
  await expect(page.getByRole('region',{name:'Workspace session',exact:true})).toBeHidden();
@@ -45,7 +46,7 @@ test("reload restores the selected workspace from HttpOnly refresh cookie and si
  await expect(page).toHaveURL(/\/\?view=video$/);
  await expect(page.locator('.current-workspace-name')).toHaveText('Orbit Verification');
  await expect(page.getByRole('link',{name:'Start image editing',exact:true})).toBeVisible();
- await page.getByRole('button',{name:'Workspace Settings',exact:true}).click();await page.getByRole('button',{name:'Sign out',exact:true}).click();
+ await selectWorkspaceDestination(page,'Workspace Settings');await page.getByRole('button',{name:'Sign out',exact:true}).click();
  await expect(page.getByRole('form',{name:'Sign in to Orbit'})).toBeVisible();
  await expect.poll(async()=>(await context.cookies('http://localhost:3000/api/auth/session')).some(cookie=>cookie.name==='orbit-refresh')).toBe(false);
  await page.reload();await expect(page.getByRole('form',{name:'Sign in to Orbit'})).toBeVisible();await expect(page.locator('.current-workspace-name')).toHaveCount(0);expect(sessionActions).toContain('delete');

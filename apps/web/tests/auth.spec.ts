@@ -82,7 +82,7 @@ test('signup returns to sign-in and confirmation is verified without auto-login'
   await page.getByLabel('Workspace name', { exact: true }).fill('My workspace');
   await page.getByRole('button', { name: 'Create workspace', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Orbit home', exact: true })).toBeVisible();
-  await expect(page.locator('.workspace-navigation')).toHaveAttribute('data-floating', 'false');
+  await expect(page.locator('.workspace-nav-slot')).toHaveAttribute('data-floating', 'false');
   await expect(page.locator('.current-workspace-name')).toHaveText('My workspace');
   await expect(page.getByRole('region', {name:'Workspace session',exact:true})).toBeHidden();
   await expect(page.getByRole('button', {name:'Sign out',exact:true})).toBeHidden();

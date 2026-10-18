@@ -35,6 +35,8 @@ test('desktop navigation hides on scroll and opens an accessible bottom-right me
   await launcher.focus();await page.keyboard.press('Enter');
   const menu=page.getByRole('navigation',{name:'Workspace menu',exact:true});
   await expect(menu).toBeVisible();await expect(menu.getByRole('button')).toHaveCount(6);
+  await menu.evaluate(async node => { await Promise.allSettled(node.getAnimations({subtree:true}).map(animation => animation.finished)); });
+  await expect(menu).toHaveCSS('opacity','1');
   await page.screenshot({path:testInfo.outputPath('desktop-collapsed-menu-open.png')});
   await page.keyboard.press('Escape');await expect(menu).toBeHidden();await expect(launcher).toBeFocused();
   await launcher.click();await menu.getByRole('button',{name:'Workspace Settings',exact:true}).click();
