@@ -46,10 +46,11 @@ test("local image edits export from preview without sign-in or upload", async ({
     return canvas.toDataURL("image/png").split(",")[1];
   });
   await page.getByLabel("Choose image", { exact: true }).setInputFiles({ name: "fixture.png", mimeType: "image/png", buffer: Buffer.from(png, "base64") });
-  await page.getByText("Adjust image and text", {exact:true}).click();
+  await page.getByRole("navigation",{name:"Image editing tools"}).getByRole("button",{name:"Adjust & text",exact:true}).click();
   await expect(page.getByRole("button", { name: "Rotate image" })).toBeEnabled();
   await page.getByRole("button", { name: "Rotate image" }).click();
   await page.getByLabel("Image crop", { exact: true }).selectOption("1:1");
+  await page.getByRole("navigation",{name:"Image editing tools"}).getByRole("button",{name:"Export",exact:true}).click();
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export image", exact: true }).click();
   expect((await download).suggestedFilename()).toBe("orbit-slide-01.png");

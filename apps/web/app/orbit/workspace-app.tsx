@@ -410,6 +410,7 @@ export function WorkspaceApp() {
           <label className="field">
             Workspace
             <select
+              aria-label="Workspace"
               value={selected}
               onChange={(e) => select(e.target.value)}
               disabled={busy}

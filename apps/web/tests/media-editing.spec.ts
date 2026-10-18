@@ -32,6 +32,7 @@ for (const width of [390, 1440]) test(`custom video calendar supports choosing a
   await page.setViewportSize({ width, height: 844 });
   await page.goto('/preview');
   await page.getByRole('button', { name: 'Video Editor', exact: true }).click();
+  if(width === 390) await page.getByRole('navigation', {name:'Video editing tools'}).getByRole('button',{name:'Adjust & text',exact:true}).click();
   const trigger = page.getByRole('button', { name: 'Video date', exact: true });
   await trigger.click();
   const dialog = page.getByRole('dialog', { name: 'Video date calendar', exact: true });

@@ -5,7 +5,7 @@ import {apiResponse} from './session-api';
 import {Button} from './ui';
 import {validEditorChanges,validEditorTiming,type ImageEditorChanges,type ImageEditorState,type VideoEditorChanges,type VideoEditorState,type EditorPlan} from './editor-ai-contract';
 import './editor-ai.css';
-type Props={disabled:boolean;preview:boolean;source?:()=>HTMLCanvasElement|null}&({kind:'image';current:ImageEditorState;onApply:(changes:ImageEditorChanges)=>void}|{kind:'video';current:VideoEditorState;onApply:(changes:VideoEditorChanges)=>void});
+type Props={disabled:boolean;preview:boolean;source?:()=>HTMLCanvasElement|null;onOpenMusic?:()=>void}&({kind:'image';current:ImageEditorState;onApply:(changes:ImageEditorChanges)=>void}|{kind:'video';current:VideoEditorState;onApply:(changes:VideoEditorChanges)=>void});
 export function EditorAiPanel(props:Props){
  const [usePreview,setUsePreview]=useState(false);
  const [instruction,setInstruction]=useState(''),[plan,setPlan]=useState<EditorPlan|null>(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
@@ -14,6 +14,7 @@ export function EditorAiPanel(props:Props){
  useEffect(()=>()=>pending.current?.abort(),[]);
  async function generate(){
   if(busy||props.disabled||props.preview||!instruction.trim())return;
+  if(props.onOpenMusic&&/\b(music|muzik|soundtrack|lagu)\b/i.test(instruction)&&/\b(add|insert|put|attach|tambah|masuk|masukkan|letak)\b/i.test(instruction)){props.onOpenMusic();setNotice('Choose a local music file in Music, then export the movie with your soundtrack.');setPlan(null);return;}
   const controller=new AbortController(),before=snapshot;pending.current=controller;setBusy(true);setNotice('');setPlan(null);
   try{
    let previewDataUrl:string|undefined;

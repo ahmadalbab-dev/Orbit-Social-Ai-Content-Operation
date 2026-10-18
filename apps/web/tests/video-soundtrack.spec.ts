@@ -33,9 +33,6 @@ test("uploaded music is encoded in the local edited video with measurable audio"
     if (r.method() === "POST") posts.push(r.url());
   });
   await page.goto("/preview");
-  await page
-    .getByRole("button", { name: "Open navigation", exact: true })
-    .click();
   await page.getByRole("button", { name: "Video Editor", exact: true }).click();
   await page
     .getByLabel("Choose video", { exact: true })

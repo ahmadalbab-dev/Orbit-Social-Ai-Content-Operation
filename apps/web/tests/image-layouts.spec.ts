@@ -2,7 +2,6 @@ import { expect, test } from '@playwright/test';
 
 test('equal split and photo stack arrange actual uploaded pixels and preserve the headline', async ({ page }) => {
   await page.goto('/preview');
-  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
   await page.getByRole('button', { name: 'Video Editor', exact: true }).click();
   await page.getByRole('button', { name: 'Image Editor', exact: true }).click();
   await page.getByRole('button', { name: 'Equal split', exact: true }).click();

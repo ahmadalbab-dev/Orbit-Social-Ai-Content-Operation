@@ -33,7 +33,10 @@ test('templates can start a composition on mobile without horizontal overflow', 
   await page.goto('/preview');
   await page.getByRole('button', { name: 'Video Editor', exact: true }).click();
   await page.getByRole('button', { name: 'Image Editor', exact: true }).click();
+  const tools = page.getByRole('navigation', { name: 'Image editing tools' });
+  await tools.getByRole('button', { name: 'Templates', exact: true }).click();
   await page.getByRole('button', { name: /Editorial poster/ }).click();
+  await tools.getByRole('button', { name: 'Export', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Export image', exact: true })).toBeEnabled();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

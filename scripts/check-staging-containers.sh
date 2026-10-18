@@ -26,6 +26,6 @@ assert.equal(ready.status,200);
 assert.equal((await fetch('http://127.0.0.1:3001/v1/workspaces')).status,401);
 const web=await fetch('http://127.0.0.1:3000');
 assert.equal(web.status,200);
-assert.match(await web.text(),/Welcome to Orbit\./);
-console.log('PASS built staging images start nonroot with private database and sign-in page');
+assert.match(await web.text(),/Restoring your session…/);
+console.log('PASS built staging images start nonroot with private database and session restoration shell');
 JS

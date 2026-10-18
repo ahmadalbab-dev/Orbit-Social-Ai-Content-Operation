@@ -27,6 +27,7 @@ import type {
   VideoEditorState,
 } from "./editor-ai-contract";
 import "./video-editor-advanced.css";
+import { MobileEditorToolbar, EditorToolPanel, videoTools, type EditorTool } from "./mobile-editor-toolbar";
 import { VideoAiPlanPanel } from "./video-ai-plan-panel";
 import { malaysiaDateKey } from "./calendar-data";
 import { DatePicker } from "../../components/ui/date-picker";
@@ -78,6 +79,7 @@ export function VideoEditor({
   active?: boolean;
   preview?: boolean;
 }) {
+  const [tool, setTool] = useState<EditorTool>("media");
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -549,7 +551,7 @@ export function VideoEditor({
     );
   }
   return (
-    <section className="workspace-view">
+    <section className="workspace-view mobile-media-editor">
       <SectionHeading
         number="02"
         label="Video"
@@ -821,6 +823,7 @@ export function VideoEditor({
           </p>
         </Card>
         <Card className="surface video-controls">
+<EditorToolPanel tool="media" active={tool}>
           <label className="upload-zone">
             <Upload size={24} aria-hidden="true" />
             <strong>Choose video</strong>
@@ -873,9 +876,11 @@ export function VideoEditor({
             <Upload size={17} aria-hidden="true" />
             {asset ? "Uploaded" : "Upload to workspace"}
           </Button>
+</EditorToolPanel><EditorToolPanel tool="ai" active={tool}>
           <EditorAiPanel
             key={source}
             kind="video"
+            onOpenMusic={() => { setTool("music"); setNotice("Choose a music file below to add a local soundtrack."); }}
             source={() => {
               const video = videoRef.current;
               if (!video || video.readyState < 2) return null;
@@ -917,11 +922,13 @@ export function VideoEditor({
               Undo AI edit
             </Button>
           ) : null}
+</EditorToolPanel><EditorToolPanel tool="music" active={tool}>
           <SoundtrackControls
             value={soundtrack}
             onChange={setSoundtrack}
             disabled={busy}
           />
+</EditorToolPanel><EditorToolPanel tool="layout" active={tool}>
           <section aria-label="Video template gallery">
             <h3>Start with a template</h3>
             <p className="review-help">
@@ -958,7 +965,8 @@ export function VideoEditor({
               ))}
             </div>
           </section>
-          <details className="small-details">
+</EditorToolPanel><EditorToolPanel tool="adjust" active={tool}>
+          <details className="small-details" open={tool === "adjust" || undefined}>
             <summary>Colour adjustments</summary>
             {(
               [
@@ -983,7 +991,8 @@ export function VideoEditor({
               </label>
             ))}
           </details>
-          <details className="small-details">
+</EditorToolPanel><EditorToolPanel tool="layers" active={tool}>
+          <details className="small-details" open={tool === "layers" || undefined}>
             <summary>Image overlays · {overlays.length}/6</summary>
             <p className="review-help">
               Add logos, product images or picture-in-picture stills. Times use
@@ -1078,6 +1087,7 @@ export function VideoEditor({
               </p>
             ) : null}
           </details>
+</EditorToolPanel><EditorToolPanel tool="adjust" active={tool}>
           <div className="two-fields">
             <label className="field">
               Speed
@@ -1246,6 +1256,7 @@ export function VideoEditor({
               </p>
             </>
           ) : null}
+</EditorToolPanel><EditorToolPanel tool="captions" active={tool}>
           <VideoAiPlanPanel
             key={`${source}:${start}:${duration}`}
             duration={duration}
@@ -1257,7 +1268,7 @@ export function VideoEditor({
               setNews(true);
             }}
           />
-          <details className="small-details">
+          <details className="small-details" open={tool === "captions" || undefined}>
             <summary>Timed captions</summary>
             <p>Times are relative to the trimmed clip. Up to 20 captions.</p>
             {captions.map((caption, index) => (
@@ -1340,6 +1351,7 @@ export function VideoEditor({
               </p>
             ) : null}
           </details>
+</EditorToolPanel><EditorToolPanel tool="export" active={tool}>
           <p className="review-help">
             Selected clip: {duration > 0 ? (duration / speed).toFixed(1) : "0"}{" "}
             seconds after speed adjustment. Speed, volume, rotate and flip are
@@ -1474,6 +1486,7 @@ export function VideoEditor({
             <Film size={17} aria-hidden="true" />
             {busy ? "Working…" : "Render MP4"}
           </Button>
+</EditorToolPanel>
           {notice ? (
             <p role="status" className="action-notice">
               {notice}
@@ -1567,6 +1580,7 @@ export function VideoEditor({
           </Button>
         </div>
       </div>
+      <MobileEditorToolbar kind="Video" value={tool} onChange={setTool} tools={videoTools}/>
     </section>
   );
 }

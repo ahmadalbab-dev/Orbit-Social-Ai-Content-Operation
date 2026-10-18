@@ -6,11 +6,11 @@ test('touch dragging edits uploaded layers while pinch and fit only affect the v
   const page = await context.newPage(), uploads: string[] = [];
   page.on('request', request => { if (request.method() === 'POST') uploads.push(request.url()); });
   await page.goto('/preview');
-  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
   await page.getByRole('button', { name: 'Video Editor', exact: true }).click();
   await page.getByRole('button', { name: 'Image Editor', exact: true }).click();
   const asset = async (color: string) => Buffer.from(await page.evaluate(color => { const canvas = document.createElement('canvas'); canvas.width = 200; canvas.height = 200; const ctx = canvas.getContext('2d')!; ctx.fillStyle = color; ctx.fillRect(0, 0, 200, 200); return canvas.toDataURL('image/png').split(',')[1]; }, color), 'base64');
   await page.getByLabel('Choose image', { exact: true }).setInputFiles({ name: 'base.png', mimeType: 'image/png', buffer: await asset('#ff0000') });
+  await page.getByRole('navigation',{name:'Image editing tools'}).getByRole('button',{name:'Layers',exact:true}).click();
   await page.getByLabel('Add image overlay', { exact: true }).setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: await asset('#0000ff') });
   await expect(page.getByLabel('Layer opacity', { exact: true })).toBeVisible();
   const canvas = page.getByLabel('Edited image preview', { exact: true });
@@ -31,6 +31,7 @@ test('touch dragging edits uploaded layers while pinch and fit only affect the v
   expect(await canvas.evaluate(node => (node as HTMLCanvasElement).toDataURL())).toBe(beforeZoom);
   await page.getByRole('button', { name: 'Fit image preview', exact: true }).click();
   await expect(page.getByLabel('Image preview zoom', { exact: true })).toHaveText('100%');
+  await page.getByRole('navigation',{name:'Image editing tools'}).getByRole('button',{name:'Export',exact:true}).click();
   const download = page.waitForEvent('download'); await page.getByRole('button', { name: 'Export image', exact: true }).click();
   const bytes = await readFile((await (await download).path())!); expect(bytes.readUInt32BE(16)).toBe(200); expect(bytes.readUInt32BE(20)).toBe(200);
   expect(uploads).toEqual([]); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
