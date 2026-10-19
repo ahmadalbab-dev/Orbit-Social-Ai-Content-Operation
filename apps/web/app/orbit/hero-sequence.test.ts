@@ -1,24 +1,40 @@
 import {describe,expect,it} from "vitest";
-import {AI_STUDIO_SCALE,codeCellOpacity,HERO_SCENE_MS,heroSequence} from "./hero-sequence";
-describe("shared-position Orbit hero sequence",()=>{
- it("holds each title for the nine-second reference scene cadence",()=>{
-  expect(HERO_SCENE_MS).toBe(9000);expect(AI_STUDIO_SCALE).toBe(.6);
+import {AI_STUDIO_SCALE,codeCellOpacity,HERO_DISSOLVE_MS,HERO_SCENE_MS,heroSequence} from "./hero-sequence";
+describe("continuous shared-position Orbit hero sequence",()=>{
+ it("keeps readable titles and the requested ai studio scale",()=>{
+  expect(AI_STUDIO_SCALE).toBe(.6);
   expect(heroSequence(1000)).toEqual({orbit:1,studio:0});
-  expect(heroSequence(10000)).toEqual({orbit:0,studio:1});
-  expect(heroSequence(19000)).toEqual({orbit:1,studio:0});
+  expect(heroSequence(HERO_SCENE_MS+1000)).toEqual({orbit:0,studio:1});
  });
- it("cross dissolves both directions without a blank frame",()=>{
-  for(const at of [7500,8000,8250,8500,8999,16500,17000,17250,17999]){
-   const state=heroSequence(at);expect(state.orbit+state.studio).toBeCloseTo(1);
+ it("dissolves both ways continuously including the loop boundary, without blank weights",()=>{
+  for(let time=0;time<=HERO_SCENE_MS*2;time+=17){
+   const state=heroSequence(time),next=heroSequence(time+17);
+   expect(state.orbit+state.studio).toBeCloseTo(1);
    expect(state.orbit).toBeGreaterThanOrEqual(0);expect(state.studio).toBeGreaterThanOrEqual(0);
+   expect(Math.abs(state.studio-next.studio)).toBeLessThan(.02);
   }
-  expect(heroSequence(8250)).toEqual({orbit:.5,studio:.5});
+  expect(heroSequence(HERO_SCENE_MS-HERO_DISSOLVE_MS/2)).toEqual({orbit:.5,studio:.5});
+  expect(heroSequence(HERO_SCENE_MS*2-HERO_DISSOLVE_MS/2)).toEqual({orbit:.5,studio:.5});
  });
- it("shows a stable Orbit title for reduced motion",()=>{expect(heroSequence(10000,true)).toEqual({orbit:1,studio:0});});
- it("dissolves individual code cells deterministically with bounded opacity",()=>{
-  expect(codeCellOpacity(0,2,3)).toBe(0);expect(codeCellOpacity(1,2,3)).toBe(1);
-  const samples=Array.from({length:20},(_,index)=>codeCellOpacity(.5,index,3));
-  expect(samples.every(value=>value>=0&&value<=1)).toBe(true);expect(new Set(samples).size).toBeGreaterThan(2);
-  expect(codeCellOpacity(.5,2,3)).toBe(codeCellOpacity(.5,2,3));
+ it("settles gently into each title rather than changing velocity suddenly",()=>{
+  for(const boundary of [HERO_SCENE_MS-HERO_DISSOLVE_MS,HERO_SCENE_MS,HERO_SCENE_MS*2-HERO_DISSOLVE_MS,HERO_SCENE_MS*2]){
+   expect(Math.abs(heroSequence(boundary-1).studio-heroSequence(boundary+1).studio)).toBeLessThan(.000001);
+  }
+ });
+ it("shows stable Orbit for reduced motion at every cycle phase",()=>{
+  for(const time of [0,8000,10000,17000,100000])expect(heroSequence(time,true)).toEqual({orbit:1,studio:0});
+ });
+ it("keeps each staggered code cell deterministic, monotonic and bounded",()=>{
+  const mids=new Set<number>();
+  for(let column=0;column<20;column++){
+   let previous=0;
+   expect(codeCellOpacity(0,column,3)).toBe(0);expect(codeCellOpacity(1,column,3)).toBe(1);
+   for(let step=0;step<=100;step++){
+    const value=codeCellOpacity(step/100,column,3);
+    expect(value).toBeGreaterThanOrEqual(previous);expect(value).toBeLessThanOrEqual(1);previous=value;
+   }
+   mids.add(codeCellOpacity(.5,column,3));
+  }
+  expect(mids.size).toBeGreaterThan(2);
  });
 });

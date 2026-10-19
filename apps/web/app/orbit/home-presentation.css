@@ -1,0 +1,13 @@
+/* Only Home uses this centered canvas; working pages retain their existing dimensions. */
+.orbit-shell .app-content.app-content-home{max-width:none}
+.orbit-shell .overview-view{width:100%;max-width:1440px;margin-inline:auto;min-width:0}
+.orbit-shell .overview-view .orbit-hero{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);grid-template-areas:"copy art";margin-inline:0;min-height:0;padding:clamp(24px,4vw,72px) clamp(20px,3vw,72px) clamp(40px,5vw,72px);align-items:center;gap:clamp(24px,3vw,48px)}
+.orbit-shell .overview-view .orbit-hero .orbit-artwork{grid-area:art;position:relative;inset:auto;z-index:0;width:100%;height:clamp(320px,30vw,580px)}
+.orbit-shell .overview-view .hero-intro{grid-area:copy;min-width:0;max-width:none}
+.orbit-shell .overview-view .hero-intro h1{font-size:clamp(2.6rem,3.6vw,5.75rem)}
+.orbit-shell .overview-view .home-launchpad{margin-block:32px 56px}
+.orbit-shell .overview-view .launchpad-actions button{min-width:0}
+.orbit-shell .overview-view .launchpad-actions strong,.orbit-shell .overview-view .launchpad-actions small{overflow-wrap:anywhere}
+@media(min-width:1920px){.orbit-shell .overview-view{width:70vw;max-width:none}}
+@media(max-width:1000px){.orbit-shell .overview-view .orbit-hero{grid-template-columns:minmax(0,1fr);grid-template-areas:"art" "copy";padding-top:0}.orbit-shell .overview-view .orbit-hero .orbit-artwork{height:clamp(250px,36vw,360px)}.orbit-shell .overview-view .hero-intro h1{font-size:clamp(2.2rem,7vw,3.8rem)}}
+@media(max-width:700px){.orbit-shell .overview-view .orbit-hero{padding-inline:0}.orbit-shell .overview-view .home-launchpad{margin-block:24px 40px}}
