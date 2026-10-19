@@ -42,6 +42,11 @@ for (const size of [{ width: 390, height: 844 }, { width: 320, height: 568 }, { 
       expect(bounds.y + bounds.height).toBeLessThanOrEqual(size.height + 1);
     }
     await selectEditorTool(page, kind, 'Adjust & text');
+    if (kind === 'Video') {
+      const news = page.getByRole('checkbox', { name: 'News report overlay', exact: true });
+      await expect(news).not.toBeChecked();
+      await news.check();
+    }
     const input = page.getByLabel(kind === 'Image' ? 'Image caption' : 'Video title', { exact: true });
     await input.fill('My mobile edit');
     await page.getByRole('button',{name:'Light mode',exact:true}).click();

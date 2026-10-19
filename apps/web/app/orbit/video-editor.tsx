@@ -994,7 +994,7 @@ export function VideoEditor({
                   type="range"
                   min={min}
                   max={max}
-                  step=".05"
+                  step=".01"
                   value={value}
                   disabled={busy}
                   onChange={(e) => setter(Number(e.target.value))}

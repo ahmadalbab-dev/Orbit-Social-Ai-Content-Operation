@@ -35,6 +35,7 @@ for (const width of [390, 1440]) test(`custom video calendar supports choosing a
   await page.setViewportSize({ width, height: 844 });
   await page.goto('/preview/editor/video');
   await selectEditorTool(page, 'Video', 'Adjust & text');
+  await page.getByRole('checkbox', { name: 'News report overlay', exact: true }).check();
   const trigger = page.getByRole('button', { name: 'Video date', exact: true });
   await trigger.click();
   const dialog = page.getByRole('dialog', { name: 'Video date calendar', exact: true });
