@@ -37,6 +37,16 @@ export function OrbitField({ paused, centered = false }: { paused: boolean; cent
         const values=stops[segment].map((value,channel)=>Math.round(value+(stops[segment+1][channel]-value)*fraction));
         return `rgb(${values.join(",")})`;
       });
+      // Cache a continuous silhouette beneath the code texture. Tinting preserves the
+      // masks' alpha coverage, and runs only after resize or an appearance change.
+      for (const drawing of [orbit!,studio!]) {
+        drawing.save();
+        drawing.globalCompositeOperation="source-in";
+        const gradient=drawing.createLinearGradient(width*.15,0,width*.95,height*.35);
+        gradient.addColorStop(0,colours[0]);gradient.addColorStop(.5,colours[12]);gradient.addColorStop(1,colours[23]);
+        drawing.fillStyle=gradient;drawing.fillRect(0,0,width,height);
+        drawing.restore();
+      }
     }
     function draw(now: number) {
       frame = 0;
@@ -60,6 +70,11 @@ export function OrbitField({ paused, centered = false }: { paused: boolean; cent
         const offset=(time*(.012+(index%3)*.0015))%row.period;
         context!.fillText(row.text,-offset,row.y);
       }
+      // The readable word comes from the cached full mask, not isolated tiny glyphs.
+      // Squared weights keep the dominant title clear without two opaque word ghosts.
+      const silhouette=dark ? .5 : .78;
+      if(weights.orbit>0){context!.globalAlpha=silhouette*weights.orbit*weights.orbit;context!.drawImage(orbitMask,0,0,width,height);}
+      if(weights.studio>0){context!.globalAlpha=silhouette*weights.studio*weights.studio;context!.drawImage(studioMask,0,0,width,height);}
       context!.font=`600 ${glyphSize}px JetBrains Mono, monospace`;
       context!.textBaseline="middle";
       const transitioning=weights.studio>0 && weights.studio<1;
