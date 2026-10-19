@@ -838,7 +838,7 @@ export function VideoEditor({
               accept="video/mp4,video/webm,video/quicktime"
               aria-label="Choose video"
               disabled={busy}
-              onChange={(event) => choose(event.target.files?.[0])}
+              onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; choose(file); }}
             />
           </label>
           {selected ? (
