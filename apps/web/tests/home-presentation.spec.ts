@@ -23,7 +23,7 @@ async function canvasHasArtwork(canvas: Locator) {
 }
 
 for (const width of [320, 390, 1440, 3840]) {
-  test(`Home presents a centered responsive hero and example posts at ${width}px`, async ({ page }, testInfo) => {
+  test(`Home presents a full-bleed responsive hero and example posts at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: width < 768 ? 844 : 1080 });
     await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
     await page.goto('/preview');
@@ -37,9 +37,14 @@ for (const width of [320, 390, 1440, 3840]) {
     expect(homeBox.x).toBeGreaterThanOrEqual(0);
     expect(homeBox.x + homeBox.width).toBeLessThanOrEqual(width + 1);
     expect(Math.abs(homeBox.x - (width - homeBox.width) / 2)).toBeLessThanOrEqual(2);
-    if (width >= 1920) expect(Math.abs(homeBox.width - width * .7)).toBeLessThanOrEqual(2);
-    else if (width < 768) expect(homeBox.width).toBeGreaterThanOrEqual(width * .88);
-    else expect(homeBox.width).toBeGreaterThan(width * .8);
+    // The artwork is a background spanning the entire viewport, not a narrow split card.
+    const fullHeroBox=(await hero.boundingBox())!,canvasBox=(await art.locator('canvas').boundingBox())!;
+    expect(Math.abs(fullHeroBox.x)).toBeLessThanOrEqual(2);
+    expect(Math.abs(fullHeroBox.width-width)).toBeLessThanOrEqual(2);
+    expect(Math.abs(canvasBox.x-fullHeroBox.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(canvasBox.width-fullHeroBox.width)).toBeLessThanOrEqual(1);
+    expect(Math.abs(canvasBox.height-fullHeroBox.height)).toBeLessThanOrEqual(1);
+    expect(await art.evaluate(node=>getComputedStyle(node).position)).toBe('absolute');
     const copyBox = (await copy.boundingBox())!, artBox = (await art.locator('canvas').boundingBox())!;
     const title = await art.locator('canvas').evaluate(node => JSON.parse((node as HTMLCanvasElement).dataset.titleBounds!) as { x: number; y: number; width: number; height: number });
     artBox.x += title.x;artBox.y += title.y;artBox.width = title.width;artBox.height = title.height;
@@ -56,6 +61,14 @@ for (const width of [320, 390, 1440, 3840]) {
     for (const mode of ['Light', 'Dark']) {
       await page.getByRole('button', { name: `${mode} mode`, exact: true }).click();
       await expect(page.locator('html')).toHaveAttribute('data-theme', mode.toLowerCase());
+      // Faint ambient code must not compete with the saturated code that forms the title.
+      const alpha = await art.locator('canvas').evaluate(node => {
+        const canvas=node as HTMLCanvasElement, pixels=canvas.getContext('2d')!.getImageData(0,0,canvas.width,canvas.height).data;
+        let faint=0,bold=0;
+        for(let at=3;at<pixels.length;at+=4){if(pixels[at]>0&&pixels[at]<25)faint++;if(pixels[at]>180)bold++;}
+        return {faint,bold};
+      });
+      expect(alpha.faint).toBeGreaterThan(0);expect(alpha.bold).toBeGreaterThan(25);
       await hero.screenshot({ path: testInfo.outputPath(`home-hero-${width}-${mode.toLowerCase()}.png`), animations: 'disabled' });
       await showcase.screenshot({ path: testInfo.outputPath(`home-posts-${width}-${mode.toLowerCase()}.png`), animations: 'disabled' });
     }

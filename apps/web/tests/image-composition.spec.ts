@@ -23,6 +23,7 @@ test('image overlays become exported pixels and carousel ZIP retains independent
   await selectEditorTool(page, 'Image', 'Media');
   await page.getByRole('button', { name: 'Duplicate slide', exact: true }).click();
   await selectEditorTool(page, 'Image', 'Templates');
+  await page.getByText('Explore classic layouts and colour finishes', { exact: true }).click();
   await page.getByRole('button', { name: /Words to keep/ }).click();
   await page.getByRole('button', { name: 'Edit slide 1', exact: true }).click();
   await expect.poll(() => pixel(50, 50)).toEqual([0, 0, 255, 255]);
@@ -38,6 +39,7 @@ test('templates can start a composition on mobile without horizontal overflow', 
   await page.goto('/preview/editor/image');
   const tools = page.getByRole('navigation', { name: 'Image editing tools' });
   await tools.getByRole('button', { name: 'Templates', exact: true }).click();
+  await page.getByText('Explore classic layouts and colour finishes', { exact: true }).click();
   await page.getByRole('button', { name: /Editorial poster/ }).click();
   await tools.getByRole('button', { name: 'Export', exact: true }).click();
   await selectEditorTool(page, 'Image', 'Export');

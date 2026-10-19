@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { Button } from "./ui";
+import { SoundLibrary } from "./sound-library";
 import {
   soundtrackGain,
   validateSoundtrack,
@@ -35,7 +36,7 @@ export function SoundtrackControls({
       }
   }, [value?.src]);
   async function choose(file: File | undefined) {
-    if (!file || disabled || loading) return;
+    if (!file || disabled || loading) return false;
     setNotice("");
     if (
       file.size > 20 * 1024 * 1024 ||
@@ -44,7 +45,7 @@ export function SoundtrackControls({
       setNotice(
         "Choose an MP3, WAV, M4A, AAC, OGG or WebM audio file up to 20 MB.",
       );
-      return;
+      return false;
     }
     setLoading(true);
     let context: AudioContext | undefined;
@@ -58,7 +59,7 @@ export function SoundtrackControls({
         throw new Error(
           "Use music up to 10 minutes and 30 million decoded samples.",
         );
-      if (!mounted.current) return;
+      if (!mounted.current) return false;
       const src = URL.createObjectURL(file);
       owned.current.add(src);
       onChange({
@@ -70,6 +71,7 @@ export function SoundtrackControls({
         fadeIn: 0.5,
         fadeOut: 0.5,
       });
+      return true;
     } catch (error) {
       if (mounted.current)
         setNotice(
@@ -77,6 +79,7 @@ export function SoundtrackControls({
             ? error.message
             : "This audio cannot be decoded. Try MP3 or WAV.",
         );
+      return false;
     } finally {
       await context?.close().catch(() => {});
       if (mounted.current) setLoading(false);
@@ -86,8 +89,8 @@ export function SoundtrackControls({
     <section className="local-soundtrack" aria-label="Local soundtrack">
       <h3>Music &amp; sound</h3>
       <p className="review-help">
-        Upload audio you can use. Music plays alongside the original clip and is
-        included in the exported movie. It stays on this device.
+        Choose audio from your device or search the sound library. Music is
+        included in exported movies; still-image exports do not contain audio.
       </p>
       <label className="field">
         Choose music
@@ -102,6 +105,7 @@ export function SoundtrackControls({
           }}
         />
       </label>
+      <SoundLibrary disabled={disabled || loading} onChooseFile={choose} />
       {loading ? <p role="status">Checking audio…</p> : null}
       {value ? (
         <>

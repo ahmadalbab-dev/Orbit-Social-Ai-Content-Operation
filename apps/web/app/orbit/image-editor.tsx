@@ -140,7 +140,7 @@ export function ImageEditor({ preview = false }: { preview?: boolean }) {
       if (overlay) {
         if (state.overlays.length >= 8) throw Error("Use up to eight image layers per slide.");
         const id = crypto.randomUUID(); patch({ overlays: [...state.overlays, { id, name: file.name, image: next, x: 50, y: 50, width: 40, opacity: 100 }] }); setSelectedLayer(id);
-      } else { patch({ image: next }); }
+      } else { patch(freshComposition(next)); setSelectedLayer(""); setViewport(fittedImageViewport); }
       return true;
     } catch (error) { if (request === generation.current) setNotice(error instanceof Error ? error.message : "This image could not be opened."); return false; }
     finally { if (request === generation.current) setLoading(false); }
@@ -220,10 +220,16 @@ export function ImageEditor({ preview = false }: { preview?: boolean }) {
         <p className="image-device-note">Original templates by Orbit. Your files stay on this device unless you choose an AI upload. Keep this page open until exported.</p>
       </Card>
       <Card className="surface video-controls">
-<EditorToolPanel tool="layout" active={tool}>    <div className="image-layout-gallery" aria-label="Uploaded photo layouts">{imageLayouts.map(layout => <button type="button" key={layout.id} disabled={busy} aria-label={layout.name} onClick={() => { try { const next = applyImageLayout(state, layout.id); snapshot(); patch(next); setNotice(`${layout.name} applied to your uploaded photos. Your text is unchanged.`); } catch (error) { setNotice(error instanceof Error ? error.message : "Choose the photos for this layout first."); } }}><ImageLayoutThumbnail state={state} layout={layout.id}/><span className="image-layout-copy"><strong>{layout.name}</strong><small>{layout.description}</small><em>{layout.photos}</em></span></button>)}</div>
+<EditorToolPanel tool="layout" active={tool}><p className="editor-panel-intro">Start neutral, then choose a layout for your own photos. Templates never replace your uploaded media.</p><h4 className="editor-control-group-title">Arrange your photos</h4>    <div className="image-layout-gallery" aria-label="Uploaded photo layouts">{imageLayouts.map(layout => <button type="button" key={layout.id} disabled={busy} aria-label={layout.name} onClick={() => { try { const next = applyImageLayout(state, layout.id); snapshot(); patch(next); setNotice(`${layout.name} applied to your uploaded photos. Your text is unchanged.`); } catch (error) { setNotice(error instanceof Error ? error.message : "Choose the photos for this layout first."); } }}><ImageLayoutThumbnail state={state} layout={layout.id}/><span className="image-layout-copy"><strong>{layout.name}</strong><small>{layout.description}</small><em>{layout.photos}</em></span></button>)}</div>
+    <h4 className="editor-control-group-title">Social starter kits</h4><div className="image-creative-presets">{[
+      { name: "Product launch", template: "product", ratio: "4:5", background: "#e8e3d9", textColor: "#282d28", description: "A framed product hero and editable launch headline." },
+      { name: "UGC cover", template: "poster", ratio: "9:16", background: "#eceee8", textColor: "#203b30", description: "Portrait cover with a clear opening headline." },
+      { name: "Editorial note", template: "quote", ratio: "4:5", background: "#e2e5e9", textColor: "#283341", description: "A quiet photo-led quote or journal cover." },
+    ].map(preset => <button type="button" key={preset.name} aria-pressed={state.template === preset.template && state.ratio === preset.ratio && state.background === preset.background} disabled={busy} onClick={() => { snapshot(); patch({ ...applyImageTemplate(state, preset.template), ratio: preset.ratio, background: preset.background, accent: preset.background, textColor: preset.textColor }); }}><strong>{preset.name}</strong><small>{preset.description}</small></button>)}</div>
+    <details className="image-explore-templates"><summary>Explore classic layouts and colour finishes</summary>
     <div className="image-template-strip" aria-label="Image templates">{imageTemplates.map(template => <button type="button" className={`image-template ${state.template === template.id ? "is-selected" : ""}`} key={template.id} disabled={busy} aria-pressed={state.template === template.id} onClick={() => { snapshot(); const next = applyImageTemplate(state, template.id); patch(next); }}><span className={`image-template-art template-${template.id}`} style={{ backgroundColor: template.color }}><i/><b>{template.id === "original" ? "+" : template.id === "quote" ? "“" : "Aa"}</b></span><strong>{template.name}</strong><small>{template.tag}</small></button>)}</div>
     <div className="image-style-presets" aria-label="Image style presets"><span>Finish the look</span>{imageStylePresets.map(preset => <button type="button" key={preset.id} disabled={busy} onClick={() => { snapshot(); patch(applyImageStylePreset(state, preset.id)); }}><i style={{ background: preset.color, borderColor: preset.ink }}/>{preset.name}</button>)}</div>
-</EditorToolPanel>
+</details></EditorToolPanel>
 <EditorToolPanel tool="ai" active={tool}>
         <EditorAiPanel key={slides[active].id} kind="image" source={()=>canvas.current} onOpenMusic={() => { setTool("music"); setNotice("Choose a music file below. Music is added locally when you export an image movie."); }} current={aiCurrent} disabled={busy} preview={preview} onApply={applyAi}/></EditorToolPanel>
         <fieldset disabled={busy} className="image-control-fieldset">

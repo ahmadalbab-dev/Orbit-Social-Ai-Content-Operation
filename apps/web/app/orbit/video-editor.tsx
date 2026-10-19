@@ -20,7 +20,7 @@ import {
 } from "./local-video-export";
 import { SoundtrackControls, useVideoSoundtrack } from "./soundtrack-controls";
 import { type LocalSoundtrack, validateSoundtrack } from "./local-soundtrack";
-import { videoTemplates } from "./video-templates";
+import { videoTemplates, creativeVideoTemplates, neutralVideoSettings } from "./video-templates";
 import { EditorAiPanel } from "./editor-ai-panel";
 import type {
   VideoEditorChanges,
@@ -100,10 +100,11 @@ export function VideoEditor({
   const overlayLoading = useRef(false);
   const sourceGeneration = useRef(0);
   const [overlays, setOverlays] = useState<VideoImageOverlay[]>([]);
-  const [template, setTemplate] = useState("news");
+  const [template, setTemplate] = useState("clean");
   const [aiUndo, setAiUndo] = useState<{
     state: VideoEditorState;
     overlays: VideoImageOverlay[];
+    originalFrame: boolean;
   } | null>(null);
   const [brightness, setBrightness] = useState(1);
   const [contrast, setContrast] = useState(1);
@@ -118,12 +119,12 @@ export function VideoEditor({
   const [source, setSource] = useState("");
   const [selected, setSelected] = useState<File | null>(null);
   const [asset, setAsset] = useState<MediaAsset | null>(null);
-  const [title, setTitle] = useState(
-    "Pemandangan terkini di sekitar Kuala Lumpur",
-  );
+  const [title, setTitle] = useState("");
   const [date, setDate] = useState(() => malaysiaDateKey(new Date()));
-  const [news, setNews] = useState(true);
+  const [news, setNews] = useState(false);
   const [format, setFormat] = useState<RenderInput["format"]>("portrait");
+  const [originalFrame, setOriginalFrame] = useState(true);
+  const [sourceFrame, setSourceFrame] = useState({ width: 1280, height: 720, aspect: 16 / 9 });
   const [sourceDuration, setSourceDuration] = useState(0);
   const [start, setStart] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -246,7 +247,7 @@ export function VideoEditor({
       c.end > c.start &&
       c.end <= duration,
   );
-  const dimensions = formats[format];
+  const dimensions = originalFrame && source ? sourceFrame : formats[format];
   useVideoSoundtrack(videoRef, soundtrack, {
     source,
     start,
@@ -430,7 +431,7 @@ export function VideoEditor({
       );
       return;
     }
-    setAiUndo({ state: aiCurrent, overlays });
+    setAiUndo({ state: aiCurrent, overlays, originalFrame });
     restoreAi(next);
     if (next.duration !== undefined && !next.captions)
       setCaptions((old) =>
@@ -465,7 +466,7 @@ export function VideoEditor({
   }
   function restoreAi(next: VideoEditorChanges) {
     if (next.template !== undefined) setTemplate(next.template);
-    if (next.format !== undefined) setFormat(next.format);
+    if (next.format !== undefined) { setFormat(next.format); setOriginalFrame(false); }
     if (next.speed !== undefined) setSpeed(next.speed);
     if (next.volume !== undefined) setVolume(next.volume);
     if (next.rotation !== undefined) setRotation(next.rotation);
@@ -480,6 +481,7 @@ export function VideoEditor({
     if (next.captions !== undefined) setCaptions(next.captions);
   }
   const canRender =
+    !originalFrame &&
     !!asset &&
     !!status?.configured &&
     validRange &&
@@ -516,6 +518,8 @@ export function VideoEditor({
       return;
     }
     setAiUndo(null);
+    setTemplate(neutralVideoSettings.template); setNews(neutralVideoSettings.news); setTitle(neutralVideoSettings.title);
+    setBrightness(1); setContrast(1); setSaturation(1); setOriginalFrame(true); setViewZoom(1);
     sourceGeneration.current += 1;
     overlayUrls.current.forEach((url) => URL.revokeObjectURL(url));
     overlayUrls.current.clear();
@@ -585,6 +589,8 @@ export function VideoEditor({
                 onLoadedMetadata={(event) => {
                   const length = event.currentTarget.duration;
                   if (Number.isFinite(length) && length > 0) {
+                    const rawWidth = event.currentTarget.videoWidth, rawHeight = event.currentTarget.videoHeight;
+                    if (rawWidth > 0 && rawHeight > 0) { const scale = Math.min(1, 1920 / Math.max(rawWidth, rawHeight)); setSourceFrame({ width: Math.max(2, Math.round(rawWidth * scale / 2) * 2), height: Math.max(2, Math.round(rawHeight * scale / 2) * 2), aspect: rawWidth / rawHeight }); if (originalFrame) setFormat(rawWidth / rawHeight > 1.2 ? "landscape" : rawWidth / rawHeight < .9 ? "portrait" : "square"); }
                     setSourceDuration(length);
                     setDuration(Math.min(length, maxDuration));
                   } else
@@ -915,6 +921,7 @@ export function VideoEditor({
               disabled={busy}
               onClick={() => {
                 restoreAi(aiUndo.state);
+                setOriginalFrame(aiUndo.originalFrame);
                 setOverlays(aiUndo.overlays);
                 setAiUndo(null);
               }}
@@ -934,15 +941,19 @@ export function VideoEditor({
             <p className="review-help">
               Original Orbit layouts. Every setting remains editable.
             </p>
+            <Button variant="outline" aria-pressed={originalFrame && template === "clean" && !news} disabled={busy || !source} onClick={() => { setTemplate("clean"); setNews(false); setTitle(""); setCaptions([]); setBrightness(1); setContrast(1); setSaturation(1); setSpeed(1); setRotation(0); setFlip(false); setOriginalFrame(true); setNotice("Original source framing and colour restored. Uploaded layers and music remain editable."); }}>Original source · no template</Button>
+            <div className="video-creative-presets">{creativeVideoTemplates.map(preset => <button type="button" key={preset.key} aria-pressed={!originalFrame && template === preset.template && format === preset.format && brightness === preset.brightness && contrast === preset.contrast && saturation === preset.saturation && speed === preset.speed} disabled={busy || !source} onClick={() => { setOriginalFrame(false); setTemplate(preset.template); setFormat(preset.format); setNews(false); setBrightness(preset.brightness); setContrast(preset.contrast); setSaturation(preset.saturation); setSpeed(preset.speed); if (preset.key === "ugc" && duration > 0 && !captions.length) setCaptions(["Your opening hook", "Show the detail", "Your next step"].map((text, index) => ({ text, start: index * duration / 3, end: (index + 1) * duration / 3 }))); if (preset.key === "photo-dump") { if (!overlays.length) setNotice("Photo sequence uses uploaded image layers. Add photos under Layers, then apply this template."); else { setOverlays(current => current.map((layer, index) => { const bitmap = overlayImages.current.get(layer.id), width = bitmap ? Math.min(.88, .88 / (9 / 16) * bitmap.naturalWidth / bitmap.naturalHeight) : .88; return { ...layer, x: (1 - width) / 2, y: .06, width, start: index * duration / current.length, end: (index + 1) * duration / current.length }; })); setNotice("Your uploaded photos are arranged in sequence. Adjust each timing under Layers."); } } else setNotice(`${preset.name} applied. Your source file stays unchanged; all text and timings are editable.`); }}><span aria-hidden="true" className={`video-preset-art preset-${preset.key}`}><i/><i/><i/></span><strong>{preset.name}</strong><small>{preset.description}</small></button>)}</div>
+            <details className="video-additional-templates"><summary>Explore frame and title styles</summary>
             <div className="video-template-gallery">
               {videoTemplates.map((t) => (
                 <button
                   type="button"
                   key={t.id}
                   disabled={busy}
-                  aria-pressed={template === t.id}
+                  aria-pressed={!originalFrame && template === t.id}
                   onClick={() => {
                     setTemplate(t.id);
+                    setOriginalFrame(false);
                     setFormat(t.format);
                     setNews(t.news);
                     setBrightness(t.brightness);
@@ -964,6 +975,7 @@ export function VideoEditor({
                 </button>
               ))}
             </div>
+            </details>
           </section>
 </EditorToolPanel><EditorToolPanel tool="adjust" active={tool}>
           <details className="small-details" open={tool === "adjust" || undefined}>
@@ -1158,12 +1170,11 @@ export function VideoEditor({
             Format
             <select
               aria-label="Video format"
-              value={format}
+              value={originalFrame ? "original" : format}
               disabled={busy}
-              onChange={(event) =>
-                setFormat(event.target.value as RenderInput["format"])
-              }
+              onChange={(event) => { if (event.target.value === "original") setOriginalFrame(true); else { setOriginalFrame(false); setFormat(event.target.value as RenderInput["format"]); } }}
             >
+              <option value="original">Original source frame</option>
               {Object.entries(formats).map(([value, entry]) => (
                 <option key={value} value={value}>
                   {entry.label}
@@ -1353,6 +1364,7 @@ export function VideoEditor({
           </details>
 </EditorToolPanel><EditorToolPanel tool="export" active={tool}>
           <p className="review-help">
+            {originalFrame ? "Original source frame is retained by local export (up to 1920px). Choose a standard format to enable a server render. " : ""}
             Selected clip: {duration > 0 ? (duration / speed).toFixed(1) : "0"}{" "}
             seconds after speed adjustment. Speed, volume, rotate and flip are
             applied by local export with image layers and colour. The server

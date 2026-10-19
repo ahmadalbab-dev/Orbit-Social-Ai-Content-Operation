@@ -22,6 +22,7 @@ test("video template and timed image layer export without an upload", async ({
     }),
   ).toBeEnabled();
   await selectEditorTool(page, "Video", "Templates");
+  await page.getByText("Explore frame and title styles", { exact: true }).click();
   await page.getByRole("button", { name: /Quiet cinema/ }).click();
   await expect(page.getByLabel("Video format", { exact: true })).toHaveValue(
     "landscape",

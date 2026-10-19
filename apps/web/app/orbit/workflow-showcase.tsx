@@ -218,7 +218,7 @@ export function WorkflowShowcase({
                     </span>
                     <span>{line.slice(0, count) || " "}</span>
                     {cursor ? (
-                      <span className="workflow-type-cursor">▍</span>
+                      <span className="workflow-type-cursor" aria-hidden="true">|</span>
                     ) : null}
                   </span>
                 );

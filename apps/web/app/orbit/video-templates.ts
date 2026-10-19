@@ -55,3 +55,13 @@ export const videoTemplates = [
     speed: 1,
   },
 ] as const;
+
+
+export const neutralVideoSettings = { template: "clean", news: false, title: "", brightness: 1, contrast: 1, saturation: 1, speed: 1, volume: 1, rotation: 0, flip: false } as const;
+/** Original editable presets, deliberately chosen by the user rather than applied on upload. */
+export const creativeVideoTemplates = [
+  { key: "showcase", template: "product", name: "Product showcase", description: "Square product frame, gentle contrast and an editable title area.", format: "square", brightness: 1.03, contrast: 1.08, saturation: 1.05, speed: 1 },
+  { key: "ugc", template: "captions", name: "UGC story", description: "Portrait frame with three editable hook, detail and next-step captions.", format: "portrait", brightness: 1, contrast: 1.04, saturation: 1, speed: 1 },
+  { key: "photo-dump", template: "clean", name: "Photo sequence", description: "Arrange your uploaded photo layers into consecutive portrait scenes.", format: "portrait", brightness: 1, contrast: 1, saturation: 1, speed: 1 },
+  { key: "editorial", template: "cinematic", name: "Editorial film", description: "Landscape frame, restrained colour and original playback speed.", format: "landscape", brightness: 1, contrast: 1.08, saturation: .85, speed: 1 },
+] as const;

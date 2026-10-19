@@ -1,13 +1,14 @@
-/* Only Home uses this centered canvas; working pages retain their existing dimensions. */
+/* Home keeps its edge-to-edge code field. Content sections below retain their reading width. */
 .orbit-shell .app-content.app-content-home{max-width:none}
-.orbit-shell .overview-view{width:100%;max-width:1440px;margin-inline:auto;min-width:0}
-.orbit-shell .overview-view .orbit-hero{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);grid-template-areas:"copy art";margin-inline:0;min-height:0;padding:clamp(24px,4vw,72px) clamp(20px,3vw,72px) clamp(40px,5vw,72px);align-items:center;gap:clamp(24px,3vw,48px)}
-.orbit-shell .overview-view .orbit-hero .orbit-artwork{grid-area:art;position:relative;inset:auto;z-index:0;width:100%;height:clamp(320px,30vw,580px)}
-.orbit-shell .overview-view .hero-intro{grid-area:copy;min-width:0;max-width:none}
-.orbit-shell .overview-view .hero-intro h1{font-size:clamp(2.6rem,3.6vw,5.75rem)}
+.orbit-shell .overview-view{width:100%;max-width:none;margin-inline:auto;min-width:0}
+.orbit-shell .overview-view>.orbit-hero{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-end;position:relative;min-height:clamp(760px,calc(100svh - 100px),1000px);margin:0 calc(-1 * var(--orbit-space));padding:clamp(420px,35vw,500px) clamp(24px,6vw,120px) 64px;gap:0;overflow:hidden;isolation:isolate}
+.orbit-shell .overview-view .orbit-hero .orbit-artwork{position:absolute;inset:0;z-index:-2;width:auto;height:auto}
+.orbit-shell .overview-view .orbit-hero::after{background:linear-gradient(0deg,var(--background),transparent 55%)}
+.orbit-shell .overview-view .hero-intro{min-width:0;max-width:860px;padding:0}
+.orbit-shell .overview-view .hero-intro h1{font-size:clamp(2.5rem,4.8vw,5.4rem)}
+.orbit-shell .overview-view>:not(.orbit-hero){width:100%;max-width:1440px;margin-inline:auto}
 .orbit-shell .overview-view .home-launchpad{margin-block:32px 56px}
 .orbit-shell .overview-view .launchpad-actions button{min-width:0}
 .orbit-shell .overview-view .launchpad-actions strong,.orbit-shell .overview-view .launchpad-actions small{overflow-wrap:anywhere}
-@media(min-width:1920px){.orbit-shell .overview-view{width:70vw;max-width:none}}
-@media(max-width:1000px){.orbit-shell .overview-view .orbit-hero{grid-template-columns:minmax(0,1fr);grid-template-areas:"art" "copy";padding-top:0}.orbit-shell .overview-view .orbit-hero .orbit-artwork{height:clamp(250px,36vw,360px)}.orbit-shell .overview-view .hero-intro h1{font-size:clamp(2.2rem,7vw,3.8rem)}}
-@media(max-width:700px){.orbit-shell .overview-view .orbit-hero{padding-inline:0}.orbit-shell .overview-view .home-launchpad{margin-block:24px 40px}}
+@media(min-width:1920px){.orbit-shell .overview-view>:not(.orbit-hero){width:70vw;max-width:none}}
+@media(max-width:700px){.orbit-shell .overview-view>.orbit-hero{min-height:max(710px,calc(100svh - 100px));padding:300px 24px 56px}.orbit-shell .overview-view .hero-intro h1{font-size:clamp(2.1rem,8.2vw,3.5rem)}.orbit-shell .overview-view .home-launchpad{margin-block:24px 40px}}

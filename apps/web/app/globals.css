@@ -365,10 +365,10 @@ body { transition:background-color .25s ease,color .25s ease; }
 .workspace-view .surface { animation:orbit-enter .5s ease both; }
 .workspace-view .surface:nth-child(2) { animation-delay:.06s; }
 .workspace-view .surface:nth-child(3) { animation-delay:.12s; }
-.cursor-mark { animation:orbit-cursor 2s steps(1) infinite; }
+.cursor-mark { width:.075em;min-width:2px;height:.9em;background:currentColor;opacity:1;animation:orbit-cursor .5s steps(1,end) infinite; }
 details[open]>*:not(summary),details[open] .setup-form { animation:orbit-enter .25s ease; }
 @keyframes orbit-enter { from { opacity:0;transform:translateY(8px); } to { opacity:1;transform:none; } }
-@keyframes orbit-cursor { 50% { opacity:.3; } }
+@keyframes orbit-cursor { 0%,100% { opacity:1; } 50% { opacity:0; } }
 html[data-motion="paused"] *,html[data-motion="paused"] *::before,html[data-motion="paused"] *::after { animation:none!important;transition:none!important;scroll-behavior:auto!important; }
 html[data-motion="paused"] .orbit-shell button:active,html[data-motion="paused"] .tool-link:hover,html[data-motion="paused"] .stat-block:hover { transform:none; }
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important;transition:none!important;scroll-behavior:auto!important; } .orbit-shell button:active,.tool-link:hover,.stat-block:hover { transform:none; } }
@@ -916,7 +916,7 @@ html[data-theme=light] .orbit-nav.reference-dock .reference-dock-icon[aria-curre
 /* Workflow examples type on screen; lights describe the example animation only. */
 .workflow-code-line { display:block;min-height:1.9em;white-space:pre; }
 .workflow-code-line>span:last-child { overflow-wrap:normal; }
-.workflow-type-cursor { display:inline-block;color:var(--primary);animation:workflow-caret .8s steps(2,end) infinite; }
+.workflow-type-cursor { display:inline-block;color:var(--primary);opacity:1;animation:orbit-cursor .5s steps(1,end) infinite; }
 .workflow-terminal-lights { display:inline-flex;align-items:center;gap:6px; }
 .workflow-terminal-lights i { display:block;width:7px;height:7px;border-radius:50%;background:var(--line); }
 .workflow-code-panel[data-state=waiting] .workflow-terminal-lights i:first-child { background:#cd8b63; }
@@ -930,7 +930,7 @@ html[data-theme=light] .orbit-nav.reference-dock .reference-dock-icon[aria-curre
 .workflow-stages li[data-state=active]::before { background:#c79343;animation:workflow-status-pulse 1.3s ease-in-out infinite; }
 .workflow-stages li[data-state=complete]::before { background:#6fb59a; }
 @keyframes workflow-status-pulse { 0%,100%{opacity:.5;box-shadow:0 0 0 0 transparent}50%{opacity:1;box-shadow:0 0 0 4px color-mix(in srgb,currentColor 10%,transparent)} }
-@keyframes workflow-caret { 50%{opacity:0} }
+
 /* Workflow explanations remain readable beside and below their titles. */
 .orbit-shell .workflow-list button { grid-template-columns:26px 26px minmax(0,1fr) 22px;gap:12px 18px;padding:22px 0; }
 .orbit-shell .workflow-list button>.workflow-number { grid-column:1;grid-row:1/3; }
