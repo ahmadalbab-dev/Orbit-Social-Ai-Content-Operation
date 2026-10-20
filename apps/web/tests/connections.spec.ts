@@ -39,6 +39,9 @@ test('workspace owner can open official provider consent through the authenticat
  });
  await page.route('https://threads.com/oauth/authorize?*',route=>route.fulfill({status:200,contentType:'text/html',body:'<h1>Official consent navigation fixture</h1>'}));
  await page.goto('/?view=connections');
+ // Workspace bootstrap may replace the initial shell. Wait for its authenticated
+ // status before interacting, rather than clicking a shell that is being replaced.
+ await expect(page.locator('.connection-card.threads')).toContainText('Ready to connect');
  await page.getByRole('button',{name:'Connect threads',exact:true}).click();
  const dialog=page.getByRole('dialog',{name:'Connect Threads',exact:true});
  await expect(dialog.getByText('Ready for your authorisation',{exact:true})).toBeVisible();
