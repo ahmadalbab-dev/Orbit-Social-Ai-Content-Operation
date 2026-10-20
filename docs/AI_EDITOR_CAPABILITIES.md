@@ -41,3 +41,7 @@ No new dependency or image/video provider SDK is required. API keys stay server-
 - OAuth setup and exact callback contract: [META_SOCIAL_SETUP.md](META_SOCIAL_SETUP.md)
 
 Clipchamp's listed AI features include auto-compose, text-to-speech, subtitles, silence/noise removal and image background removal. Those listings are a feature reference, not evidence of unrestricted prompt-driven video editing or parity with this app.
+
+## Browser recording boundary observed in CI
+
+The Linux WebKit 26.5 build in CI has no canvas recording support required by the existing local video exporter. Its real export tests are capability-skipped and a separate browser test must verify the existing unsupported-export message, preserved composition and usable Undo. Chromium must still produce and decode real media, including music and thunder. This is not evidence of physical iPhone Safari export support; that remains an explicit device acceptance check. No fake captureStream implementation or encoder replacement is used to make the tests pass.

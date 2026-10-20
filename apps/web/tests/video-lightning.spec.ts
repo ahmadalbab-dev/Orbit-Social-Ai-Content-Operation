@@ -3,10 +3,12 @@ import {join} from 'node:path';
 import {readFile} from 'node:fs/promises';
 import {selectEditorTool} from './editor-helpers';
 import {toneWav} from './audio-fixtures';
+const canRecord = (page:import('@playwright/test').Page) => page.evaluate(() => typeof MediaRecorder !== 'undefined' && typeof HTMLCanvasElement.prototype.captureStream === 'function' && ['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp8,opus','video/webm'].some(type => MediaRecorder.isTypeSupported(type)));
+
 
 for(const speed of [1,2])test(`local lightning + thunder survive actual export at speed ${speed} without provider calls`,async({page})=>{
  test.setTimeout(60000);const posts:string[]=[];page.on('request',r=>{if(r.method()==='POST')posts.push(r.url());});
- await page.goto('/preview/editor/video');await page.getByLabel('Choose video',{exact:true}).setInputFiles(join(__dirname,'fixtures','clip.mp4'));
+ await page.goto('/preview/editor/video');test.skip(!await canRecord(page),'This browser build cannot record a canvas; the separate unsupported-export test verifies its honest fallback.');await page.getByLabel('Choose video',{exact:true}).setInputFiles(join(__dirname,'fixtures','clip.mp4'));
  await selectEditorTool(page,'Video','Adjust & text');await page.getByLabel('Video speed',{exact:true}).selectOption(String(speed));
  await page.getByLabel('Video volume',{exact:true}).focus();await page.getByLabel('Video volume',{exact:true}).press('Home');
  if(speed===2){
@@ -50,6 +52,7 @@ test('stopping a temporary lightning preview leaves an ordinary export without t
  test.setTimeout(60000);
  const posts:string[]=[];page.on('request',request=>{if(request.method()==='POST')posts.push(request.url());});
  await page.goto('/preview/editor/video');
+ test.skip(!await canRecord(page),'This browser build cannot record a canvas; the separate unsupported-export test verifies its honest fallback.');
  await page.getByLabel('Choose video',{exact:true}).setInputFiles(join(__dirname,'fixtures','clip.mp4'));
  await selectEditorTool(page,'Video','AI editor');
  await page.getByRole('button',{name:'Prepare lightning + thunder',exact:true}).click();
@@ -80,4 +83,24 @@ test('stopping a temporary lightning preview leaves an ordinary export without t
   return Math.max(...after.map((value,index)=>Math.abs(value-before[index])));
  },{exported:bytes.toString('base64'),original:(await readFile(join(__dirname,'fixtures','clip.mp4'))).toString('base64')});
  expect(difference).toBeLessThan(6);expect(posts).toEqual([]);
+});
+
+
+test('a browser without local recording reports the limit and keeps the video editor usable',async({page})=>{
+ await page.goto('/preview/editor/video');
+ test.skip(await canRecord(page),'The actual encoder/export path is checked by the export tests in recording-capable browsers.');
+ const posts:string[]=[];page.on('request',request=>{if(request.method()==='POST')posts.push(request.url());});
+ await page.getByLabel('Choose video',{exact:true}).setInputFiles(join(__dirname,'fixtures','clip.mp4'));
+ await selectEditorTool(page,'Video','AI editor');
+ await page.getByRole('button',{name:'Prepare lightning + thunder',exact:true}).click();
+ await page.getByRole('button',{name:'Apply lightning + thunder',exact:true}).click();
+ await selectEditorTool(page,'Video','Export');
+ await page.getByRole('button',{name:'Export edited video locally',exact:true}).click();
+ await expect(page.getByRole('status').filter({hasText:/Local video export is unavailable|cannot encode MP4 or WebM/})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Export edited video locally',exact:true})).toBeEnabled();
+ await selectEditorTool(page,'Video','AI editor');
+ await page.getByRole('button',{name:'Undo lightning edit',exact:true}).click();
+ await expect(page.getByText('Lightning + synthesized thunder active.',{exact:true})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Prepare lightning + thunder',exact:true})).toBeEnabled();
+ expect(posts).toEqual([]);
 });
