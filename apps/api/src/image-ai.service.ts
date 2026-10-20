@@ -5,6 +5,8 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import {
+  GEMINI_IMAGE_MODEL,
+  GeminiImageEditor,
   HF_IMAGE_MODEL,
   HuggingFaceImageEditor,
   validateImageEdit,
@@ -21,12 +23,19 @@ export class ImageAiService {
     private readonly db: DatabaseService,
     private readonly billing: BillingService,
   ) {}
+  private imageConfig() {
+    const selected = process.env.AI_IMAGE_PROVIDER ?? "huggingface";
+    const provider = selected === "gemini" || selected === "huggingface" ? selected : null;
+    const apiKey = provider === "gemini" ? process.env.GEMINI_API_KEY : provider === "huggingface" ? process.env.HF_TOKEN : undefined;
+    return { provider, apiKey, configured: !!provider && Boolean(apiKey?.trim()) && !/[\r\n]/.test(apiKey ?? "") };
+  }
   status() {
+    const config = this.imageConfig();
     return {
-      configured: Boolean(process.env.HF_TOKEN),
+      configured: config.configured,
       verified: false,
-      model: HF_IMAGE_MODEL,
-      provider: "fal-ai",
+      model: config.provider === "gemini" ? GEMINI_IMAGE_MODEL : config.provider === "huggingface" ? HF_IMAGE_MODEL : null,
+      provider: config.provider === "huggingface" ? "fal-ai" : config.provider,
       maxInputBytes: 2097152,
       maxOutputBytes: 4194304,
     };
@@ -49,9 +58,10 @@ export class ImageAiService {
       throw new BadRequestException(
         "Music cannot be embedded in a PNG or JPEG. Open Music & sound under Turn your image or carousel into a movie, upload audio, then export an image movie. No AI request was sent.",
       );
-    await this.reserveAttempt(identity);
+    const config = this.imageConfig();
+    await this.reserveAttempt(identity, config.configured);
     try {
-      return await new HuggingFaceImageEditor(process.env.HF_TOKEN!).edit(body);
+      return config.provider === "gemini" ? await new GeminiImageEditor(config.apiKey!).edit(body) : await new HuggingFaceImageEditor(config.apiKey!).edit(body);
     } catch (error) {
       throw aiServiceFailure(
         error,
@@ -61,7 +71,7 @@ export class ImageAiService {
   }
   async reserveAttempt(
     identity: RequestIdentity,
-    configured = Boolean(process.env.HF_TOKEN),
+    configured = this.imageConfig().configured,
   ) {
     requireRole(identity);
     if (!configured)

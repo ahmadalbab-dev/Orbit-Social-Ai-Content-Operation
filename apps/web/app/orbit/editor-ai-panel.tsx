@@ -5,15 +5,18 @@ import {apiResponse} from './session-api';
 import {Button} from './ui';
 import {validEditorChanges,validEditorTiming,type ImageEditorChanges,type ImageEditorState,type VideoEditorChanges,type VideoEditorState,type EditorPlan} from './editor-ai-contract';
 import './editor-ai.css';
-type Props={disabled:boolean;preview:boolean;source?:()=>HTMLCanvasElement|null;onOpenMusic?:()=>void}&({kind:'image';current:ImageEditorState;onApply:(changes:ImageEditorChanges)=>void}|{kind:'video';current:VideoEditorState;onApply:(changes:VideoEditorChanges)=>void});
+import {uploadedBackgroundPlan} from './local-editor-actions';
+type Props={assetIdentity?:string;disabled:boolean;preview:boolean;source?:()=>HTMLCanvasElement|null;onOpenMusic?:()=>void;onPrepareLightning?:()=>void}&({kind:'image';current:ImageEditorState;onApply:(changes:ImageEditorChanges)=>void}|{kind:'video';current:VideoEditorState;onApply:(changes:VideoEditorChanges)=>void});
 export function EditorAiPanel(props:Props){
  const [usePreview,setUsePreview]=useState(false);
  const [instruction,setInstruction]=useState(''),[plan,setPlan]=useState<EditorPlan|null>(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
- const pending=useRef<AbortController|null>(null),snapshot=JSON.stringify(props.current),current=useRef(snapshot),prepared=useRef('');current.current=snapshot;
+ const pending=useRef<AbortController|null>(null),snapshot=JSON.stringify([props.assetIdentity,props.current]),current=useRef(snapshot),prepared=useRef('');current.current=snapshot;
  useEffect(()=>{setPlan(null);return ()=>{pending.current?.abort();};},[snapshot]);
  useEffect(()=>()=>pending.current?.abort(),[]);
  async function generate(){
   if(busy||props.disabled||props.preview||!instruction.trim())return;
+  if(props.kind==='video'&&props.onPrepareLightning&&/\b(?:lightning|kilat)\b/i.test(instruction)&&/\b(?:thunder|guruh)\b/i.test(instruction)&&!/\b(?:not|never|don't|jangan|bukan)\b/i.test(instruction)){props.onPrepareLightning();setPlan(null);setNotice('Review the local lightning and thunder effect below. No AI request was sent.');return;}
+  if(props.kind==='image'){const local=uploadedBackgroundPlan(instruction,props.current);if(local){prepared.current=snapshot;setPlan(local);setNotice('Prepared locally from your uploaded images. No AI request was sent.');return;}}
   if(props.onOpenMusic&&/\b(music|muzik|soundtrack|lagu)\b/i.test(instruction)&&/\b(add|insert|put|attach|tambah|masuk|masukkan|letak)\b/i.test(instruction)){props.onOpenMusic();setNotice('Choose a local music file in Music, then export the movie with your soundtrack.');setPlan(null);return;}
   const controller=new AbortController(),before=snapshot;pending.current=controller;setBusy(true);setNotice('');setPlan(null);
   try{
@@ -35,7 +38,7 @@ export function EditorAiPanel(props:Props){
   {props.source?<label className="editor-preview-choice"><input type="checkbox" checked={usePreview} disabled={busy||props.preview} onChange={event=>{setUsePreview(event.target.checked);setPlan(null);}}/>Use current preview with AI <small>Sends one reduced preview to Groq for visual guidance when you prepare this edit. For video, only the current frame is shared.</small></label>:null}
   <div className="editor-ai-actions"><Button disabled={props.disabled||props.preview||busy||!instruction.trim()} onClick={()=>void generate()}><Sparkles size={16}/>{busy?'Preparing your edit…':'Prepare AI edit'}<ArrowUpRight size={16}/></Button>{busy?<Button variant="outline" onClick={()=>pending.current?.abort()}><X size={16}/>Cancel</Button>:null}</div>
   {plan?<div className="editor-ai-result"><h4>Your proposed edit</h4><p>{plan.summary}</p>{Object.keys(plan.changes).length?<><dl>{Object.entries(plan.changes).map(([key,value])=><div key={key}><dt>{key.replace(/([A-Z])/g,' $1')}</dt><dd>{Array.isArray(value)?`${value.length} ${key==='captions'?'timed captions':'layers'}`:String(value)}</dd></div>)}</dl><Button disabled={props.disabled||prepared.current!==snapshot} onClick={()=>{if(prepared.current!==current.current)return;if(props.kind==='image')props.onApply(plan.changes as ImageEditorChanges);else props.onApply(plan.changes as VideoEditorChanges);setPlan(null);setNotice('AI changes applied to your editor. Preview the result and use Undo to restore the previous edit.');}}>Apply AI edit</Button></>:<p>Your current edit is unchanged. Add the requested media, use the music controls, or clarify the instruction above.</p>}</div>:null}
-  <small>Your instruction and editable settings are sent. If preview sharing is enabled, one reduced preview is also sent to Groq. AI does not watch the full video or transcribe speech. Original files stay on this device. Generative image changes use the separate image connection. Each request uses your workspace AI quota.</small>
+  <small>Your instruction and editable settings are sent. If preview sharing is enabled, one reduced preview is also sent to Groq. AI does not watch the full video or transcribe speech. Original files stay on this device. Generative image changes use the separate image connection. Requests sent to an AI provider use your workspace AI quota. Supported uploaded-image background commands run locally without an AI request.</small>
   {props.preview?<p>Sign in to use the AI editor.</p>:props.disabled?<p>Choose media to start an AI edit.</p>:null}
   {notice?<p role="status" className="action-notice">{notice}</p>:null}
  </section>;

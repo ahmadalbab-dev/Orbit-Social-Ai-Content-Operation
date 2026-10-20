@@ -57,3 +57,55 @@ test('AI proposes layer changes, applies them together and restores the composit
   await expect(page.getByLabel('Layer opacity', { exact: true })).toHaveValue('100');
   await expect.poll(pixel).toEqual([0, 0, 255, 255]);
 });
+
+
+test('replacing same-aspect media rejects a pending preview-guided AI proposal without uploading local asset identities', async ({ page }) => {
+  let submitted: Record<string, unknown> | undefined;
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  let dispatched!: () => void;
+  const started = new Promise<void>(resolve => { dispatched = resolve; });
+  await page.route('**/api/auth/session', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'fixture-editor-token', expires_in: 3600, refreshable: true }) }));
+  await page.route('https://auth.orbit.test/auth/v1/user', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ email_confirmed_at: '2026-10-17T00:00:00Z' }) }));
+  await page.route('**/api/workspace/**', async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith('/media/editor-plan')) {
+      submitted = route.request().postDataJSON(); dispatched(); await held;
+      // Replacing the media may already have aborted the browser request.
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ summary: 'A proposal for the original red image.', changes: { caption: 'OLD IMAGE PROPOSAL' } }) }).catch(() => {});
+      return;
+    }
+    const body = path.endsWith('/workspaces') ? [{ id: 'fixture-workspace', name: 'Editor test', role: 'OWNER' }]
+      : path.endsWith('/integrations/status') ? { providers: {} }
+      : path.endsWith('/media/status') ? { configured: false, limits: { uploadBytes: 25000000, maxDuration: 120 } }
+      : path.endsWith('/ai/status') ? { configured: true }
+      : path.endsWith('/media/image-edit/status') ? { configured: false } : [];
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+  });
+  await page.goto('/editor/image');
+  const asset = async (color: string) => Buffer.from(await page.evaluate(color => {
+    const canvas = document.createElement('canvas'); canvas.width = canvas.height = 100;
+    const ctx = canvas.getContext('2d')!; ctx.fillStyle = color; ctx.fillRect(0, 0, 100, 100);
+    return canvas.toDataURL().split(',')[1];
+  }, color), 'base64');
+  await page.getByLabel('Choose image', { exact: true }).setInputFiles({ name: 'original.png', mimeType: 'image/png', buffer: await asset('#ff0000') });
+  await selectEditorTool(page, 'Image', 'AI editor');
+  await page.getByLabel('AI image editing instruction', { exact: true }).fill('Add a caption suitable for this photo.');
+  await page.getByLabel('Use current preview with AI').check();
+  await page.getByRole('button', { name: 'Prepare AI edit', exact: true }).click();
+  await started;
+  try {
+    expect(Object.keys(submitted!).sort()).toEqual(['current', 'instruction', 'kind', 'previewDataUrl']);
+    expect(submitted!.previewDataUrl).toMatch(/^data:image\/jpeg;base64,/);
+    expect(JSON.stringify(submitted!.current)).not.toMatch(/blob:|assetIdentity|original\.png/);
+    await selectEditorTool(page, 'Image', 'Media');
+    await page.getByLabel('Choose image', { exact: true }).setInputFiles({ name: 'replacement.png', mimeType: 'image/png', buffer: await asset('#0000ff') });
+    await expect.poll(() => page.getByLabel('Edited image preview', { exact: true }).evaluate(node => Array.from((node as HTMLCanvasElement).getContext('2d')!.getImageData(50, 50, 1, 1).data))).toEqual([0, 0, 255, 255]);
+  } finally { release(); }
+  await selectEditorTool(page, 'Image', 'AI editor');
+  await expect(page.getByRole('button', { name: 'Prepare AI edit', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Apply AI edit', exact: true })).toHaveCount(0);
+  await expect(page.getByText('A proposal for the original red image.', { exact: true })).toHaveCount(0);
+  await selectEditorTool(page, 'Image', 'Adjust & text');
+  await expect(page.getByLabel('Image caption', { exact: true })).toHaveValue('');
+});

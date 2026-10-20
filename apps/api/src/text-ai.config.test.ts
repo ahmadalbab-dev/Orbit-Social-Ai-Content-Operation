@@ -22,7 +22,7 @@ describe("explicit text provider configuration",()=>{
   });
   it("returns setup metadata without leaking keys or claiming live verification",()=>{
     vi.stubEnv("AI_TEXT_PROVIDER","groq");vi.stubEnv("GROQ_API_KEY","gsk_private_fixture");
-    const result=new AppController({} as never,{} as never,{} as never).aiStatus();
+    const result=new AppController({} as never,{} as never,{} as never,{} as never).aiStatus();
     expect(result).toEqual({configured:true,provider:"groq",verified:false});
     expect(JSON.stringify(result)).not.toContain("gsk_private_fixture");
   });

@@ -1,95 +1,68 @@
-# Connect Facebook, Instagram, Threads, and TikTok to Orbit Social
+# Meta account connections
 
-Orbit Social must use OAuth. Never paste a social password, access token, app secret, or recovery code into chat or the web interface.
+Orbit has a server OAuth connection flow for Facebook Pages, Instagram professional accounts linked to Facebook Pages, and Threads profiles. Live publishing stays disabled. This implementation does not connect TikTok and does not request publishing permissions.
 
-## 1. Prepare the public URLs
+Never paste social passwords, access tokens, app secrets or recovery codes into chat or the web interface. Set secrets directly in the backend environment or hosting secret manager.
 
-Meta and TikTok review normally require a public HTTPS application, privacy policy, terms page, and data-deletion instructions. Localhost is useful for development, but production review needs a real domain.
+## Exact callback URLs
 
-Orbit callback routes are reserved as:
+Register the **web application's** HTTPS routes, not the API POST endpoint:
 
-- Facebook and Instagram: `https://YOUR-API-DOMAIN/v1/oauth/meta/callback`
-- Threads: `https://YOUR-API-DOMAIN/v1/oauth/threads/callback`
-- TikTok: `https://YOUR-API-DOMAIN/v1/oauth/tiktok/callback`
+| App family | Registered redirect URI |
+| --- | --- |
+| Facebook / Instagram | `https://YOUR-WEB-DOMAIN/api/social-oauth/meta/callback` |
+| Threads | `https://YOUR-WEB-DOMAIN/api/social-oauth/threads/callback` |
 
-The real OAuth start/callback handlers must be deployed before these routes are submitted for platform review. Do not switch `SOCIAL_CONNECTOR_MODE` from `mock` to `live` until those handlers, encrypted token storage, token refresh, state verification, and account revocation are tested.
+The browser GET callback is a server bridge to the API. `WEB_URL` and `API_URL` must be bare HTTPS origins. Redirect variables must match these paths exactly; no trailing slash, query or fragment. API routes below include the configured `/v1` prefix.
 
-## 2. Configure the Meta developer app
-
-1. Open [Meta for Developers](https://developers.facebook.com/apps/) and create or select a Business-type app owned by the correct Meta Business Portfolio.
-2. Add the products/use cases needed for Facebook Login for Business, Facebook Pages, and Instagram publishing.
-3. Add the exact Orbit callback URL, app domain, privacy policy URL, terms URL, and data-deletion URL.
-4. Add yourself and any testers under App Roles while the app is in development mode.
-5. Connect a Facebook Page you administer.
-6. Use an Instagram Professional account (Business or Creator) connected to the appropriate Facebook Page.
-7. Request only the permissions required by the feature set. Typical publishing implementations need Page/account discovery, Page content publishing, Instagram basic access, and Instagram content publishing. Confirm the current names and review requirements in Meta's dashboard because they can change.
-8. Complete Business Verification and App Review before offering the connection to users outside app roles.
-
-Store the resulting values only in the backend environment:
+## Backend configuration
 
 ```dotenv
+WEB_URL=https://YOUR-WEB-DOMAIN
+API_URL=https://YOUR-API-DOMAIN
 META_APP_ID=
 META_APP_SECRET=
-META_REDIRECT_URI=https://YOUR-API-DOMAIN/v1/oauth/meta/callback
-```
-
-Official references: [Meta app dashboard](https://developers.facebook.com/apps/), [Instagram content publishing](https://developers.facebook.com/docs/instagram-platform/content-publishing/), and [Pages API](https://developers.facebook.com/docs/pages-api/).
-
-## 3. Configure Threads
-
-1. In Meta for Developers, add or configure the Threads API use case.
-2. Add your Threads profile as a tester while the app remains in development mode, then accept the tester invitation from the Threads account.
-3. Add the exact Threads OAuth redirect URL and deauthorization/data-deletion configuration.
-4. Request the minimum scopes needed for profile access, publishing, replies, and insights. Start with publishing only if that is the first Orbit feature.
-5. Generate a tester token and validate text publishing in sandbox before requesting access for public users.
-6. Complete any required App Review and business verification.
-
-Store the Threads configuration separately:
-
-```dotenv
+META_API_VERSION=
+META_REDIRECT_URI=https://YOUR-WEB-DOMAIN/api/social-oauth/meta/callback
 THREADS_APP_ID=
 THREADS_APP_SECRET=
-THREADS_REDIRECT_URI=https://YOUR-API-DOMAIN/v1/oauth/threads/callback
+THREADS_REDIRECT_URI=https://YOUR-WEB-DOMAIN/api/social-oauth/threads/callback
+TOKEN_ENCRYPTION_KEY=
+SOCIAL_CONNECTOR_MODE=mock
 ```
 
-Official references: [Threads API overview](https://developers.facebook.com/docs/threads/) and [Threads getting started](https://developers.facebook.com/docs/threads/get-started/).
+Pin `META_API_VERSION` to the currently supported `vNN.0` version selected for your Meta app; do not guess it from a sample. `TOKEN_ENCRYPTION_KEY` is a dedicated base64 encoding of 32 random bytes. Keep this stable: replacing it without a token migration prevents existing token decryption. Threads credentials are the separate Threads use-case app ID and secret, not automatically the regular Meta app credentials. The Threads API follows the app's default API version using Meta's current unversioned sample route.
 
-## 4. Configure TikTok
+## App setup and access
 
-1. Create a TikTok developer app at the [TikTok Developer Portal](https://developers.tiktok.com/).
-2. Add Login Kit and the Content Posting API.
-3. Configure the production web domain and exact redirect URL.
-4. Request the publishing scopes needed by Orbit. Direct posting commonly requires `video.publish`.
-5. Complete the Content Posting API audit. Until approval, keep Orbit in mock mode; unaudited posting may be restricted.
+1. Configure the appropriate Meta app/use cases for Facebook Login and Pages/Instagram access. Add the app domain and exact registered redirect above, privacy policy, terms and data deletion information.
+2. During development, add authorized testers/app roles. Instagram uses **Facebook Login**, requires a Business or Creator account linked to a Page, and discovers accounts through the Page list. It does not use Instagram Login.
+3. Configure the separate Threads API use case, its exact callback and tester invitations. Testers must accept invitations in Threads.
+4. Request only the implemented discovery permissions below. Complete applicable App Review, advanced access and business verification before offering connections outside app roles. Dashboard app configuration and approved access must be checked by the app owner.
+5. Sign into Orbit as a workspace Owner or Admin and connect through Channels. No manually pasted tokens are needed. Denied consent or provider errors return a generic failure; start again from Channels to retry.
 
-```dotenv
-TIKTOK_CLIENT_KEY=
-TIKTOK_CLIENT_SECRET=
-TIKTOK_REDIRECT_URI=https://YOUR-API-DOMAIN/v1/oauth/tiktok/callback
-```
+| Provider | Permissions requested | Account discovery |
+| --- | --- | --- |
+| Facebook | `pages_show_list`, `pages_read_engagement` | Managed Facebook Pages via `/me/accounts` |
+| Instagram | `pages_show_list`, `pages_read_engagement`, `instagram_basic` | Linked `instagram_business_account` for each Page |
+| Threads | `threads_basic` | Own profile via `/me?fields=id,username` |
 
-Official references: [Login Kit](https://developers.tiktok.com/doc/login-kit-overview) and [Content Posting API](https://developers.tiktok.com/doc/content-posting-api-get-started/).
+Orbit inspects the granted token's app ID, validity, expiry and scopes, verifies required Meta permissions, and stores granted scopes. The connection's expiry is the earlier positive provider token/data-access expiry. For Page tokens this is conservatively bounded by the authorizing user's grant; it is not a promise of a Page token's independent lifetime. Missing trustworthy expiry fails closed. A stored connection is not a live provider health check: revocation can invalidate a token earlier. Reconnect explicitly when expired or revoked. No refresh token, long-lived exchange or automatic refresh is claimed or performed.
 
-## 5. Safe activation order
+## Readiness and limits
 
-1. Deploy Orbit Web and API on HTTPS.
-2. Add all secrets using the hosting provider's secret manager.
-3. Implement and test OAuth state/PKCE where supported, callbacks, encrypted token storage, refresh, revocation, and audit logs.
-4. Connect developer/test accounts first.
-5. Publish a private or sandbox test from Orbit.
-6. Complete platform reviews.
-7. Connect the production accounts through Orbit's Connections screen.
-8. Change `SOCIAL_CONNECTOR_MODE=live` only after every platform test passes.
+The repository includes mocked provider tests for authorization boundaries, replay, expiry, route-family binding, provider failures, grant inspection, account discovery, encrypted storage and tenant status. These do not replace an owner-authorized consent smoke test against the real configured app. No real credentials, app review approval, live consent or production deployment is assumed.
 
-## Information Matt needs from you
+Apply the repository database migrations and configure both web and API environments before a controlled test deployment. Follow [the OAuth operations guide](SOCIAL_OAUTH.md) for the request contract and test procedure. Do not switch live publishing on: publishing authorization, token lifecycle/revocation handling and a separate end-to-end publishing validation remain outside this connection flow.
 
-Do not send secrets. Provide only:
+## Official references checked 2026-10-20
 
-- Meta App ID (not the secret).
-- Whether your Facebook Page and Instagram Professional account are already linked.
-- Your Threads username.
-- The production web domain and API domain you want to use.
-- Privacy policy, terms, and data-deletion page URLs, if already available.
-- TikTok developer app status when created.
+- [Instagram Platform overview](https://developers.facebook.com/documentation/instagram-platform/overview)
+- [Facebook Login for Business for Instagram](https://developers.facebook.com/documentation/instagram-platform/instagram-api-with-facebook-login/business-login-for-instagram)
+- [Meta Pages API](https://developers.facebook.com/docs/pages-api/)
+- [Threads access tokens and permissions](https://developers.facebook.com/docs/threads/get-started/get-access-tokens-and-permissions/)
+- [Meta's maintained Threads sample](https://github.com/fbsamples/threads_api)
+- [Official Threads request implementation](https://github.com/fbsamples/threads_api/blob/main/src/index.js)
+- [Official Threads sample environment](https://github.com/fbsamples/threads_api/blob/main/.env.template)
 
-App secrets and client secrets should be entered directly into the local `.env` file or deployment secret manager.
+The direct Meta developer documentation fetches returned HTTP 429 in this environment. Current Threads host, form token exchange, unversioned default and token-debug response fields were checked against the retrieved official `fbsamples/threads_api` source. Dashboard access, app-specific approval and real provider responses still require the owner's controlled test.

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ImageAiService } from "./image-ai.service";
-import { AiProviderError, HuggingFaceImageEditor } from "@sma/ai";
+import { AiProviderError, GeminiImageEditor, HuggingFaceImageEditor } from "@sma/ai";
 import type { DatabaseService } from "./database.service";
 import type { BillingService } from "./billing.service";
 const identity = {
@@ -119,4 +119,32 @@ describe("Image AI metering", () => {
       expect(ctx.updateMany).toHaveBeenCalledTimes(1);
     },
   );
+});
+
+describe('explicit Gemini image selection', () => {
+  it('reports selected provider/model without returning keys or implying a live verification', async () => {
+    vi.stubEnv('AI_IMAGE_PROVIDER', 'gemini'); vi.stubEnv('GEMINI_API_KEY', 'gemini_fixture'); vi.stubEnv('HF_TOKEN', 'hf_retained');
+    const status = setup().service.status(); expect(status).toMatchObject({ configured: true, provider: 'gemini', model: 'gemini-nano-banana-2.1', verified: false }); expect(JSON.stringify(status)).not.toContain('gemini_fixture'); expect(JSON.stringify(status)).not.toContain('hf_retained');
+  });
+  it('uses Gemini only after billing and quota, retaining the independent HF key without fallback', async () => {
+    vi.stubEnv('AI_IMAGE_PROVIDER', 'gemini'); vi.stubEnv('GEMINI_API_KEY', 'gemini_fixture'); vi.stubEnv('HF_TOKEN', 'hf_retained');
+    const ctx = setup(), output = { bytes: new Uint8Array([1]), contentType: 'image/png' };
+    const gemini = vi.spyOn(GeminiImageEditor.prototype, 'edit').mockResolvedValue(output), hf = vi.spyOn(HuggingFaceImageEditor.prototype, 'edit');
+    expect(await ctx.service.edit(identity, input)).toBe(output); expect(ctx.requirePaidAccess).toHaveBeenCalledOnce(); expect(ctx.updateMany).toHaveBeenCalledOnce(); expect(gemini).toHaveBeenCalledWith(input); expect(hf).not.toHaveBeenCalled();
+  });
+  it('keeps a failed Gemini attempt metered without trying the retained HF credentials', async () => {
+    vi.stubEnv('AI_IMAGE_PROVIDER', 'gemini'); vi.stubEnv('GEMINI_API_KEY', 'gemini_fixture'); vi.stubEnv('HF_TOKEN', 'hf_retained');
+    const ctx = setup(); vi.spyOn(GeminiImageEditor.prototype, 'edit').mockRejectedValue(new AiProviderError('credits_unavailable')); const hf = vi.spyOn(HuggingFaceImageEditor.prototype, 'edit');
+    await expect(ctx.service.edit(identity, input)).rejects.toThrow('credits are unavailable'); expect(ctx.updateMany).toHaveBeenCalledOnce(); expect(hf).not.toHaveBeenCalled();
+  });
+  it('fails closed before quota when explicit Gemini configuration is absent or invalid', async () => {
+    vi.stubEnv('HF_TOKEN', 'hf_retained'); vi.stubEnv('AI_IMAGE_PROVIDER', 'gemini'); vi.stubEnv('GEMINI_API_KEY', '');
+    const ctx = setup(); await expect(ctx.service.edit(identity, input)).rejects.toThrow('not configured'); expect(ctx.updateMany).not.toHaveBeenCalled(); expect(ctx.requirePaidAccess).not.toHaveBeenCalled();
+    vi.stubEnv('GEMINI_API_KEY', 'invalid\nkey'); expect(ctx.service.status().configured).toBe(false);
+    vi.stubEnv('AI_IMAGE_PROVIDER', 'other'); expect(ctx.service.status()).toMatchObject({ configured: false, provider: null, model: null });
+  });
+  it('preserves HF as default even when a Gemini key exists', () => {
+    vi.stubEnv('AI_IMAGE_PROVIDER', 'huggingface'); vi.stubEnv('HF_TOKEN', 'hf_retained'); vi.stubEnv('GEMINI_API_KEY', 'gemini_fixture');
+    expect(setup().service.status()).toMatchObject({ provider: 'fal-ai', configured: true, verified: false });
+  });
 });

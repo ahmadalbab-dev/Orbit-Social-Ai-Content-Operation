@@ -407,3 +407,16 @@ model BillingEvent {
   type String
   createdAt DateTime @default(now())
 }
+
+// Short-lived OAuth CSRF records. Only hashes of public nonces are retained.
+model SocialOAuthState {
+  id String @id
+  workspaceId String
+  userId String
+  provider String
+  browserHash String?
+  consumedAt DateTime?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([expiresAt])
+}

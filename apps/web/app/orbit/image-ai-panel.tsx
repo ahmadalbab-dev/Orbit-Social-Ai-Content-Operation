@@ -21,15 +21,16 @@ export function ImageAiPanel({
 }: Props) {
   const [prompt, setPrompt] = useState("");
   const [configured, setConfigured] = useState(false);
+  const [imageProvider, setImageProvider] = useState("the configured image provider");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const pending = useRef<AbortController | null>(null);
   useEffect(() => {
     let active = true;
     if (!preview)
-      void api<{ configured: boolean }>("/media/image-edit/status")
+      void api<{ configured: boolean; provider?: string; model?: string }>("/media/image-edit/status")
         .then((status) => {
-          if (active) setConfigured(status.configured);
+          if (active) { setConfigured(status.configured); setImageProvider(status.provider === "gemini" ? "Google Gemini (Nano Banana 2.1)" : status.provider === "fal-ai" ? "Hugging Face / fal-ai" : "the configured image provider"); }
         })
         .catch(() => {});
     return () => {
@@ -113,7 +114,7 @@ export function ImageAiPanel({
       </h3>
       <p>
         Describe a background, lighting or style change. Clicking Edit sends
-        this preview and your instruction to Hugging Face / fal-ai. Each attempt
+        this preview and your instruction to {imageProvider}. Each attempt
         uses your workspace AI quota and may incur provider charges.
       </p>
       <label className="field">

@@ -1,0 +1,20 @@
+import { expect, test } from '@playwright/test';
+import { selectEditorTool } from './editor-helpers';
+test('uploaded background preview applies real local pixels, cancels safely, exports and undoes without a provider call', async ({ page }) => {
+  const posts: string[] = []; page.on('request', request => { if (request.method() === 'POST') posts.push(request.url()); });
+  await page.goto('/preview/editor/image');
+  const asset = async (color: string) => Buffer.from(await page.evaluate(color => { const c = document.createElement('canvas'); c.width = 200; c.height = 200; const ctx = c.getContext('2d')!; ctx.fillStyle = color; ctx.fillRect(0, 0, 200, 200); return c.toDataURL().split(',')[1]; }, color), 'base64');
+  await page.getByLabel('Choose image', { exact: true }).setInputFiles({ name: 'foreground.png', mimeType: 'image/png', buffer: await asset('#ff0000') });
+  await selectEditorTool(page, 'Image', 'Layers');
+  await page.getByLabel('Add image overlay', { exact: true }).setInputFiles({ name: 'background.png', mimeType: 'image/png', buffer: await asset('#0000ff') });
+  const pixel = (x: number) => page.getByLabel('Edited image preview', { exact: true }).evaluate((canvas, x) => Array.from((canvas as HTMLCanvasElement).getContext('2d')!.getImageData(x, 100, 1, 1).data), x);
+  await expect.poll(() => pixel(100)).toEqual([0, 0, 255, 255]);
+  await page.getByRole('button', { name: 'Preview selected image as background', exact: true }).click();
+  await expect.poll(() => pixel(100)).toEqual([255, 0, 0, 255]); await expect.poll(() => pixel(5)).toEqual([0, 0, 255, 255]);
+  await page.getByRole('button', { name: 'Cancel background preview', exact: true }).click();
+  await expect.poll(() => pixel(100)).toEqual([0, 0, 255, 255]); await expect.poll(() => pixel(5)).toEqual([255, 0, 0, 255]);
+  await page.getByRole('button', { name: 'Preview selected image as background', exact: true }).click(); await page.getByRole('button', { name: 'Apply uploaded background', exact: true }).click();
+  await expect.poll(() => pixel(5)).toEqual([0, 0, 255, 255]); await expect.poll(() => pixel(100)).toEqual([255, 0, 0, 255]);
+  await selectEditorTool(page, 'Image', 'Export'); const downloaded = page.waitForEvent('download'); await page.getByRole('button', { name: 'Export image', exact: true }).click(); expect((await downloaded).suggestedFilename()).toBe('orbit-slide-01.png');
+  await page.getByRole('button', { name: 'Undo last composition', exact: true }).click(); await expect.poll(() => pixel(100)).toEqual([0, 0, 255, 255]); expect(posts).toEqual([]);
+});

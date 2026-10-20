@@ -63,3 +63,4 @@ export { HuggingFaceImageEditor, ImageEditError, validateImageEdit, HF_IMAGE_MOD
 export { GroqVideoPlanner, HuggingFaceVideoPlanner, parseVideoPlan, validateVideoPlanInput } from "./huggingface-video-plan.js";
 export type { VideoPlan } from "./huggingface-video-plan.js";
 export {EditorPlanner,validateEditorInput,parseEditorPlan} from './editor-planner.js';
+export { GeminiImageEditor, GEMINI_IMAGE_MODEL, GEMINI_IMAGE_ENDPOINT, parseGeminiImageResponse } from './gemini-image.js';

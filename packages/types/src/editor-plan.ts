@@ -1,5 +1,6 @@
 export type EditorLayerChange={index:number;x?:number;y?:number;width?:number;opacity?:number;start?:number;end?:number};
 export type ImageEditorChanges = {
+ backgroundLayerIndex?:number|null;
  baseScale?:number;baseX?:number;baseY?:number;
  layers?:EditorLayerChange[];
  ratio?:'original'|'1:1'|'4:5'|'9:16'|'16:9';rotation?:0|90|180|270;flip?:boolean;
@@ -33,6 +34,7 @@ export function validEditorChanges(kind:EditorKind,value:unknown,state=false):va
  rotation:v=>choice(v,[0,90,180,270]),flip:v=>typeof v==='boolean',
  brightness:v=>number(v,kind==='image'?(state?0:50):0.5,kind==='image'?(state?200:150):1.5),contrast:v=>number(v,kind==='image'?(state?0:50):0.5,kind==='image'?(state?200:150):1.5),saturation:v=>number(v,0,kind==='image'?200:2),
  ...(kind==='image'?{
+ backgroundLayerIndex:(v:unknown)=>v===null||(Number.isInteger(v)&&number(v,0,7)),
  baseScale:(v:unknown)=>number(v,0.1,2),baseX:(v:unknown)=>number(v,0,100),baseY:(v:unknown)=>number(v,0,100),
  ...(state?{hasBaseImage:(v:unknown)=>typeof v==='boolean',baseAspectRatio:(v:unknown)=>number(v,0.001,1000),canvasAspectRatio:(v:unknown)=>number(v,0.001,1000)}:{}),
  ratio:(v:unknown)=>choice(v,['original','1:1','4:5','9:16','16:9']),focusX:(v:unknown)=>number(v,0,100),focusY:(v:unknown)=>number(v,0,100),textSize:(v:unknown)=>number(v,60,180),

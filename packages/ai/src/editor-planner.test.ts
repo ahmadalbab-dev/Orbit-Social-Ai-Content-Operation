@@ -66,3 +66,13 @@ describe('visual composition context',()=>{
   await expect(new EditorPlanner('fixture','huggingface',undefined,fetcher).plan({...image,previewDataUrl:'data:image/jpeg;base64,/9j/2Q=='})).rejects.toThrow();expect(fetcher).not.toHaveBeenCalled();
  });
 });
+
+
+describe('uploaded image background boundary',()=>{
+ const input=validateEditorInput({kind:'image',instruction:'Use second image as background',current:{hasBaseImage:true,layers:[{index:0,x:50,y:50,width:40,opacity:100}]}});
+ it('accepts only an uploaded background image and clearing its role',()=>{
+  for(const backgroundLayerIndex of [0,null])expect(parseEditorPlan(JSON.stringify({summary:'Use uploaded photo behind the base',changes:{backgroundLayerIndex}}),input).changes).toEqual({backgroundLayerIndex});
+  for(const backgroundLayerIndex of [1,-1,0.5,'0','https://example.com'])expect(()=>parseEditorPlan(JSON.stringify({summary:'Invalid background',changes:{backgroundLayerIndex}}),input)).toThrow();
+ });
+ it('keeps image-only actions out of video plans',()=>{expect(()=>parseEditorPlan(JSON.stringify({summary:'Invalid role',changes:{backgroundLayerIndex:0}}),validateEditorInput({kind:'video',instruction:'Background',current:{sourceDuration:10}}))).toThrow();});
+});
