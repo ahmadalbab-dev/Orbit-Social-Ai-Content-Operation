@@ -1,5 +1,7 @@
 import { expect, test, type Locator } from '@playwright/test';
 
+test.use({ trace: 'retain-on-failure' });
+
 /** Measure title ink, excluding the translucent ambient-code background. */
 async function canvasHasArtwork(canvas: Locator) {
   await expect.poll(() => canvas.evaluate(node => {
@@ -100,7 +102,14 @@ test('example platform tabs support keyboard selection and open Content Studio',
   await expect(facebook).toHaveAttribute('aria-selected', 'true');
   await page.keyboard.press('End');
   await expect(tabs.getByRole('tab', { name: 'Threads', exact: true })).toBeFocused();
-  await showcase.getByRole('button', { name: 'Create your own post', exact: true }).click();
+  // Focus moves inside the key handler before React commits the selected panel.
+  // Wait for that content before scrolling to and clicking the following action.
+  await expect(tabs.getByRole('tab', { name: 'Threads', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(showcase.getByRole('article', { name: 'Threads example post', exact: true })).toBeVisible();
+  const create = showcase.getByRole('button', { name: 'Create your own post', exact: true });
+  await create.scrollIntoViewIfNeeded();
+  await expect(create).toBeInViewport();
+  await create.click();
   await expect(page).toHaveURL(/view=studio/);
   await expect(page.getByRole('heading', { name: 'Create once. Review every channel.', exact: true })).toBeVisible();
 });
