@@ -17,7 +17,7 @@ Updated 20 October 2026. This change prepares local/staging functionality only. 
 
 ## Existing Groq adapter work
 
-The separate chat "Semak Adapter Groq Minimal" reported a model-ID validation correction and local setup/test documents. Its separate checkout was not available here for a byte-for-byte comparison. This patch does not reimplement that correction or silently overwrite its files. Apply the reviewed adapter correction once, compare the overlapping planner/test hunks, and run both suites before merging branches. Existing namespaced Groq defaults remain in use here.
+The separate "Semak Adapter Groq Minimal" checkout was located on DESKTOP-ALBAB at `C:\Users\User\Documents\Codex\2026-10-20\new-chat\work\orbit-studio` (baseline `2f6c759`). Its tracked code diff was compared read-only. The shared `isValidTextModel` correction is integrated once here across API configuration, text generation, video planning and editor planning. Bare Groq model identifiers are accepted; HF still requires namespaced identifiers. Existing background-layer and image-provider changes are preserved. The other checkout remains untouched. Two workflow regressions additionally preserve HF image routing when Groq is selected and reject missing Groq credentials before quota reservation. Historical test totals from the separate checkout are not claimed as current validation.
 
 No new dependency or image/video provider SDK is required. API keys stay server-only. A model name in documentation is a candidate, not evidence that the current account can call it.
 

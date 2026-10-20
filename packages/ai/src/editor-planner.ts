@@ -1,5 +1,5 @@
 import {validEditorChanges,validEditorTiming,type EditorKind,type EditorPlan,type VideoEditorState,type VideoEditorChanges} from '@sma/types';
-import {AiProviderError,aiProviderResponseError,readBoundedAiJson,GROQ_CHAT_ENDPOINT,HF_CHAT_ENDPOINT,DEFAULT_GROQ_MODEL,DEFAULT_HF_MODEL} from './huggingface.js';
+import {AiProviderError,aiProviderResponseError,readBoundedAiJson,GROQ_CHAT_ENDPOINT,HF_CHAT_ENDPOINT,DEFAULT_GROQ_MODEL,DEFAULT_HF_MODEL,isValidTextModel} from './huggingface.js';
 type Input={kind:EditorKind;instruction:string;current:Record<string,unknown>;previewDataUrl?:string};
 export function validateEditorInput(value:unknown):Input {
  if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('Invalid editor request');
@@ -22,13 +22,13 @@ export function parseEditorPlan(text:string,input:Input):EditorPlan {
 }
 export class EditorPlanner {
  constructor(private readonly apiKey:string,private readonly provider:'groq'|'huggingface',private readonly model=provider==='groq'?DEFAULT_GROQ_MODEL:DEFAULT_HF_MODEL,private readonly fetcher:typeof fetch=fetch,private readonly visionModel='qwen/qwen3.8-27b'){
-  if(!apiKey.trim()||/[\r\n]/.test(apiKey)||!/^\w[\w.-]*\/[\w.-]+(?::[\w-]+)?$/.test(model))throw new AiProviderError('unconfigured');
+  if(!apiKey.trim()||/[\r\n]/.test(apiKey)||!isValidTextModel(model,provider))throw new AiProviderError('unconfigured');
  }
  async plan(value:unknown):Promise<EditorPlan>{
   const input=validateEditorInput(value),signal=AbortSignal.timeout(45000);
   if(input.previewDataUrl&&this.provider!=='groq')throw new AiProviderError('unconfigured');
   const model=input.previewDataUrl?this.visionModel:this.model;
-  if(!/^\w[\w.-]*\/[\w.-]+(?::[\w-]+)?$/.test(model))throw new AiProviderError('unconfigured');
+  if(!isValidTextModel(model,this.provider))throw new AiProviderError('unconfigured');
   const {previewDataUrl,...textInput}=input;
   const contract=input.kind==='image'?`Image changes: backgroundLayerIndex is an existing uploaded overlay index (0..7), or null to clear the photo background. This draws that uploaded image full-canvas behind the base photo, not subject cutout or pixel generation. For image2 as background use backgroundLayerIndex:0; if baseScale is neutral 1, also use baseScale:0.75 to expose the background, otherwise preserve the current scale. baseScale 0.1..2 (1 original canvas frame), baseX/baseY centre percentages0..100; ratio original|1:1|4:5|9:16|16:9; rotation 0|90|180|270; flip boolean; brightness/contrast 50..150 (100 neutral); saturation 0..200 (100 neutral); focusX/focusY 0..100; textSize 60..180; textPosition top|center|bottom; textColor/accent/background #RRGGBB; caption <=200 characters; template original|product|poster|offer|quote.`:`Video changes: format portrait|square|landscape; speed 0.5..2; volume 0..1; rotation 0|90|180|270; flip boolean; start>=0,0<duration<=120 in source seconds, start+duration<=current.sourceDuration; brightness/contrast 0.5..1.5 (1 neutral); saturation 0..2 (1 neutral); template clean|news|product|cinematic|captions; title <=100 characters; news boolean; captions [{text <=120 chars,start,end}], max20, chronological non-overlapping and within resulting duration, times relative to trimmed source BEFORE speed.`;
   try{

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { GROQ_CHAT_ENDPOINT } from "@sma/ai";
+import { GROQ_CHAT_ENDPOINT, HF_IMAGE_ENDPOINT } from "@sma/ai";
 import { WorkflowService } from "./workflow.service";
 import { VideoAiService } from "./video-ai.service";
 import { ImageAiService } from "./image-ai.service";
@@ -19,6 +19,29 @@ function setup(count=1){
 }
 afterEach(()=>{vi.unstubAllEnvs();vi.unstubAllGlobals();});
 describe("Groq server selection with shared workspace controls",()=>{
+  it("keeps HF image editing on its own key and endpoint while Groq is selected",async()=>{
+    const ctx=setup();vi.stubEnv("HF_TOKEN","hf_retained_for_images");vi.stubEnv("AI_IMAGE_PROVIDER","huggingface");
+    const png=Buffer.from([137,80,78,71,13,10,26,10,0]);
+    const fetcher=vi.fn()
+      .mockResolvedValueOnce(Response.json({request_id:"fixture-id",status:"COMPLETED"}))
+      .mockResolvedValueOnce(Response.json({images:[{url:"https://fal.media/fixture.png"}]}))
+      .mockResolvedValueOnce(new Response(png,{headers:{"Content-Type":"image/png"}}));
+    vi.stubGlobal("fetch",fetcher);
+    expect(ctx.image.status()).toMatchObject({configured:true,provider:"fal-ai",verified:false});
+    const result=await ctx.image.edit(identity,{imageDataUrl:`data:image/png;base64,${png.toString("base64")}`,prompt:"Make the background blue"});
+    expect(result.contentType).toBe("image/png");
+    expect(fetcher.mock.calls[0][0]).toBe(`${HF_IMAGE_ENDPOINT}?_subdomain=queue`);
+    expect(fetcher.mock.calls[0][1].headers.Authorization).toBe("Bearer hf_retained_for_images");
+    expect(fetcher.mock.calls[2][1].headers).toBeUndefined();
+    expect(fetcher.mock.calls.some(call=>call[0]===GROQ_CHAT_ENDPOINT)).toBe(false);
+    expect(ctx.aiQuota.updateMany).toHaveBeenCalledOnce();
+  });
+  it("fails closed before reserving quota when the selected Groq key is missing",async()=>{
+    const ctx=setup();vi.stubEnv("GROQ_API_KEY","");vi.stubEnv("HF_TOKEN","hf_retained_for_images");
+    const fetcher=vi.fn();vi.stubGlobal("fetch",fetcher);
+    await expect(new WorkflowService(ctx.db,ctx.billing).generate(identity,{brandId:"brand",topic:"Test",platforms:["facebook"]})).rejects.toThrow("not configured");
+    expect(fetcher).not.toHaveBeenCalled();expect(ctx.aiQuota.upsert).not.toHaveBeenCalled();expect(ctx.contentItem.create).not.toHaveBeenCalled();
+  });
   it("saves a real provider-shaped draft through Groq even when HF remains configured",async()=>{
     const ctx=setup();vi.stubEnv("HF_TOKEN","hf_retained_for_images");
     const fetcher=vi.fn().mockResolvedValue(Response.json({choices:[{finish_reason:"stop",message:{content:JSON.stringify({variants})}}]}));vi.stubGlobal("fetch",fetcher);

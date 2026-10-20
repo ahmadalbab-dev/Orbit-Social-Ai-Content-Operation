@@ -2,6 +2,8 @@
 
 This guide covers account connection only. Publishing remains off; no billing or production change is required to validate this code.
 
+Direct Instagram Login for Business/Creator accounts without a Facebook Page is a separate Meta-supported option. It is not implemented here: the exact code-exchange, granted-scope, expiry and app-binding verification contract could not be fully retrieved from primary documentation during this review. Do not substitute the Facebook token-inspection contract or present direct Instagram Login as enabled. The existing Instagram connection remains the tested Facebook-linked flow. Reference: https://www.postman.com/meta/instagram/folder/6raa77c/instagram-api-with-instagram-login
+
 ## Request flow
 
 1. The authenticated web route receives an Owner/Admin's same-origin POST for `facebook`, `instagram` or `threads`. It generates a cryptographically random 32-byte base64url browser nonce (43 characters), retains it in a secure HttpOnly callback cookie and forwards it to API `POST /v1/integrations/oauth/:provider/start` as `x-orbit-oauth-browser`. The API requires an empty JSON object and the existing verified workspace identity.

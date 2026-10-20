@@ -4,6 +4,16 @@ import { AppController } from "./app.controller";
 import { afterEach, vi } from "vitest";
 describe("explicit text provider configuration",()=>{
   afterEach(()=>vi.unstubAllEnvs());
+  it.each(["llama-3.3-70b-versatile","openai/gpt-oss-120b"])("accepts Groq model %s without affecting the retained image provider",model=>{
+    expect(textAiConfig({AI_TEXT_PROVIDER:"groq",GROQ_API_KEY:"gsk_fixture",GROQ_MODEL:model,HF_TOKEN:"hf_fixture"})).toMatchObject({provider:"groq",configured:true,model});
+  });
+  it.each(["", "model name", "model\n", "org/model/extra", "org/model:route"])("rejects malformed Groq model %j rather than reporting readiness",GROQ_MODEL=>{
+    expect(textAiConfig({AI_TEXT_PROVIDER:"groq",GROQ_API_KEY:"gsk_fixture",GROQ_MODEL}).configured).toBe(false);
+  });
+  it("keeps HF flat model rejection and namespace/provider suffix support",()=>{
+    expect(textAiConfig({AI_TEXT_PROVIDER:"huggingface",HF_TOKEN:"hf_fixture",HF_MODEL:"flat-model"}).configured).toBe(false);
+    expect(textAiConfig({AI_TEXT_PROVIDER:"huggingface",HF_TOKEN:"hf_fixture",HF_MODEL:"Qwen/Qwen3:provider"}).configured).toBe(true);
+  });
   it("selects Groq even if the HF token is retained for images",()=>{
     expect(textAiConfig({AI_TEXT_PROVIDER:"groq",GROQ_API_KEY:"gsk_fixture",HF_TOKEN:"hf_fixture"})).toMatchObject({provider:"groq",configured:true,apiKey:"gsk_fixture"});
   });
