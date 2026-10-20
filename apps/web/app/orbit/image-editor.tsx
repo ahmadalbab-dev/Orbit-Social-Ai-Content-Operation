@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Download, ImagePlus, RotateCw, FlipHorizontal, RefreshCw, Plus, Copy, Trash2, ArrowUp, ArrowDown, Undo2, Layers, ZoomIn, ZoomOut, Maximize2, Film, X } from "lucide-react";
 import { Button, Card } from "./ui";
+import { MediaShare } from "./media-share";
 import { SectionHeading } from "./design-ui";
 import { ImageAiPanel } from "./image-ai-panel";
 import { EditorAiPanel } from "./editor-ai-panel";
@@ -58,6 +59,7 @@ export function ImageEditor({ preview = false }: { preview?: boolean }) {
   const [slides, setSlides] = useState<Slide[]>(() => [createSlide()]);
   const [active, setActive] = useState(0), [selectedLayer, setSelectedLayer] = useState("");
   const [aiBusy, setAiBusy] = useState(false), [loading, setLoading] = useState(false), [exporting, setExporting] = useState(false);
+  const [shareFile, setShareFile] = useState<File | null>(null);
   const [soundtrack, setSoundtrack] = useState<LocalSoundtrack | null>(null);
   const [secondsPerSlide, setSecondsPerSlide] = useState(3), [movieAll, setMovieAll] = useState(false);
   const [movieProgress, setMovieProgress] = useState<number | null>(null), [movieResult, setMovieResult] = useState("");
@@ -159,7 +161,7 @@ export function ImageEditor({ preview = false }: { preview?: boolean }) {
         const target = renderImageComposition(document.createElement("canvas"), selected[i].state);
         if (format === "jpeg") { const context = target.getContext("2d"); if (context) { context.globalCompositeOperation = "destination-over"; context.fillStyle = "white"; context.fillRect(0, 0, target.width, target.height); context.globalCompositeOperation = "source-over"; } }
         const blob = await canvasBlob(target, format), name = `orbit-slide-${String(all ? i + 1 : active + 1).padStart(2, "0")}.${format === "jpeg" ? "jpg" : "png"}`;
-        if (!all) downloadBlob(blob, name); else files.push({ name, bytes: new Uint8Array(await blob.arrayBuffer()) });
+        if (!all) { downloadBlob(blob, name); setShareFile(new File([blob], name, { type: blob.type })); } else files.push({ name, bytes: new Uint8Array(await blob.arrayBuffer()) });
       }
       if (all) downloadBlob(new Blob([imageCarouselZip(files).buffer as ArrayBuffer], { type: "application/zip" }), "orbit-carousel.zip");
       setNotice(all ? `${files.length} carousel slides exported as a ZIP in slide order.` : "Image exported. Your original stays unchanged.");
@@ -184,7 +186,8 @@ export function ImageEditor({ preview = false }: { preview?: boolean }) {
       const context = movie.getContext("2d"); if (!context) throw Error("Movie rendering is unavailable.");
       const blob = await exportCanvasMovie(movie, seconds * frames.length, soundtrack, controller.signal, setMovieProgress, elapsed => { const frame = frames[Math.min(frames.length - 1, Math.floor(elapsed / seconds))]; context.drawImage(frame, 0, 0); });
       if (controller.signal.aborted) return;
-      downloadBlob(blob, `orbit-${movieAll ? "carousel" : "image"}-movie.${blob.type.includes("mp4") ? "mp4" : "webm"}`); setMovieResult(URL.createObjectURL(blob)); setNotice("Image movie exported locally. Preview the complete movie below.");
+      const name = `orbit-${movieAll ? "carousel" : "image"}-movie.${blob.type.includes("mp4") ? "mp4" : "webm"}`;
+      downloadBlob(blob, name); setShareFile(new File([blob], name, { type: blob.type })); setMovieResult(URL.createObjectURL(blob)); setNotice("Image movie exported locally. Preview the complete movie below.");
     } catch (error) { if (movieController.current === controller) setNotice(error instanceof Error ? error.message : "Movie export failed."); }
     finally { if (movieController.current === controller) { movieController.current = null; setExporting(false); setMovieProgress(null); } }
   }
@@ -260,6 +263,7 @@ export function ImageEditor({ preview = false }: { preview?: boolean }) {
 </EditorToolPanel><EditorToolPanel tool="ai" active={tool}>
         <details className="image-pixel-ai"><summary>Generate a new background or visual with AI</summary><ImageAiPanel source={() => canvas.current} disabled={!hasArtwork || loading || exporting} preview={preview} onBusyChange={setAiBusy} onResult={async blob => { const next = await decode(new File([blob], "orbit-ai-result.png", { type: blob.type })); snapshot(); patch(freshComposition(next)); }}/></details>
 </EditorToolPanel><EditorToolPanel tool="export" active={tool}>
+        <MediaShare file={shareFile} disabled={busy}/>
         <fieldset disabled={busy} className="image-control-fieldset"><Button disabled={!hasArtwork} onClick={() => void download()} aria-label="Export image"><Download size={17}/>{exporting ? "Exporting…" : "Export image"}</Button><Button variant="outline" disabled={slides.length < 2} onClick={() => void download(true)}><Download size={17}/>Export carousel ZIP</Button><Button variant="outline" disabled={!undo} onClick={() => { if (undo) { const previous = undo; setUndo(state); patch(previous); } }}><Undo2 size={17}/>Undo last composition</Button><Button variant="outline" onClick={() => { snapshot(); patch(freshComposition(image)); setSelectedLayer(""); }} aria-label="Reset image edits"><RefreshCw size={17}/>Reset edits</Button></fieldset>
 </EditorToolPanel>
         {notice ? <p role="status" className="action-notice">{notice}</p> : null}

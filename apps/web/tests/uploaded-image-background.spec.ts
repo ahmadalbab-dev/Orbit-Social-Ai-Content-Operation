@@ -1,8 +1,14 @@
 import { expect, test } from '@playwright/test';
 import { selectEditorTool } from './editor-helpers';
+import { readFile } from 'node:fs/promises';
 test('uploaded background preview applies real local pixels, cancels safely, exports and undoes without a provider call', async ({ page }) => {
   const posts: string[] = []; page.on('request', request => { if (request.method() === 'POST') posts.push(request.url()); });
   await page.goto('/preview/editor/image');
+  await page.evaluate(() => {
+    const probe = window as unknown as { sharedBytes?: number[] };
+    Object.defineProperty(navigator, 'canShare', { configurable: true, value: (data: ShareData) => !!data.files?.length });
+    Object.defineProperty(navigator, 'share', { configurable: true, value: async (data: ShareData) => { probe.sharedBytes = Array.from(new Uint8Array(await data.files![0].arrayBuffer())); } });
+  });
   const asset = async (color: string) => Buffer.from(await page.evaluate(color => { const c = document.createElement('canvas'); c.width = 200; c.height = 200; const ctx = c.getContext('2d')!; ctx.fillStyle = color; ctx.fillRect(0, 0, 200, 200); return c.toDataURL().split(',')[1]; }, color), 'base64');
   await page.getByLabel('Choose image', { exact: true }).setInputFiles({ name: 'foreground.png', mimeType: 'image/png', buffer: await asset('#ff0000') });
   await selectEditorTool(page, 'Image', 'Layers');
@@ -15,6 +21,15 @@ test('uploaded background preview applies real local pixels, cancels safely, exp
   await expect.poll(() => pixel(100)).toEqual([0, 0, 255, 255]); await expect.poll(() => pixel(5)).toEqual([255, 0, 0, 255]);
   await page.getByRole('button', { name: 'Preview selected image as background', exact: true }).click(); await page.getByRole('button', { name: 'Apply uploaded background', exact: true }).click();
   await expect.poll(() => pixel(5)).toEqual([0, 0, 255, 255]); await expect.poll(() => pixel(100)).toEqual([255, 0, 0, 255]);
-  await selectEditorTool(page, 'Image', 'Export'); const downloaded = page.waitForEvent('download'); await page.getByRole('button', { name: 'Export image', exact: true }).click(); expect((await downloaded).suggestedFilename()).toBe('orbit-slide-01.png');
+  await selectEditorTool(page, 'Image', 'Export'); const downloaded = page.waitForEvent('download'); await page.getByRole('button', { name: 'Export image', exact: true }).click(); const exported = await downloaded; expect(exported.suggestedFilename()).toBe('orbit-slide-01.png');
+  const bytes = Array.from(await readFile((await exported.path())!));
+  await page.getByRole('button', { name: 'Share export', exact: true }).click();
+  await expect(page.getByText(/Export handed to your device's share menu/)).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { sharedBytes: number[] }).sharedBytes)).toEqual(bytes);
+  await page.evaluate(() => { Object.defineProperty(navigator, 'share', { configurable: true, value: async () => { throw new DOMException('Cancelled', 'AbortError'); } }); });
+  await page.getByRole('button', { name: 'Share export', exact: true }).click(); await expect(page.getByText('Sharing cancelled. Your export is still ready.', { exact: true })).toBeVisible();
+  await page.evaluate(() => { Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => false }); });
+  await page.getByRole('button', { name: 'Share export', exact: true }).click(); await expect(page.getByText(/File sharing is unavailable for this export/)).toBeVisible();
+  const fallback = page.waitForEvent('download'); await page.getByRole('button', { name: 'Download exported file', exact: true }).click(); expect(Array.from(await readFile((await (await fallback).path())!))).toEqual(bytes);
   await page.getByRole('button', { name: 'Undo last composition', exact: true }).click(); await expect.poll(() => pixel(100)).toEqual([0, 0, 255, 255]); expect(posts).toEqual([]);
 });

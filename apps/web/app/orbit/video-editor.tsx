@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { Button, Card } from "./ui";
+import { MediaShare } from "./media-share";
 import { SectionHeading } from "./design-ui";
 import {
   drawEditedFrame,
@@ -114,6 +115,7 @@ export function VideoEditor({
   const [saturation, setSaturation] = useState(1);
   const localExport = useRef<AbortController | null>(null);
   const [exportProgress, setExportProgress] = useState<number | null>(null);
+  const [shareFile, setShareFile] = useState<File | null>(null);
   const [speed, setSpeed] = useState(1);
   const [volume, setVolume] = useState(1);
   const [rotation, setRotation] = useState(0);
@@ -592,6 +594,7 @@ export function VideoEditor({
   async function download(job: RenderJob, signal: AbortSignal) {
     const blob = await renderDownload(job.id, signal);
     if (signal.aborted) return;
+    setShareFile(new File([blob], `orbit-${job.id}.mp4`, { type: blob.type || "video/mp4" }));
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -1496,6 +1499,7 @@ export function VideoEditor({
                     },
                   );
                   if (signal.aborted) return;
+                  setShareFile(new File([blob], `orbit-edited.${blob.type.includes("mp4") ? "mp4" : "webm"}`, { type: blob.type }));
                   const url = URL.createObjectURL(blob),
                     link = document.createElement("a");
                   link.href = url;
@@ -1519,6 +1523,7 @@ export function VideoEditor({
               ? `Exporting ${Math.round(exportProgress)}%`
               : "Export edited video locally"}
           </Button>
+          <MediaShare file={shareFile} disabled={busy}/>
           {exportProgress !== null ? (
             <>
               <progress
