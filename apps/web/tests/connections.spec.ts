@@ -30,14 +30,14 @@ async function signedWorkspace(page:import('@playwright/test').Page,connected=fa
 
 test('workspace owner can open official provider consent through the authenticated start operation',async({page})=>{
  await signedWorkspace(page);
- const authorizationUrl='https://threads.net/oauth/authorize?client_id=fixture&state=opaque';
+ const authorizationUrl='https://threads.com/oauth/authorize?client_id=fixture&state=opaque';
  await page.route('**/api/workspace/integrations/oauth/threads/start',async route=>{
   expect(route.request().method()).toBe('POST');expect(route.request().postDataJSON()).toEqual({});
   expect(route.request().headers()['authorization']).toBe('Bearer synthetic-connection-access');
   expect(route.request().headers()['x-workspace-id']).toBe('fixture-workspace');
   await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({authorizationUrl,expiresAt:new Date(Date.now()+600000).toISOString()})});
  });
- await page.route('https://threads.net/oauth/authorize?*',route=>route.fulfill({status:200,contentType:'text/html',body:'<h1>Official consent navigation fixture</h1>'}));
+ await page.route('https://threads.com/oauth/authorize?*',route=>route.fulfill({status:200,contentType:'text/html',body:'<h1>Official consent navigation fixture</h1>'}));
  await page.goto('/?view=connections');
  await page.getByRole('button',{name:'Connect threads',exact:true}).click();
  const dialog=page.getByRole('dialog',{name:'Connect Threads',exact:true});
