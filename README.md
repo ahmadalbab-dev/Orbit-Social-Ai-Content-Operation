@@ -1,4 +1,4 @@
-# Orbit Social AI Content Operation
+# ai studio by Orbit
 
 A production-minded, multi-tenant content operations platform that turns a brand brief into reviewed, scheduled, and published social content. The first release defaults to mock publishing and strict AI budgets so it is safe and inexpensive to run.
 
