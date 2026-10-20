@@ -1,5 +1,5 @@
 export type Overlay = { id: string; name: string; image: HTMLImageElement; x: number; y: number; width: number; opacity: number };
-export type ImageComposition = { image: HTMLImageElement | null; baseScale: number; baseX: number; baseY: number; ratio: string; rotation: number; flip: boolean; brightness: number; contrast: number; saturation: number; focusX: number; focusY: number; textSize: number; textPosition: string; textColor: string; caption: string; template: string; accent: string; background: string; overlays: Overlay[] };
+export type ImageComposition = { backgroundLayerId: string | null; image: HTMLImageElement | null; baseScale: number; baseX: number; baseY: number; ratio: string; rotation: number; flip: boolean; brightness: number; contrast: number; saturation: number; focusX: number; focusY: number; textSize: number; textPosition: string; textColor: string; caption: string; template: string; accent: string; background: string; overlays: Overlay[] };
 export const imageTemplates = [
   { id: "original", name: "Free canvas", tag: "Your composition", color: "#29443c", caption: "", ratio: "original" },
   { id: "product", name: "Product spotlight", tag: "New collection", color: "#ddd6bd", caption: "MADE FOR YOUR EVERYDAY", ratio: "4:5" },
@@ -8,7 +8,7 @@ export const imageTemplates = [
   { id: "quote", name: "Words to keep", tag: "Share a little inspiration", color: "#d0c6e6", caption: "Small beginnings.\nRemarkable possibilities.", ratio: "1:1" },
 ] as const;
 export function freshComposition(image: HTMLImageElement | null = null): ImageComposition {
-  return { image, baseScale: 1, baseX: 50, baseY: 50, ratio: "original", rotation: 0, flip: false, brightness: 100, contrast: 100, saturation: 100, focusX: 50, focusY: 50, textSize: 100, textPosition: "bottom", textColor: "#ffffff", caption: "", template: "original", accent: "#e8ff72", background: "#152b25", overlays: [] };
+  return { backgroundLayerId: null, image, baseScale: 1, baseX: 50, baseY: 50, ratio: "original", rotation: 0, flip: false, brightness: 100, contrast: 100, saturation: 100, focusX: 50, focusY: 50, textSize: 100, textPosition: "bottom", textColor: "#ffffff", caption: "", template: "original", accent: "#e8ff72", background: "#152b25", overlays: [] };
 }
 export function applyImageTemplate(state: ImageComposition, id: string): ImageComposition {
   const template = imageTemplates.find(item => item.id === id);
@@ -44,6 +44,13 @@ export function renderImageComposition(target: HTMLCanvasElement, state: ImageCo
   const w = target.width, h = target.height, designed = state.template !== "original";
   ctx.clearRect(0, 0, w, h);
   if (designed || !image || state.baseScale !== 1 || state.baseX !== 50 || state.baseY !== 50) { ctx.fillStyle = state.background; ctx.fillRect(0, 0, w, h); }
+  const backgroundLayer = state.overlays.find(layer => layer.id === state.backgroundLayerId);
+  if (backgroundLayer) {
+    ctx.save(); ctx.globalAlpha = backgroundLayer.opacity / 100;
+    const cover = Math.max(w / backgroundLayer.image.naturalWidth, h / backgroundLayer.image.naturalHeight);
+    const width = backgroundLayer.image.naturalWidth * cover, height = backgroundLayer.image.naturalHeight * cover;
+    ctx.drawImage(backgroundLayer.image, (w - width) / 2, (h - height) / 2, width, height); ctx.restore();
+  }
   if (image) {
     ctx.save();
     ctx.translate(w * (state.baseX / 100 - .5), h * (state.baseY / 100 - .5));
@@ -68,6 +75,7 @@ export function renderImageComposition(target: HTMLCanvasElement, state: ImageCo
   }
   if (state.template === "quote") { ctx.fillStyle = state.accent + "e8"; ctx.fillRect(w * .07, h * .14, w * .86, h * .72); }
   for (const layer of state.overlays) {
+    if (layer.id === state.backgroundLayerId) continue;
     ctx.save(); ctx.globalAlpha = layer.opacity / 100;
     const width = w * layer.width / 100, height = width * layer.image.naturalHeight / layer.image.naturalWidth;
     ctx.drawImage(layer.image, w * layer.x / 100 - width / 2, h * layer.y / 100 - height / 2, width, height); ctx.restore();
@@ -128,10 +136,19 @@ export function applyImageLayout(state: ImageComposition, id: ImageLayoutId): Im
   if (id !== "product-card" && !state.overlays.length) throw Error("Add an image overlay first. This layout needs at least two uploaded photos.");
   if (id === "equal-split") {
     const count = state.overlays.length + 1, cell = 100 / count, width = Math.max(5, cell - 4);
-    return { ...state, template: "original", ratio: "original", baseScale: width / 100, baseX: cell / 2, baseY: 50, textPosition: "bottom", overlays: state.overlays.map((layer, index) => ({ ...layer, x: cell * (index + 1.5), y: 50, width, opacity: 100 })) };
+    return { ...state, backgroundLayerId: null, template: "original", ratio: "original", baseScale: width / 100, baseX: cell / 2, baseY: 50, textPosition: "bottom", overlays: state.overlays.map((layer, index) => ({ ...layer, x: cell * (index + 1.5), y: 50, width, opacity: 100 })) };
   }
   if (id === "photo-stack") {
-    return { ...state, template: "original", ratio: "4:5", baseScale: .78, baseX: 45, baseY: 43, textPosition: "bottom", overlays: state.overlays.map((layer, index) => ({ ...layer, x: Math.max(25, 68 - index * 5), y: Math.min(78, 61 + index * 3), width: Math.max(22, 50 - index * 3), opacity: 100 })) };
+    return { ...state, backgroundLayerId: null, template: "original", ratio: "4:5", baseScale: .78, baseX: 45, baseY: 43, textPosition: "bottom", overlays: state.overlays.map((layer, index) => ({ ...layer, x: Math.max(25, 68 - index * 5), y: Math.min(78, 61 + index * 3), width: Math.max(22, 50 - index * 3), opacity: 100 })) };
   }
-  return { ...applyImageTemplate(state, "product"), baseScale: 1, baseX: 50, baseY: 50, overlays: state.overlays.map((layer, index) => ({ ...layer, x: Math.min(82, 75 + index * 2), y: Math.min(70, 57 + index * 3), width: Math.max(16, 30 - index * 2), opacity: 100 })) };
+  return { ...applyImageTemplate(state, "product"), backgroundLayerId: null, baseScale: 1, baseX: 50, baseY: 50, overlays: state.overlays.map((layer, index) => ({ ...layer, x: Math.min(82, 75 + index * 2), y: Math.min(70, 57 + index * 3), width: Math.max(16, 30 - index * 2), opacity: 100 })) };
+}
+
+/** Reuses an uploaded overlay behind the existing photo. No segmentation or generated pixels. */
+export function applyUploadedImageBackground(state: ImageComposition, index: number | null): ImageComposition {
+  if (index === null) return { ...state, backgroundLayerId: null };
+  if (!state.image) throw Error("Choose a base photo before adding an uploaded image background.");
+  if (!Number.isInteger(index) || index < 0 || index >= state.overlays.length) throw Error("Choose an uploaded image layer to use as the background.");
+  const chosen = state.overlays[index];
+  return { ...state, backgroundLayerId: chosen.id, baseScale: state.baseScale === 1 ? .75 : state.baseScale, overlays: state.overlays.map(layer => layer.id === chosen.id ? { ...layer, opacity: 100 } : layer) };
 }

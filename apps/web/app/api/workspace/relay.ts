@@ -1,9 +1,11 @@
+import { randomBytes } from "node:crypto";
 import { apiOrigin } from "../../orbit/api-origin";
 
 const MAX_BODY = 4 * 1024 * 1024;
 const routes: [string, RegExp][] = [
   ["GET", /^(workspaces|brands|content|ai\/status|integrations\/status|media\/status|media\/renders|media\/image-edit\/status|billing\/status)$/],
   ["POST", /^(workspaces|brands|content\/(manual|generate)|billing\/(checkout|portal)|media\/(assets|renders|image-edit|video-plan|editor-plan))$/],
+  ["POST", /^integrations\/oauth\/(facebook|instagram|threads)\/start$/],
   ["PUT", /^brands\/[A-Za-z0-9_-]+$/],
   ["PUT", /^content\/[A-Za-z0-9_-]+\/review$/],
   ["POST", /^content\/[A-Za-z0-9_-]+\/(approve|schedule|publish)$/],
@@ -18,11 +20,15 @@ export async function relayWorkspace(request: Request, segments: string[], fetch
   const path = segments.join("/");
   if (segments.some(s => !/^[A-Za-z0-9_-]+$/.test(s)) || !routes.some(([method, pattern]) => method === request.method && pattern.test(path)))
     return failure(404, "Workspace route not found.");
+  const oauthProvider = request.method === "POST" ? /^integrations\/oauth\/(facebook|instagram|threads)\/start$/.exec(path)?.[1] : undefined;
+  if (oauthProvider && request.headers.get("origin") !== new URL(request.url).origin) return failure(403, "Start the social connection from Orbit.");
+  const browserNonce = oauthProvider ? randomBytes(32).toString("base64url") : undefined;
   const base = apiOrigin(process.env.NEXT_PUBLIC_API_URL, process.env.NODE_ENV === "production");
   if (!base || base === new URL(request.url).origin) return failure(503, "Workspace API is not configured yet.");
   const authorization = request.headers.get("authorization");
   if (!authorization || !/^Bearer [^\s]{1,16384}$/i.test(authorization)) return failure(401, "Sign in to access your workspace.");
   const headers = new Headers({ Authorization: authorization });
+  if (browserNonce) headers.set("x-orbit-oauth-browser", browserNonce);
   const workspaceId = request.headers.get("x-workspace-id");
   if (workspaceId) {
     if (!/^[A-Za-z0-9_-]{1,100}$/.test(workspaceId)) return failure(400, "Invalid workspace.");
@@ -62,6 +68,10 @@ export async function relayWorkspace(request: Request, segments: string[], fetch
       return failure(502, "Workspace API returned an unexpected redirect. Please contact support.");
     }
     const responseHeaders = new Headers({ "Cache-Control": "private, no-store" });
+    if (browserNonce && upstream.ok) {
+      const family = oauthProvider === "threads" ? "threads" : "meta";
+      responseHeaders.set("Set-Cookie", `orbit_oauth_${family}=${browserNonce}; Path=/api/social-oauth; HttpOnly; SameSite=Lax; Max-Age=600${process.env.NODE_ENV === "production" ? "; Secure" : ""}`);
+    }
     for (const name of ["content-type", "content-disposition"]) {
       const value = upstream.headers.get(name); if (value) responseHeaders.set(name, value);
     }

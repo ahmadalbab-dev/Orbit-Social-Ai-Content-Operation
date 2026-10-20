@@ -57,9 +57,10 @@ export function estimateCost(model: string, inputTokens: number, outputTokens: n
   return (inputTokens * rate.input + outputTokens * rate.output) / 1_000_000;
 }
 
-export { GroqContentProvider, HuggingFaceContentProvider, AiProviderError, GROQ_CHAT_ENDPOINT, DEFAULT_GROQ_MODEL, HF_CHAT_ENDPOINT, DEFAULT_HF_MODEL, aiModes, parseSocialDrafts, socialMessages, readBoundedAiJson, validateAiGenerationInput, socialDraftLimitViolation } from "./huggingface.js";
+export { GroqContentProvider, HuggingFaceContentProvider, AiProviderError, GROQ_CHAT_ENDPOINT, DEFAULT_GROQ_MODEL, HF_CHAT_ENDPOINT, DEFAULT_HF_MODEL, aiModes, parseSocialDrafts, socialMessages, readBoundedAiJson, validateAiGenerationInput, socialDraftLimitViolation, isValidTextModel } from "./huggingface.js";
 export type { AiGenerationInput, AiProviderFailure } from "./huggingface.js";
 export { HuggingFaceImageEditor, ImageEditError, validateImageEdit, HF_IMAGE_MODEL, HF_IMAGE_ENDPOINT } from "./huggingface-image.js";
 export { GroqVideoPlanner, HuggingFaceVideoPlanner, parseVideoPlan, validateVideoPlanInput } from "./huggingface-video-plan.js";
 export type { VideoPlan } from "./huggingface-video-plan.js";
 export {EditorPlanner,validateEditorInput,parseEditorPlan} from './editor-planner.js';
+export { GeminiImageEditor, GEMINI_IMAGE_MODEL, GEMINI_IMAGE_ENDPOINT, parseGeminiImageResponse } from './gemini-image.js';

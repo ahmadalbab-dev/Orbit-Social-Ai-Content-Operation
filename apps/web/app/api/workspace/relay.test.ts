@@ -53,3 +53,12 @@ it('relays only the approved AI media operations and preserves binary image outp
   const planned = await relayWorkspace(request('media/video-plan', { method: 'POST', body: '{}' }), ['media', 'video-plan'], vi.fn(async () => Response.json({ title: 'Fixture', captions: [], scenes: [] })));
   expect(planned.status).toBe(200);
 });
+
+it('sets an independent HttpOnly OAuth browser binding only after an authenticated same-origin start',async()=>{
+ const fetcher=vi.fn(async()=>Response.json({authorizationUrl:'https://www.facebook.com/v24.0/dialog/oauth?state=opaque'}));
+ const segments=['integrations','oauth','facebook','start'];
+ expect((await relayWorkspace(request(segments.join('/'),{method:'POST',body:'{}'}),segments,fetcher)).status).toBe(403);expect(fetcher).not.toHaveBeenCalled();
+ const response=await relayWorkspace(request(segments.join('/'),{method:'POST',headers:{Origin:origin,'x-orbit-oauth-browser':'attacker-value'},body:'{}'}),segments,fetcher);
+ const init=(fetcher.mock.calls[0] as unknown as [string,RequestInit])[1];const nonce=new Headers(init.headers).get('x-orbit-oauth-browser');
+ expect(nonce).toMatch(/^[A-Za-z0-9_-]{43}$/);expect(response.headers.get('set-cookie')).toContain(`orbit_oauth_meta=${nonce};`);expect(response.headers.get('set-cookie')).toContain('HttpOnly; SameSite=Lax; Max-Age=600; Secure');expect(await response.text()).not.toContain(nonce!);
+});

@@ -1,3 +1,4 @@
+import { SocialOAuthService } from "./social-oauth.service";
 import { Body, Controller, Get, Param, Post, Put, Req, ServiceUnavailableException } from "@nestjs/common";
 import { WorkflowService } from "./workflow.service";
 import { DatabaseService } from "./database.service";
@@ -7,13 +8,13 @@ import { textAiConfig } from "./text-ai.config";
 type Request = {identity:RequestIdentity};
 @Controller()
 export class AppController {
-  constructor(private readonly workflow: WorkflowService,private readonly db:DatabaseService,private readonly workspaces:WorkspaceService) {}
+  constructor(private readonly workflow: WorkflowService,private readonly db:DatabaseService,private readonly workspaces:WorkspaceService,private readonly social:SocialOAuthService) {}
   @Public() @Get("health") health() { return {status:"ok",service:"orbit-api",timestamp:new Date().toISOString()}; }
   @Public() @Get("ready") async ready() { try {await this.db.readiness();return {status:"ready",dependencies:{database:"connected"},livePublishing:false};}catch{throw new ServiceUnavailableException("Database not ready");} }
   @IdentityOnly() @Get("workspaces") listWorkspaces(@Req() req:Request) {return this.workspaces.list(req.identity);}
   @IdentityOnly() @Post("workspaces") createWorkspace(@Req() req:Request,@Body() body:unknown) {return this.workspaces.create(req.identity,body);}
   @Get("ai/status") aiStatus(){const {configured,provider}=textAiConfig();return {configured,provider,verified:false};}
-  @Get("integrations/status") integrationStatus(){return {connectorMode:"disabled",livePublishing:false,providers:Object.fromEntries(["facebook","instagram","threads"].map(p=>[p,{configured:false,connected:false,oauthImplemented:false,requiresOwnerAuthorization:true,reason:"Social OAuth integration is not enabled in this deployment."}]))};}
+  @Get("integrations/status") integrationStatus(@Req() req:Request){return this.social.status(req.identity);}
   @Get("brands") brands(@Req() req:Request){return this.workflow.listBrands(req.identity.workspaceId);}
   @Get("content") list(@Req() req:Request){return this.workflow.list(req.identity.workspaceId);}
   @Post("brands") createBrand(@Req() req:Request,@Body() body:unknown){return this.workflow.createBrand(req.identity,body);}

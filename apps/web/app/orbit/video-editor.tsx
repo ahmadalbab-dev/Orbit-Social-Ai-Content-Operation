@@ -5,12 +5,15 @@ import {
   Download,
   Film,
   LockKeyhole,
+  Pause,
+  Play,
   RefreshCw,
   Type,
   Upload,
   X,
 } from "lucide-react";
 import { Button, Card } from "./ui";
+import { MediaShare } from "./media-share";
 import { SectionHeading } from "./design-ui";
 import {
   drawEditedFrame,
@@ -18,6 +21,7 @@ import {
   type LocalVideoEdit,
   type VideoImageOverlay,
 } from "./local-video-export";
+import { lightningRecipe, validateLightning, scheduleThunder, type LightningEffect } from "./local-video-effects";
 import { SoundtrackControls, useVideoSoundtrack } from "./soundtrack-controls";
 import { type LocalSoundtrack, validateSoundtrack } from "./local-soundtrack";
 import { videoTemplates, creativeVideoTemplates, neutralVideoSettings } from "./video-templates";
@@ -111,11 +115,28 @@ export function VideoEditor({
   const [saturation, setSaturation] = useState(1);
   const localExport = useRef<AbortController | null>(null);
   const [exportProgress, setExportProgress] = useState<number | null>(null);
+  const [shareFile, setShareFile] = useState<File | null>(null);
   const [speed, setSpeed] = useState(1);
   const [volume, setVolume] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [flip, setFlip] = useState(false);
   const [playhead, setPlayhead] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [lightning, setLightning] = useState<LightningEffect | null>(null);
+  const [proposedLightning, setProposedLightning] = useState<LightningEffect | null>(null);
+  const [previewLightning, setPreviewLightning] = useState(false);
+  const [lightningUndo, setLightningUndo] = useState<{effect: LightningEffect | null} | null>(null);
+  const thunderContext = useRef<AudioContext | null>(null);
+  const chosenLightning = previewLightning ? proposedLightning : lightning;
+  function prepareLightning() {
+    try { if (!source) throw new Error("Choose a video before preparing lightning and thunder."); setProposedLightning(lightningRecipe(duration / speed)); setPreviewLightning(false); setTool("ai"); }
+    catch (error) { setNotice(error instanceof Error ? error.message : "Choose a clip at least half a second long."); }
+  }
+  function unlockThunder() {
+    try { if (typeof AudioContext === "undefined") throw new Error("Audio preview is unavailable in this browser.");
+      const context = thunderContext.current ?? new AudioContext(); thunderContext.current = context; return context.resume();
+    } catch (error) { return Promise.reject(error); }
+  }
   const [source, setSource] = useState("");
   const [selected, setSelected] = useState<File | null>(null);
   const [asset, setAsset] = useState<MediaAsset | null>(null);
@@ -264,6 +285,34 @@ export function VideoEditor({
   const validOverlays = overlays.every(
     (o) => o.start >= 0 && o.end > o.start && o.end <= duration,
   );
+  let validLightning = true;
+  try { if (lightning) validateLightning(lightning, duration / speed); } catch { validLightning = false; }
+  useEffect(() => {
+    // Changing the source/trim/speed invalidates an old timing proposal instead of silently retiming it.
+    setPreviewLightning(false);setProposedLightning(null);
+  }, [source, start, duration, speed]);
+  useEffect(() => { setLightning(null);setLightningUndo(null); }, [source]);
+  useEffect(() => () => { void thunderContext.current?.close().catch(() => {}); }, []);
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !source || !chosenLightning || !active || busy) return;
+    let stop = () => {}, generation = 0;
+    const cancel = () => { generation++;stop();stop=()=>{}; };
+    const sync = async () => {
+      cancel();const current=generation;
+      if (video.paused || document.hidden) return;
+      try { validateLightning(chosenLightning, duration / speed);await unlockThunder();
+        if (current !== generation || video.paused) return;
+        const context=thunderContext.current!;
+        stop=scheduleThunder(context,chosenLightning,context.destination,Math.max(0,(video.currentTime-start)/speed),duration/speed);
+      } catch { if(current===generation)setNotice("Thunder preview was blocked. Tap Play again to enable audio."); }
+    };
+    const visibility = () => { if (document.hidden) cancel(); else void sync(); };
+    document.addEventListener("visibilitychange",visibility);
+    video.addEventListener("play",sync);video.addEventListener("pause",cancel);video.addEventListener("seeking",cancel);video.addEventListener("seeked",sync);video.addEventListener("ended",cancel);
+    if (!video.paused) void sync();
+    return () => { cancel();document.removeEventListener("visibilitychange",visibility);video.removeEventListener("play",sync);video.removeEventListener("pause",cancel);video.removeEventListener("seeking",cancel);video.removeEventListener("seeked",sync);video.removeEventListener("ended",cancel); };
+  }, [source, chosenLightning, start, duration, speed, active, busy]);
   const edit: LocalVideoEdit = {
     start,
     duration,
@@ -278,6 +327,7 @@ export function VideoEditor({
     saturation,
     overlays,
     soundtrack,
+    lightning: chosenLightning,
     ...(template === "product" ||
     template === "cinematic" ||
     template === "captions"
@@ -492,6 +542,8 @@ export function VideoEditor({
     !flip &&
     !edit.titleCard &&
     !soundtrack &&
+    !lightning &&
+    !previewLightning &&
     !overlays.length &&
     brightness === 1 &&
     contrast === 1 &&
@@ -542,6 +594,7 @@ export function VideoEditor({
   async function download(job: RenderJob, signal: AbortSignal) {
     const blob = await renderDownload(job.id, signal);
     if (signal.aborted) return;
+    setShareFile(new File([blob], `orbit-${job.id}.mp4`, { type: blob.type || "video/mp4" }));
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -581,6 +634,10 @@ export function VideoEditor({
             {source ? (
               <video
                 ref={videoRef}
+                onPlay={() => setPlaying(true)}
+                onPause={() => setPlaying(false)}
+                onEnded={() => setPlaying(false)}
+                onEmptied={() => setPlaying(false)}
                 onTimeUpdate={(event) =>
                   setPlayhead(event.currentTarget.currentTime)
                 }
@@ -768,20 +825,26 @@ export function VideoEditor({
           {source ? (
             <div className="video-playhead">
               <Button
+                type="button"
                 variant="outline"
                 disabled={busy}
+                aria-label={playing ? "Pause video preview" : "Play video preview"}
+                aria-pressed={playing}
+                title={playing ? "Pause video preview" : "Play video preview"}
+                style={{ minWidth: 44, minHeight: 44, padding: 10 }}
                 onClick={() => {
                   const v = videoRef.current;
                   if (v) {
-                    if (v.paused)
+                    if (v.paused) {
+                      if (chosenLightning) void unlockThunder().catch(() => setNotice("Tap Play again to enable thunder audio."));
                       void v
                         .play()
                         .catch(() => setNotice("Playback unavailable."));
-                    else v.pause();
+                    } else v.pause();
                   }
                 }}
               >
-                Play / pause
+                {playing ? <Pause size={20} strokeWidth={1.5} aria-hidden="true" /> : <Play size={20} strokeWidth={1.5} aria-hidden="true" />}
               </Button>
               <input
                 aria-label="Video playhead"
@@ -884,7 +947,9 @@ export function VideoEditor({
           </Button>
 </EditorToolPanel><EditorToolPanel tool="ai" active={tool}>
           <EditorAiPanel
+            assetIdentity={JSON.stringify([source, overlays.map(layer => layer.id)])}
             key={source}
+            onPrepareLightning={prepareLightning}
             kind="video"
             onOpenMusic={() => { setTool("music"); setNotice("Choose a music file below to add a local soundtrack."); }}
             source={() => {
@@ -915,6 +980,19 @@ export function VideoEditor({
             preview={preview}
             onApply={(changes) => applyAi(changes as VideoEditorChanges)}
           />
+          <section aria-label="Local lightning and thunder" className="surface" style={{padding:16}}>
+            <h3>Lightning + thunder</h3><p className="review-help">A stylized lightning overlay with synthesized thunder. Your original scene and music stay in place. This does not replace the background or generate a new clip.</p>
+            <Button variant="outline" disabled={busy || !source} onClick={prepareLightning}>Prepare lightning + thunder</Button>
+            {proposedLightning ? <div role="region" aria-label="Lightning proposal"><p>One lightning event at {proposedLightning.at.toFixed(2)}s in the finished video, followed by synthesized thunder after {proposedLightning.thunderDelay.toFixed(2)}s.</p><p className="review-help">Preview is temporary. Apply includes the effect in local video exports.</p>
+              <Button variant="outline" disabled={busy} onClick={() => { const video=videoRef.current;if(!video)return;setPreviewLightning(true);video.currentTime=start;void unlockThunder().then(()=>video.play()).catch(()=>setNotice("Tap Play to preview lightning and thunder.")); }}>Preview lightning + thunder</Button>
+              <Button variant="outline" disabled={busy || !previewLightning} onClick={()=>{videoRef.current?.pause();setPreviewLightning(false);}}>Stop effect preview</Button>
+              <Button disabled={busy} onClick={()=>{videoRef.current?.pause();setLightningUndo({effect:lightning});setLightning(proposedLightning);setPreviewLightning(false);setProposedLightning(null);setNotice("Lightning and synthesized thunder applied to local export.");}}>Apply lightning + thunder</Button>
+            </div> : null}
+            {lightning ? <p role="status">Lightning + synthesized thunder active.</p> : null}
+            {lightningUndo ? <Button variant="outline" disabled={busy} onClick={()=>{videoRef.current?.pause();setLightning(lightningUndo.effect);setLightningUndo(null);setPreviewLightning(false);setProposedLightning(null);setNotice("Lightning edit undone.");}}>Undo lightning edit</Button> : null}
+            {!validLightning ? <p role="alert">The applied lightning timing no longer fits this trim. Undo it or prepare a new effect before exporting.</p> : null}
+          </section>
+
           {aiUndo ? (
             <Button
               variant="outline"
@@ -1379,6 +1457,8 @@ export function VideoEditor({
               !validCaptions ||
               !validOverlays ||
               !validMusic ||
+              !validLightning ||
+              previewLightning ||
               (news && (!cleanText(title) || !dateLabel))
             }
             onClick={() =>
@@ -1404,6 +1484,7 @@ export function VideoEditor({
                       captions,
                       overlays,
                       soundtrack,
+                      lightning,
                       titleCard: edit.titleCard,
                       brightness,
                       contrast,
@@ -1418,6 +1499,7 @@ export function VideoEditor({
                     },
                   );
                   if (signal.aborted) return;
+                  setShareFile(new File([blob], `orbit-edited.${blob.type.includes("mp4") ? "mp4" : "webm"}`, { type: blob.type }));
                   const url = URL.createObjectURL(blob),
                     link = document.createElement("a");
                   link.href = url;
@@ -1441,6 +1523,7 @@ export function VideoEditor({
               ? `Exporting ${Math.round(exportProgress)}%`
               : "Export edited video locally"}
           </Button>
+          <MediaShare file={shareFile} disabled={busy}/>
           {exportProgress !== null ? (
             <>
               <progress

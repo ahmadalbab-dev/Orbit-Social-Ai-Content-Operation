@@ -1,3 +1,5 @@
+import { SocialOAuthController } from "./social-oauth.controller";
+import { SocialOAuthService } from "./social-oauth.service";
 import { BillingController } from "./billing.controller";
 import { BillingService } from "./billing.service";
 import { MediaController } from "./media.controller";
@@ -18,7 +20,7 @@ import { EditorAiController } from './editor-ai.controller';
 
 @Module({
   imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 60 }])],
-  controllers: [AppController, MediaController, BillingController, ImageAiController, VideoAiController, EditorAiController],
-  providers: [VideoAiService, ImageAiService, BillingService, MediaService, WorkflowService, DatabaseService, WorkspaceService, TenantAuthGuard, { provide: APP_GUARD, useClass: ThrottlerGuard }, { provide: APP_GUARD, useClass: TenantAuthGuard }]
+  controllers: [SocialOAuthController, AppController, MediaController, BillingController, ImageAiController, VideoAiController, EditorAiController],
+  providers: [SocialOAuthService, VideoAiService, ImageAiService, BillingService, MediaService, WorkflowService, DatabaseService, WorkspaceService, TenantAuthGuard, { provide: APP_GUARD, useClass: ThrottlerGuard }, { provide: APP_GUARD, useClass: TenantAuthGuard }]
 })
 export class AppModule {}

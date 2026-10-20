@@ -7,6 +7,12 @@ export const HF_CHAT_ENDPOINT = "https://router.huggingface.co/v1/chat/completio
 export const DEFAULT_HF_MODEL = "Qwen/Qwen3-235B-A22B-Instruct-2507";
 export const GROQ_CHAT_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 export const DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b";
+/** Validate identifiers only; provider endpoints remain fixed independently. */
+export function isValidTextModel(model: string, provider: "groq" | "huggingface" | "openai") {
+  if (!model || /\s/.test(model)) return false;
+  if (provider === "huggingface") return /^[\w.-]+\/[\w.-]+(?::[\w-]+)?$/.test(model);
+  return /^[\w.-]+(?:\/[\w.-]+)?$/.test(model);
+}
 export const aiModes = ["caption", "ideas", "rewrite", "hashtags", "script"] as const;
 const platforms = ["facebook", "instagram", "linkedin", "tiktok", "youtube", "x", "threads", "pinterest"] as const;
 const inputSchema = z.object({
@@ -104,7 +110,7 @@ export class HuggingFaceContentProvider {
   constructor(private readonly store: UsageStore, private readonly options: {apiKey:string;model?:string;monthlyBudgetUsd?:number;maxOutputTokens?:number;fetch?:typeof fetch;provider?:"groq"}) {
     if (!options.apiKey.trim() || /[\r\n]/.test(options.apiKey)) throw new AiProviderError("unconfigured");
     this.model = options.model ?? (options.provider === "groq" ? DEFAULT_GROQ_MODEL : DEFAULT_HF_MODEL);
-    if (!/^[\w.-]+\/[\w.-]+(?::[\w-]+)?$/.test(this.model)) throw new AiProviderError("unconfigured");
+    if (!isValidTextModel(this.model, options.provider ?? "huggingface")) throw new AiProviderError("unconfigured");
     this.maxOutputTokens = options.maxOutputTokens ?? 3000;
     if (!Number.isSafeInteger(this.maxOutputTokens) || this.maxOutputTokens < 128 || this.maxOutputTokens > 6000 || (options.monthlyBudgetUsd !== undefined && (!Number.isFinite(options.monthlyBudgetUsd) || options.monthlyBudgetUsd < 0))) throw new AiProviderError("unconfigured");
   }

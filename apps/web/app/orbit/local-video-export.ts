@@ -1,3 +1,4 @@
+import { drawLightning, scheduleThunder, validateLightning, type LightningEffect } from "./local-video-effects";
 import {
   prepareSoundtrack,
   startSoundtrack,
@@ -29,6 +30,7 @@ export interface LocalVideoEdit {
   saturation?: number;
   overlays?: VideoImageOverlay[];
   soundtrack?: LocalSoundtrack | null;
+  lightning?: LightningEffect | null;
   titleCard?: {
     text: string;
     kicker: string;
@@ -51,6 +53,7 @@ export function recorderMime(
 }
 export function validateVideoEdit(edit: LocalVideoEdit) {
   if (edit.soundtrack) validateSoundtrack(edit.soundtrack);
+  if (edit.lightning) validateLightning(edit.lightning, edit.duration / edit.speed);
   if (
     ![
       edit.start,
@@ -197,6 +200,7 @@ export function drawEditedFrame(
     );
     ctx.restore();
   }
+  if (edit.lightning) drawLightning(ctx, edit.lightning, elapsed / edit.speed, w, h);
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   if (edit.news) {
@@ -274,7 +278,7 @@ export async function exportLocalVideo(
   validateVideoEdit(edit);
   signal.throwIfAborted();
   if (
-    (edit.volume > 0 || edit.soundtrack) &&
+    (edit.volume > 0 || edit.soundtrack || (edit.lightning?.thunderVolume ?? 0) > 0) &&
     typeof AudioContext === "undefined"
   )
     throw new Error(
@@ -292,9 +296,10 @@ export async function exportLocalVideo(
   video.playbackRate = edit.speed;
   // Create/resume audio during the export button gesture. Audio is routed to the recording, not speakers.
   const audio =
-    (edit.volume > 0 || edit.soundtrack) && typeof AudioContext !== "undefined"
+    (edit.volume > 0 || edit.soundtrack || (edit.lightning?.thunderVolume ?? 0) > 0) && typeof AudioContext !== "undefined"
       ? new AudioContext()
       : null;
+  const audioReady = audio?.resume();
   const stream = canvas.captureStream(30);
   let frame = 0;
   let recorder: MediaRecorder | undefined;
@@ -302,6 +307,7 @@ export async function exportLocalVideo(
   let musicBuffer: AudioBuffer | null = null;
   let destination: MediaStreamAudioDestinationNode | null = null;
   let stopMusic = () => {};
+  let stopThunder = () => {};
   const deadline = setTimeout(
     () => {
       if (recorder?.state === "recording") recorder.stop();
@@ -309,6 +315,7 @@ export async function exportLocalVideo(
     (edit.duration / edit.speed + 20) * 1000,
   );
   try {
+    await audioReady;
     const images = new Map<string, HTMLImageElement>();
     await Promise.all(
       (edit.overlays ?? []).map(async (overlay) => {
@@ -320,7 +327,6 @@ export async function exportLocalVideo(
       }),
     );
     if (audio) {
-      await audio.resume();
       if (audio.state !== "running")
         throw new Error(
           "Audio export was blocked. Tap Export again, or mute the clip.",
@@ -442,6 +448,7 @@ export async function exportLocalVideo(
       void video
         .play()
         .then(() => {
+          if (audio && edit.lightning && destination) stopThunder = scheduleThunder(audio, edit.lightning, destination, 0, edit.duration / edit.speed);
           if (audio && musicBuffer && edit.soundtrack && destination)
             stopMusic = startSoundtrack(
               audio,
@@ -462,6 +469,7 @@ export async function exportLocalVideo(
   } finally {
     cleanupRecording();
     stopMusic();
+    stopThunder();
     clearTimeout(deadline);
     cancelAnimationFrame(frame);
     if (recorder?.state === "recording") recorder.stop();

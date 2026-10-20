@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AiProviderError, aiProviderResponseError, DEFAULT_HF_MODEL, DEFAULT_GROQ_MODEL, GROQ_CHAT_ENDPOINT, HF_CHAT_ENDPOINT, readBoundedAiJson } from "./huggingface.js";
+import { AiProviderError, aiProviderResponseError, DEFAULT_HF_MODEL, DEFAULT_GROQ_MODEL, GROQ_CHAT_ENDPOINT, HF_CHAT_ENDPOINT, readBoundedAiJson, isValidTextModel } from "./huggingface.js";
 const inputSchema = z.object({ brief: z.string().trim().min(1).max(3000), duration: z.number().finite().positive().max(600) }).strict();
 export function validateVideoPlanInput(input: unknown) { return inputSchema.parse(input); }
 const segment = (max: number) => z.object({ text: z.string().trim().min(1).max(max), start: z.number().finite().min(0), end: z.number().finite().positive() }).strict();
@@ -19,7 +19,7 @@ export function parseVideoPlan(text: string, duration: number): VideoPlan {
 export class HuggingFaceVideoPlanner {
   private readonly model: string;
   constructor(private readonly token: string, model = DEFAULT_HF_MODEL, private readonly fetcher: typeof fetch = fetch, private readonly provider: "huggingface" | "groq" = "huggingface") {
-    if (!/^[\w.-]+\/[\w.-]+(?::[\w-]+)?$/.test(model)) throw new AiProviderError("unconfigured");
+    if (!isValidTextModel(model, provider)) throw new AiProviderError("unconfigured");
     this.model = model;
   }
   async plan(input: unknown): Promise<VideoPlan> {

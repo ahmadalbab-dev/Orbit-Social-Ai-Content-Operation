@@ -36,7 +36,12 @@ const errorMessage = (error: unknown) => error instanceof Error ? error.message 
 export default function Home({workspaceId,workspaceName="Preview workspace",workspaceControls,preview=false}:{workspaceId:string;workspaceName?:string;workspaceControls?:ReactNode;preview?:boolean}) {
   const [view, setView] = useState<View>("overview");
   useEffect(() => {
-    const requested = new URLSearchParams(window.location.search).get("view");
+    const query = new URLSearchParams(window.location.search);
+    const requested = query.get("view");
+    if (!preview && ["connected", "failed"].includes(query.get("oauth") ?? "") && ["facebook", "instagram", "threads"].includes(query.get("provider") ?? "")) {
+      setView("connections");
+      return; // ConnectionsPanel rechecks workspace status, then removes the result query.
+    }
     const allowed: View[] = ["overview", "studio", "video", "calendar", "connections", "settings", "profile"];
     if (allowed.includes(requested as View)) setView(requested as View);
   }, []);

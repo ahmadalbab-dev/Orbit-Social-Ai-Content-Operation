@@ -2,6 +2,27 @@ import {describe,it,expect,vi} from 'vitest';
 import {EditorPlanner,parseEditorPlan,validateEditorInput} from './editor-planner';
 const image={kind:'image',instruction:'Make a warm poster',current:{brightness:100}};
 describe('conversational editor boundary',()=>{
+ it.each(['llama-3.3-70b-versatile','openai/gpt-oss-120b'])('forwards configured Groq editor model %s to its fixed endpoint',async model=>{
+  const plan={summary:'Adjusted',changes:{brightness:110}};
+  const fetcher=vi.fn().mockResolvedValue(Response.json({choices:[{message:{content:JSON.stringify(plan)}}]}));
+  expect(await new EditorPlanner('fixture','groq',model,fetcher).plan(image)).toEqual(plan);
+  expect(fetcher.mock.calls[0][0]).toBe('https://api.groq.com/openai/v1/chat/completions');
+  expect(JSON.parse(fetcher.mock.calls[0][1].body).model).toBe(model);
+ });
+ it('uses the same provider identifier boundary for preview model selection',async()=>{
+  const plan={summary:'Adjusted',changes:{brightness:110}},input={...image,previewDataUrl:'data:image/jpeg;base64,/9j/2Q=='};
+  const fetcher=vi.fn().mockResolvedValue(Response.json({choices:[{message:{content:JSON.stringify(plan)}}]}));
+  await new EditorPlanner('fixture','groq',undefined,fetcher,'fixture-vision-model').plan(input);
+  expect(JSON.parse(fetcher.mock.calls[0][1].body).model).toBe('fixture-vision-model');
+  expect(fetcher.mock.calls[0][0]).toBe('https://api.groq.com/openai/v1/chat/completions');
+  fetcher.mockClear();
+  for(const model of ['https://example.test/model','model name','model\n','org/model/extra']){
+   expect(()=>new EditorPlanner('fixture','groq',model,fetcher)).toThrow();
+   await expect(new EditorPlanner('fixture','groq',undefined,fetcher,model).plan(input)).rejects.toThrow();
+  }
+  expect(()=>new EditorPlanner('fixture','huggingface','flat-model',fetcher)).toThrow();
+  expect(fetcher).not.toHaveBeenCalled();
+ });
  it('routes coherent editable changes through Groq without media upload',async()=>{
   const plan={summary:'Warm poster',changes:{template:'poster',caption:'Everyday',background:'#eee1cc',textColor:'#302222'}};
   const fetcher=vi.fn().mockResolvedValue(Response.json({choices:[{message:{content:JSON.stringify(plan)}}]}));
@@ -65,4 +86,14 @@ describe('visual composition context',()=>{
   for(const previewDataUrl of ['https://private.test/file','data:image/svg+xml;base64,PHN2Zz4=',`data:image/jpeg;base64,${'a'.repeat(700001)}`])await expect(new EditorPlanner('fixture','groq',undefined,fetcher).plan({...image,previewDataUrl})).rejects.toThrow();
   await expect(new EditorPlanner('fixture','huggingface',undefined,fetcher).plan({...image,previewDataUrl:'data:image/jpeg;base64,/9j/2Q=='})).rejects.toThrow();expect(fetcher).not.toHaveBeenCalled();
  });
+});
+
+
+describe('uploaded image background boundary',()=>{
+ const input=validateEditorInput({kind:'image',instruction:'Use second image as background',current:{hasBaseImage:true,layers:[{index:0,x:50,y:50,width:40,opacity:100}]}});
+ it('accepts only an uploaded background image and clearing its role',()=>{
+  for(const backgroundLayerIndex of [0,null])expect(parseEditorPlan(JSON.stringify({summary:'Use uploaded photo behind the base',changes:{backgroundLayerIndex}}),input).changes).toEqual({backgroundLayerIndex});
+  for(const backgroundLayerIndex of [1,-1,0.5,'0','https://example.com'])expect(()=>parseEditorPlan(JSON.stringify({summary:'Invalid background',changes:{backgroundLayerIndex}}),input)).toThrow();
+ });
+ it('keeps image-only actions out of video plans',()=>{expect(()=>parseEditorPlan(JSON.stringify({summary:'Invalid role',changes:{backgroundLayerIndex:0}}),validateEditorInput({kind:'video',instruction:'Background',current:{sourceDuration:10}}))).toThrow();});
 });

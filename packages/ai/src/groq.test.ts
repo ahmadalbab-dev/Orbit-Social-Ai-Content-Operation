@@ -1,12 +1,35 @@
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_GROQ_MODEL, GROQ_CHAT_ENDPOINT, GroqContentProvider, HuggingFaceContentProvider } from "./huggingface";
-import { GroqVideoPlanner } from "./huggingface-video-plan";
+import { DEFAULT_GROQ_MODEL, GROQ_CHAT_ENDPOINT, GroqContentProvider, HuggingFaceContentProvider, isValidTextModel } from "./huggingface";
+import { GroqVideoPlanner, HuggingFaceVideoPlanner } from "./huggingface-video-plan";
 import type { UsageStore } from "./index";
 const input = { workspaceId:"ws", brandName:"Orbit", voice:"Clear", audience:"Creators", topic:"A product introduction", platforms:["facebook" as const] };
 const variants = [{ platform:"facebook", copy:"An idea for your next post.", hashtags:[], callToAction:"What will you create?" }];
 function store(): UsageStore { return { find:vi.fn().mockResolvedValue(null), monthlyCost:vi.fn().mockResolvedValue(0), save:vi.fn() }; }
 const completion = () => Response.json({choices:[{finish_reason:"stop",message:{content:JSON.stringify({variants})}}]});
 describe("Groq text and video planning", () => {
+  it.each(["llama-3.3-70b-versatile", "openai/gpt-oss-120b"])("forwards configured model %s to fixed Groq text and video endpoints", async model => {
+    const fetcher=vi.fn().mockResolvedValue(completion());
+    await new GroqContentProvider(store(),{apiKey:"gsk_fixture",model,fetch:fetcher}).generateVariants(input);
+    expect(fetcher.mock.calls[0][0]).toBe(GROQ_CHAT_ENDPOINT);
+    expect(JSON.parse(fetcher.mock.calls[0][1].body).model).toBe(model);
+    const plan={title:"Test",captions:[],scenes:[{text:"Product",start:0,end:5}]};
+    fetcher.mockResolvedValue(Response.json({choices:[{message:{content:JSON.stringify(plan)}}]}));
+    await new GroqVideoPlanner("gsk_fixture",model,fetcher).plan({brief:"Product",duration:5});
+    expect(fetcher.mock.calls[1][0]).toBe(GROQ_CHAT_ENDPOINT);
+    expect(JSON.parse(fetcher.mock.calls[1][1].body).model).toBe(model);
+  });
+  it.each(["", "https://example.test/model", "model name", "model\n", "model?key=value", "org/model/extra", "org/model:route"])("rejects malformed Groq identifier %j before provider dispatch", model => {
+    const fetcher=vi.fn();
+    expect(()=>new GroqContentProvider(store(),{apiKey:"gsk_fixture",model,fetch:fetcher})).toThrow();
+    expect(()=>new GroqVideoPlanner("gsk_fixture",model,fetcher)).toThrow();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("preserves HF namespaced routing and keeps flat models provider-specific", () => {
+    expect(isValidTextModel("Qwen/Qwen3:provider", "huggingface")).toBe(true);
+    expect(isValidTextModel("gpt-4.1-mini", "openai")).toBe(true);
+    expect(()=>new HuggingFaceContentProvider(store(),{apiKey:"hf_fixture",model:"llama-3.3-70b-versatile"})).toThrow();
+    expect(()=>new HuggingFaceVideoPlanner("hf_fixture","llama-3.3-70b-versatile")).toThrow();
+  });
   it("uses only the fixed Groq endpoint and Groq key with validated saved output", async () => {
     const usage=store(), fetcher=vi.fn().mockResolvedValue(completion());
     const result=await new GroqContentProvider(usage,{apiKey:"gsk_fixture",fetch:fetcher}).generateVariants(input);
