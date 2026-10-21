@@ -23,3 +23,9 @@ it('filters unsupported catalog entries before limiting selectable results', () 
   expect(librarySounds({ results: [...unsupported, row] })).toHaveLength(1);
   expect(librarySounds({ results: Array.from({ length: 40 }, (_, index) => ({ ...row, id: String(index) })) })).toHaveLength(12);
 });
+
+it('accepts CC0 Freesound preview MP3 only when its source identity matches', () => {
+  const sound = { ...row, source: 'freesound', url: 'https://cdn.freesound.org/previews/155/155139_2098884-hq.mp3', foreign_landing_url: 'https://freesound.org/people/composer/sounds/155139/' };
+  expect(librarySounds({ results: [sound] })[0]).toMatchObject({ extension: 'mp3', url: sound.url });
+  for (const patch of [{ url: sound.url.replace('cdn.freesound.org', 'cdn.freesound.org.evil.test') }, { url: sound.url.replace('/previews/', '/arbitrary/') }, { url: sound.url.replace('-hq.mp3', '-hq.exe') }, { foreign_landing_url: sound.foreign_landing_url.replace('155139', '99999') }, { license: 'by-nc' }]) expect(librarySounds({ results: [{ ...sound, ...patch }] })).toEqual([]);
+});

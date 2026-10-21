@@ -4,7 +4,7 @@ import { Button } from './ui';
 import { boundedAudioFile, librarySounds, type LibrarySound } from './sound-library-api';
 import './sound-library.css';
 export function SoundLibrary({ disabled, onChooseFile }: { disabled: boolean; onChooseFile: (file: File) => Promise<boolean> }) {
-  const [query, setQuery] = useState('piano');
+  const [query, setQuery] = useState('ambient');
   const [results, setResults] = useState<LibrarySound[]>([]), [selected, setSelected] = useState<LibrarySound | null>(null);
   const [confirmed, setConfirmed] = useState(false), [busy, setBusy] = useState(false), [notice, setNotice] = useState('');
   const request = useRef<AbortController | null>(null), player = useRef<HTMLAudioElement>(null), alive = useRef(true);
@@ -20,14 +20,14 @@ export function SoundLibrary({ disabled, onChooseFile }: { disabled: boolean; on
     finally { clearTimeout(timer); if (alive.current) setBusy(false); }
   }
   async function search() { await run(async signal => {
-    const params = new URLSearchParams({ q: query.trim().slice(0, 80), license: 'cc0', source: 'wikimedia_audio', page_size: '40' });
+    const params = new URLSearchParams({ q: query.trim().slice(0, 80), license: 'cc0', source: 'freesound', page_size: '40' });
     const response = await fetch(`https://api.openverse.org/v1/audio/?${params}`, { signal, credentials: 'omit', referrerPolicy: 'no-referrer' });
     if (!response.ok) throw Error(response.status === 429 ? 'The public sound library reached its request limit. Try later or use local audio.' : 'Cannot reach the sound library. Try later or use local audio.');
     const tracks = librarySounds(await response.json()); signal.throwIfAborted(); if (!alive.current) return;
     setResults(tracks); setSelected(null); setConfirmed(false); setNotice(tracks.length ? 'Choose a result to preview and review its source.' : 'No supported CC0 sounds found. Try another term, such as ambient, piano or whoosh.');
   }); }
   return <details className="sound-library" open><summary>Search music &amp; sound library</summary>
-    <p>Search CC0 audio from Wikimedia. Availability is limited. Check the source before using a sound in your project.</p>
+    <p>Browse CC0 music and sounds from Freesound through Openverse. Select a preview, then check the source before using it.</p>
     <form onSubmit={event => { event.preventDefault(); void search(); }}>
       <label className="field">Sound search<input aria-label="Sound library search" maxLength={80} value={query} onChange={event => setQuery(event.target.value)} disabled={disabled || busy}/></label>
       <Button type="submit" disabled={disabled || busy}>{busy ? 'Loading sounds…' : 'Search sounds'}</Button>

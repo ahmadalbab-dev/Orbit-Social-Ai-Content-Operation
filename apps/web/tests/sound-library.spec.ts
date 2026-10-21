@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { toneWav } from './audio-fixtures';
 import { selectEditorTool } from './editor-helpers';
-const result = { id: 'library-tone', title: 'Library piano', creator: 'Fixture composer', license: 'cc0', license_url: 'https://creativecommons.org/publicdomain/zero/1.0/deed.en/', source: 'wikimedia_audio', category: 'music', mature: false, foreign_landing_url: 'https://commons.wikimedia.org/wiki/File:Fixture.wav', url: 'https://upload.wikimedia.org/wikipedia/commons/a/ab/Fixture.wav' };
+const result = { id: 'library-tone', title: 'Library piano', creator: 'Fixture composer', license: 'cc0', license_url: 'https://creativecommons.org/publicdomain/zero/1.0/deed.en/', source: 'freesound', category: 'music', mature: false, foreign_landing_url: 'https://freesound.org/people/fixture/sounds/155139/', url: 'https://cdn.freesound.org/previews/155/155139_2098884-hq.mp3' };
 for (const kind of ['Image', 'Video'] as const) test(`${kind} editor imports a bounded library sound through the local soundtrack decoder`, async ({ page }) => {
-  await page.route('https://api.openverse.org/v1/audio/**', route => { const url = new URL(route.request().url()); expect(url.searchParams.get('license')).toBe('cc0'); expect(url.searchParams.get('source')).toBe('wikimedia_audio'); return route.fulfill({ json: { results: [result, { ...result, id: 'excluded', license: 'by-nc', title: 'Restricted song' }] } }); });
+  await page.route('https://api.openverse.org/v1/audio/**', route => { const url = new URL(route.request().url()); expect(url.searchParams.get('license')).toBe('cc0'); expect(url.searchParams.get('source')).toBe('freesound'); return route.fulfill({ json: { results: [result, { ...result, id: 'excluded', license: 'by-nc', title: 'Restricted song' }] } }); });
   await page.route(result.url, route => route.fulfill({ contentType: 'audio/wav', body: toneWav() }));
   await page.goto(`/preview/editor/${kind.toLowerCase()}`); await selectEditorTool(page, kind, 'Music');
   await expect(page.getByLabel('Sound library search')).toBeVisible();

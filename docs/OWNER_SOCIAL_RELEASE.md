@@ -8,7 +8,7 @@ Use https://orbit-ai-studio-two.vercel.app/editor/image after signing into a wor
 
 ## Owner configuration
 
-In Vercel, select the **orbit-ai-studio-api** project, Settings → Environment Variables → Production. Configure values directly there; never paste credentials into chat or NEXT_PUBLIC variables. Redeploy the API after saving. API_URL and the Meta/Threads redirect values have already been added to project configuration; the current production build predates those additions and later redeployment is required.
+In Vercel, select the **orbit-ai-studio-api** project, Settings → Environment Variables → Production. Configure values directly there; never paste credentials into chat or NEXT_PUBLIC variables. Redeploy the API after saving. API_URL and the Meta/Threads redirect values have already been added to project configuration; the PR #9 production build predates those additions and later redeployment is required.
 
 Shared configuration: WEB_URL=https://orbit-ai-studio-two.vercel.app, API_URL=https://orbit-ai-studio-api.vercel.app. Set TOKEN_ENCRYPTION_KEY to a dedicated base64 encoding of 32 cryptographically random bytes; keep it stable after connections are stored. A local Node command to generate it is `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"`. Enter the result into Vercel only.
 
@@ -39,3 +39,5 @@ Native Share remains usable without account linking. The user confirmed an actua
 ## Music verification and remaining limits
 
 Openverse catalog returned HTTP 200 and 170 piano results from DESKTOP-ALBAB, with Access-Control-Allow-Origin:* when the Orbit Origin header was sent. Cloud execution received a Cloudflare challenge; that is not evidence of global outage. A Wikimedia audio HEAD check timed out, so no real track playback/download is claimed. Catalog source URLs, file limits and CC0 checks remain enforced; search is shown open and filtering precedes the display limit in the follow-up patch. Browser acceptance uses controlled audio fixtures to exercise preview/import. Real iPhone playback/export still requires device testing.
+
+Follow-up Music source: Openverse returned actual CC0 Freesound entries. A byte-range GET of the catalog-provided `cdn.freesound.org/previews/...-hq.mp3` returned HTTP206, audio/mpeg, Access-Control-Allow-Origin:* and512 bytes from DESKTOP-ALBAB. Default search uses Freesound preview MP3 for mobile compatibility. Only exact preview paths whose sound ID matches the Freesound source page are accepted. Full device playback remains unverified; the sample-byte request does not establish whole-file decoding/export.
