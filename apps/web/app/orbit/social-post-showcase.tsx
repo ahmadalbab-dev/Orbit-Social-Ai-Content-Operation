@@ -8,6 +8,7 @@ const examples = [
  {id:"facebook",name:"Facebook",caption:"A little room for your next big idea.\n\nThoughtful details. A fresh perspective. Something worth sharing with your community.",approach:"A welcoming introduction, with room to tell the story behind your image.",media:"Landscape image, with the caption above it.",format:"Landscape image post"},
  {id:"instagram",name:"Instagram",caption:"Small details. Fresh possibilities.\nMake room for your next idea.\n\n#CreativeSpace #MadeWithCare",approach:"A short visual story, followed by a few relevant hashtags.",media:"Square image first, with the caption underneath.",format:"Square image post"},
  {id:"threads",name:"Threads",caption:"Sometimes a fresh idea starts with a little breathing room.\n\nWhat are you making space for today?",approach:"A conversational thought and a question that invites a reply.",media:"Text first, with a supporting image below.",format:"Text + image post"},
+ {id:"tiktok",name:"TikTok",caption:"A fresh perspective, one detail at a time.\nWhat would you create here? #CreativeSpace",approach:"An opening hook and a concise caption that invites a response.",media:"A portrait photo post with a short caption. Video clips can be prepared in Media.",format:"Portrait photo post"},
 ] as const;
 export function SocialPostShowcase({brandName,onCreate}:{brandName:string;onCreate:()=>void}) {
  const [platform,setPlatform]=useState<OrbitChannel>("facebook");

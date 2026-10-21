@@ -6,6 +6,7 @@ import { Button } from "./ui";
 
 type Props = {
   source: () => HTMLCanvasElement | null;
+  instructionDraft?: {text:string;id:number};
   disabled: boolean;
   preview: boolean;
   onResult: (blob: Blob) => Promise<void> | void;
@@ -14,6 +15,7 @@ type Props = {
 /** Only the explicit edit action uploads a bounded preview. The original stays on the device. */
 export function ImageAiPanel({
   source,
+  instructionDraft,
   disabled,
   preview,
   onResult,
@@ -39,6 +41,7 @@ export function ImageAiPanel({
       pending.current = null;
     };
   }, [preview]);
+  useEffect(() => { if (instructionDraft) setPrompt(instructionDraft.text.slice(0,1500)); }, [instructionDraft]);
   const needsMusic =
     /\b(?:add|insert|attach|include|put|tambah|masuk(?:kan)?|letak|sertakan)[\s\S]{0,80}(?:music|muzik|audio|soundtrack|song|lagu|voiceover|suara)\b/i.test(
       prompt,

@@ -45,3 +45,28 @@ test('image replacement starts neutral and customer text survives an explicitly 
   const pixel = await page.getByLabel('Edited image preview', { exact: true }).evaluate(node => Array.from((node as HTMLCanvasElement).getContext('2d')!.getImageData(60, 40, 1, 1).data));
   expect(pixel).toEqual([36, 104, 66, 255]);
 });
+
+test('expanded image and video starter kits apply real editable settings', async ({ page }) => {
+  await page.goto('/preview/editor/image');
+  const png = Buffer.from(await page.evaluate(() => { const c = document.createElement('canvas'); c.width = 120; c.height = 80; const ctx = c.getContext('2d')!; ctx.fillStyle = '#246842'; ctx.fillRect(0, 0, 120, 80); return c.toDataURL().split(',')[1]; }), 'base64');
+  await page.getByLabel('Choose image', { exact: true }).setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: png });
+  await selectEditorTool(page, 'Image', 'Templates');
+  await expect(page.locator('.image-creative-presets > button')).toHaveCount(20);
+  await page.getByRole('button', { name: /Mono manifesto/ }).click();
+  await selectEditorTool(page, 'Image', 'Adjust & text');
+  await expect(page.getByLabel('Image crop', { exact: true })).toHaveValue('1:1');
+  await expect(page.getByLabel('Image saturation', { exact: true })).toHaveValue('0');
+  const corner = await page.getByLabel('Edited image preview', { exact: true }).evaluate(node => Array.from((node as HTMLCanvasElement).getContext('2d')!.getImageData(0, 0, 1, 1).data));
+  expect(corner).toEqual([238, 234, 228, 255]);
+
+  await page.goto('/preview/editor/video');
+  await page.getByLabel('Choose video', { exact: true }).setInputFiles(clip);
+  await selectEditorTool(page, 'Video', 'Templates');
+  await expect(page.locator('.video-creative-presets > button')).toHaveCount(20);
+  await page.getByRole('button', { name: /Launch teaser/ }).click();
+  await selectEditorTool(page, 'Video', 'Adjust & text');
+  await expect(page.getByLabel('Video format', { exact: true })).toHaveValue('portrait');
+  await expect(page.getByLabel('Video contrast', { exact: true })).toHaveValue('1.18');
+  await expect(page.getByLabel('Template video headline', { exact: true })).toHaveValue('Something new is coming');
+  await expect(page.getByRole('checkbox', { name: 'News report overlay' })).not.toBeChecked();
+});

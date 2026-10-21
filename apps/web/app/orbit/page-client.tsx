@@ -23,7 +23,7 @@ import "./workspace-settings.css";
 import "./workspace-navigation.css";
 import {ConnectionsPanel,type IntegrationStatus} from "./connections-panel";
 
-const channels = ["facebook", "instagram", "threads"] as const;
+const channels = ["facebook", "instagram", "threads", "tiktok"] as const;
 type Variant = { platform: string; copy: string; hashtags: string[]; callToAction: string };
 type Content = { id: string; topic: string; status: string; revision: number; source?: string; variants: Variant[]; scheduledFor?: string; approvedRevision?: number };
 import {brandPayload,profileFromBrand,type Profile,type StoredBrand} from "./brand-profile";
@@ -113,7 +113,7 @@ function ContentStudio({profile,items,onRefresh,openedDraft,preview=false}:{prev
   const [generating,setGenerating]=useState(false);
   const brandCache=useRef<{key:string;id:string}|null>(null);
   const [topic,setTopic]=useState("Kongsi peluang mencari kerja dan ajak orang berbual tentang kawasan kerja pilihan mereka.");
-  const [selected,setSelected]=useState<string[]>([...channels]);
+  const [selected,setSelected]=useState<string[]>(["facebook", "instagram", "threads"]);
   const [item,setItem]=useState<Content|null>(null);
   const [variants,setVariants]=useState<Variant[]>([]);
   const [active,setActive]=useState("facebook");
