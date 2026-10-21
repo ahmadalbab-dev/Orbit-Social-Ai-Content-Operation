@@ -23,8 +23,19 @@ test('customer motion instruction previews actual pixels and exports a moving im
   await page.getByRole('button',{name:'Undo image motion',exact:true}).click();
   await expect(page.getByLabel('Image movie motion',{exact:true})).toHaveValue('zoom-in');
   await page.getByLabel('Image movie seconds per slide',{exact:true}).fill('1');
-  const capture=await page.evaluate(()=>typeof HTMLCanvasElement.prototype.captureStream==='function');
-  if(!capture){await page.getByRole('button',{name:'Export image movie',exact:true}).click();await expect(page.getByText(/Video export requires a current Chrome or Safari browser/)).toBeVisible();return;}
+  // Follow exportCanvasMovie's actual guards: this WebKit build can expose
+  // captureStream even when MediaRecorder itself is unavailable.
+  const unsupported=await page.evaluate(()=>{
+    if(typeof MediaRecorder==='undefined'||typeof HTMLCanvasElement.prototype.captureStream!=='function')return 'Video export requires a current Chrome or Safari browser.';
+    if(!['video/mp4','video/webm;codecs=vp8,opus','video/webm'].some(type=>MediaRecorder.isTypeSupported(type)))return 'Video encoding is unavailable.';
+    return null;
+  });
+  if(unsupported){
+    await page.getByRole('button',{name:'Export image movie',exact:true}).click();
+    await expect(page.getByText(unsupported,{exact:true})).toBeVisible();
+    expect(posts).toEqual([]);
+    return;
+  }
   const download=page.waitForEvent('download');await page.getByRole('button',{name:'Export image movie',exact:true}).click();
   const file=await download;const movie=await readFile((await file.path())!);
   expect(movie.length).toBeGreaterThan(100);
