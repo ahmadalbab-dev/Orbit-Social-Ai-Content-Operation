@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ImageAiService } from "./image-ai.service";
-import { AiProviderError, GeminiImageEditor, HuggingFaceImageEditor } from "@sma/ai";
+import { AiProviderError, CloudflareImageEditor, GeminiImageEditor, HuggingFaceImageEditor } from "@sma/ai";
 import type { DatabaseService } from "./database.service";
 import type { BillingService } from "./billing.service";
 const identity = {
@@ -146,5 +146,143 @@ describe('explicit Gemini image selection', () => {
   it('preserves HF as default even when a Gemini key exists', () => {
     vi.stubEnv('AI_IMAGE_PROVIDER', 'huggingface'); vi.stubEnv('HF_TOKEN', 'hf_retained'); vi.stubEnv('GEMINI_API_KEY', 'gemini_fixture');
     expect(setup().service.status()).toMatchObject({ provider: 'fal-ai', configured: true, verified: false });
+  });
+});
+
+describe("explicit Cloudflare image selection", () => {
+  const account = "0123456789abcdef0123456789abcdef";
+  function configure() {
+    vi.stubEnv("AI_IMAGE_PROVIDER", "cloudflare");
+    vi.stubEnv("CLOUDFLARE_API_TOKEN", "cloudflare_fixture");
+    vi.stubEnv("CLOUDFLARE_ACCOUNT_ID", account);
+    vi.stubEnv("HF_TOKEN", "hf_retained");
+    vi.stubEnv("GEMINI_API_KEY", "gemini_retained");
+  }
+  it("reports configuration without exposing credential or account identifiers", () => {
+    configure();
+    const status = setup().service.status();
+    expect(status).toMatchObject({
+      configured: true,
+      provider: "cloudflare",
+      model: "@cf/black-forest-labs/flux-2-klein-4b",
+      verified: false,
+    });
+    for (const value of [
+      account,
+      "cloudflare_fixture",
+      "hf_retained",
+      "gemini_retained",
+    ])
+      expect(JSON.stringify(status)).not.toContain(value);
+  });
+  it("dispatches only to Cloudflare after existing billing and atomic quota checks", async () => {
+    configure();
+    const ctx = setup();
+    const output = { bytes: new Uint8Array([1]), contentType: "image/png" };
+    const cf = vi
+      .spyOn(CloudflareImageEditor.prototype, "edit")
+      .mockResolvedValue(output);
+    const hf = vi.spyOn(HuggingFaceImageEditor.prototype, "edit");
+    const gemini = vi.spyOn(GeminiImageEditor.prototype, "edit");
+    expect(await ctx.service.edit(identity, input)).toBe(output);
+    expect(ctx.requirePaidAccess).toHaveBeenCalledWith("ws");
+    expect(ctx.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          workspaceId: "ws",
+          used: { lt: 100 },
+        }),
+        data: { used: { increment: 1 } },
+      }),
+    );
+    expect(ctx.requirePaidAccess.mock.invocationCallOrder[0]).toBeLessThan(
+      ctx.updateMany.mock.invocationCallOrder[0],
+    );
+    expect(ctx.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
+      cf.mock.invocationCallOrder[0],
+    );
+    expect(cf).toHaveBeenCalledWith(input);
+    expect(hf).not.toHaveBeenCalled();
+    expect(gemini).not.toHaveBeenCalled();
+  });
+  it.each(["access_denied", "credits_unavailable", "rate_limited"] as const)(
+    "retains safe %s classification and metering without a provider fallback",
+    async (code) => {
+      configure();
+      const ctx = setup();
+      vi.spyOn(CloudflareImageEditor.prototype, "edit").mockRejectedValue(
+        new AiProviderError(code),
+      );
+      const hf = vi.spyOn(HuggingFaceImageEditor.prototype, "edit");
+      const gemini = vi.spyOn(GeminiImageEditor.prototype, "edit");
+      await expect(ctx.service.edit(identity, input)).rejects.toMatchObject({
+        response: expect.objectContaining({ code: `AI_${code.toUpperCase()}` }),
+      });
+      expect(ctx.updateMany).toHaveBeenCalledOnce();
+      expect(hf).not.toHaveBeenCalled();
+      expect(gemini).not.toHaveBeenCalled();
+    },
+  );
+  it.each([
+    ["", account],
+    ["token\nvalue", account],
+    ["token value", account],
+    ["token\tvalue", account],
+    ["tokené", account],
+    ["x".repeat(1025), account],
+    ["token", ""],
+    ["token", "bad-account"],
+    ["token", `${account}/requests`],
+    ["token", ` ${account}`],
+    ["token", `${account}\n`],
+  ])(
+    "rejects missing or invalid Cloudflare credentials before billing or quota",
+    async (token, accountId) => {
+      configure();
+      vi.stubEnv("CLOUDFLARE_API_TOKEN", token);
+      vi.stubEnv("CLOUDFLARE_ACCOUNT_ID", accountId);
+      const ctx = setup();
+      const cf = vi.spyOn(CloudflareImageEditor.prototype, "edit");
+      expect(ctx.service.status()).toMatchObject({
+        provider: "cloudflare",
+        configured: false,
+        verified: false,
+      });
+      await expect(ctx.service.edit(identity, input)).rejects.toThrow(
+        "not configured",
+      );
+      expect(ctx.requirePaidAccess).not.toHaveBeenCalled();
+      expect(ctx.upsert).not.toHaveBeenCalled();
+      expect(ctx.updateMany).not.toHaveBeenCalled();
+      expect(cf).not.toHaveBeenCalled();
+    },
+  );
+  it("does not dispatch after workspace quota is exhausted", async () => {
+    configure();
+    const ctx = setup(0);
+    const cf = vi.spyOn(CloudflareImageEditor.prototype, "edit");
+    await expect(ctx.service.edit(identity, input)).rejects.toThrow(
+      "quota reached",
+    );
+    expect(cf).not.toHaveBeenCalled();
+  });
+  it("does not dispatch for a read-only workspace member", async () => {
+    configure();
+    const ctx = setup();
+    const cf = vi.spyOn(CloudflareImageEditor.prototype, "edit");
+    await expect(
+      ctx.service.edit({ ...identity, role: "VIEWER" }, input),
+    ).rejects.toThrow("Role");
+    expect(ctx.requirePaidAccess).not.toHaveBeenCalled();
+    expect(cf).not.toHaveBeenCalled();
+  });
+  it("does not auto-select Cloudflare merely because its credentials exist", () => {
+    configure();
+    delete process.env.AI_IMAGE_PROVIDER;
+    expect(setup().service.status()).toMatchObject({
+      provider: "fal-ai",
+      configured: true,
+      verified: false,
+    });
   });
 });

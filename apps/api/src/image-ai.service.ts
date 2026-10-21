@@ -5,6 +5,8 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import {
+  CLOUDFLARE_IMAGE_MODEL,
+  CloudflareImageEditor,
   GEMINI_IMAGE_MODEL,
   GeminiImageEditor,
   HF_IMAGE_MODEL,
@@ -25,16 +27,50 @@ export class ImageAiService {
   ) {}
   private imageConfig() {
     const selected = process.env.AI_IMAGE_PROVIDER ?? "huggingface";
-    const provider = selected === "gemini" || selected === "huggingface" ? selected : null;
-    const apiKey = provider === "gemini" ? process.env.GEMINI_API_KEY : provider === "huggingface" ? process.env.HF_TOKEN : undefined;
-    return { provider, apiKey, configured: !!provider && Boolean(apiKey?.trim()) && !/[\r\n]/.test(apiKey ?? "") };
+    const provider =
+      selected === "gemini" ||
+      selected === "huggingface" ||
+      selected === "cloudflare"
+        ? selected
+        : null;
+    const apiKey =
+      provider === "gemini"
+        ? process.env.GEMINI_API_KEY
+        : provider === "huggingface"
+          ? process.env.HF_TOKEN
+          : provider === "cloudflare"
+            ? process.env.CLOUDFLARE_API_TOKEN
+            : undefined;
+    const accountId =
+      provider === "cloudflare" ? process.env.CLOUDFLARE_ACCOUNT_ID : undefined;
+    return {
+      provider,
+      apiKey,
+      accountId,
+      configured:
+        !!provider &&
+        Boolean(apiKey?.trim()) &&
+        !/[\r\n]/.test(apiKey ?? "") &&
+        (provider !== "cloudflare" ||
+          (accountId?.length === 32 &&
+            /^[a-fA-F0-9]{32}$/.test(accountId) &&
+            apiKey!.trim().length <= 1024 &&
+            !/[^\x21-\x7e]/.test(apiKey!.trim()))),
+    };
   }
   status() {
     const config = this.imageConfig();
     return {
       configured: config.configured,
       verified: false,
-      model: config.provider === "gemini" ? GEMINI_IMAGE_MODEL : config.provider === "huggingface" ? HF_IMAGE_MODEL : null,
+      model:
+        config.provider === "gemini"
+          ? GEMINI_IMAGE_MODEL
+          : config.provider === "huggingface"
+            ? HF_IMAGE_MODEL
+            : config.provider === "cloudflare"
+              ? CLOUDFLARE_IMAGE_MODEL
+              : null,
       provider: config.provider === "huggingface" ? "fal-ai" : config.provider,
       maxInputBytes: 2097152,
       maxOutputBytes: 4194304,
@@ -61,7 +97,14 @@ export class ImageAiService {
     const config = this.imageConfig();
     await this.reserveAttempt(identity, config.configured);
     try {
-      return config.provider === "gemini" ? await new GeminiImageEditor(config.apiKey!).edit(body) : await new HuggingFaceImageEditor(config.apiKey!).edit(body);
+      if (config.provider === "cloudflare")
+        return await new CloudflareImageEditor(
+          config.apiKey!,
+          config.accountId!,
+        ).edit(body);
+      return config.provider === "gemini"
+        ? await new GeminiImageEditor(config.apiKey!).edit(body)
+        : await new HuggingFaceImageEditor(config.apiKey!).edit(body);
     } catch (error) {
       throw aiServiceFailure(
         error,

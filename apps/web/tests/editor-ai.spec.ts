@@ -1,6 +1,44 @@
 import { selectEditorTool } from './editor-helpers';
 import { expect, test } from '@playwright/test';
 
+test('Cloudflare image edit shares a bounded preview only on click and loads returned pixels', async ({ page }) => {
+  let submitted: {imageDataUrl:string;prompt:string}|undefined;
+  let output: Buffer;
+  await page.route('**/api/auth/session', r => r.fulfill({json:{access_token:'fixture-editor-token',expires_in:3600,refreshable:true}}));
+  await page.route('https://auth.orbit.test/auth/v1/user', r => r.fulfill({json:{email_confirmed_at:'2026-10-17T00:00:00Z'}}));
+  await page.route('**/api/workspace/**', r => {
+    const path = new URL(r.request().url()).pathname;
+    if(path.endsWith('/media/image-edit')){
+      submitted=r.request().postDataJSON();
+      return r.fulfill({status:200,contentType:'image/png',body:output});
+    }
+    const body=path.endsWith('/workspaces')?[{id:'fixture-workspace',name:'Editor test',role:'OWNER'}]
+      :path.endsWith('/media/image-edit/status')?{configured:true,provider:'cloudflare',verified:false}
+      :path.endsWith('/media/status')?{configured:false,limits:{uploadBytes:25000000,maxDuration:120}}
+      :path.endsWith('/integrations/status')?{providers:{}}
+      :path.endsWith('/ai/status')?{configured:true}:[];
+    return r.fulfill({json:body});
+  });
+  await page.goto('/editor/image');
+  const asset=async(color:string)=>Buffer.from(await page.evaluate(color=>{
+    const c=document.createElement('canvas');c.width=1600;c.height=1000;
+    const x=c.getContext('2d')!;x.fillStyle=color;x.fillRect(0,0,c.width,c.height);
+    return c.toDataURL().split(',')[1];
+  },color),'base64');
+  output=await asset('#0000ff');
+  await page.getByLabel('Choose image',{exact:true}).setInputFiles({name:'source.png',mimeType:'image/png',buffer:await asset('#ff0000')});
+  await selectEditorTool(page,'Image','AI editor');
+  await expect(page.getByText(/this preview and your instruction to Cloudflare Workers AI/)).toBeVisible();
+  await page.getByLabel('AI image edit instruction',{exact:true}).fill('Replace the background with blue');
+  expect(submitted).toBeUndefined();
+  await page.getByRole('button',{name:'Edit image with AI',exact:true}).click();
+  await expect(page.getByText('AI edit loaded. Review it before exporting. Your original file is unchanged.',{exact:true})).toBeVisible();
+  expect(submitted?.prompt).toBe('Replace the background with blue');
+  const dimensions=await page.evaluate(async src=>{const i=new Image();i.src=src;await i.decode();return [i.width,i.height];},submitted!.imageDataUrl);
+  expect(Math.max(...dimensions)).toBe(511);
+  await expect.poll(()=>page.getByLabel('Edited image preview',{exact:true}).evaluate(n=>Array.from((n as HTMLCanvasElement).getContext('2d')!.getImageData(50,50,1,1).data))).toEqual([0,0,255,255]);
+});
+
 test('AI proposes layer changes, applies them together and restores the composition with Undo', async ({ page }) => {
   let submitted: { kind: string; current: { layers: { index: number; x: number }[] } } | undefined;
   await page.route('https://auth.orbit.test/auth/v1/token?grant_type=password', route => route.fulfill({

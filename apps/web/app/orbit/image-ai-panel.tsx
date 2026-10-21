@@ -24,6 +24,7 @@ export function ImageAiPanel({
   const [prompt, setPrompt] = useState("");
   const [configured, setConfigured] = useState(false);
   const [imageProvider, setImageProvider] = useState("the configured image provider");
+  const [previewLimit, setPreviewLimit] = useState(1024);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const pending = useRef<AbortController | null>(null);
@@ -32,7 +33,7 @@ export function ImageAiPanel({
     if (!preview)
       void api<{ configured: boolean; provider?: string; model?: string }>("/media/image-edit/status")
         .then((status) => {
-          if (active) { setConfigured(status.configured); setImageProvider(status.provider === "gemini" ? "Google Gemini (Nano Banana 2.1)" : status.provider === "fal-ai" ? "Hugging Face / fal-ai" : "the configured image provider"); }
+          if (active) { setConfigured(status.configured); setPreviewLimit(status.provider === "cloudflare" ? 511 : 1024); setImageProvider(status.provider === "cloudflare" ? "Cloudflare Workers AI (FLUX.2 Klein 4B)" : status.provider === "gemini" ? "Google Gemini (Nano Banana 2.1)" : status.provider === "fal-ai" ? "Hugging Face / fal-ai" : "the configured image provider"); }
         })
         .catch(() => {});
     return () => {
@@ -62,7 +63,7 @@ export function ImageAiPanel({
     setNotice("");
     try {
       const copy = document.createElement("canvas");
-      const scale = Math.min(1, 1024 / Math.max(canvas.width, canvas.height));
+      const scale = Math.min(1, previewLimit / Math.max(canvas.width, canvas.height));
       copy.width = Math.max(1, Math.round(canvas.width * scale));
       copy.height = Math.max(1, Math.round(canvas.height * scale));
       const context = copy.getContext("2d");
