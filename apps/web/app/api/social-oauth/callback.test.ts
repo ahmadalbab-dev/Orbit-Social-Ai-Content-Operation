@@ -20,3 +20,9 @@ it('does not leak provider diagnostics or tokens into redirect URLs',async()=>{
 it('bounds upstream output and requires a matching provider family',async()=>{
  for(const body of ['x'.repeat(8193),JSON.stringify({provider:'threads',status:'connected'})]){const response=await socialOAuthCallback(request(),'meta',vi.fn(async()=>new Response(body)));expect(response.headers.get('location')).toContain('oauth=failed');}
 });
+it('binds TikTok callback to its browser cookie and matching provider',async()=>{
+ const req=new Request(`https://web.orbit.test/api/social-oauth/tiktok/callback?state=${state}&code=private-code`,{headers:{cookie:`orbit_oauth_tiktok=${nonce}`}}),fetcher=vi.fn(async()=>Response.json({provider:'tiktok',status:'connected'}));
+ const result=await socialOAuthCallback(req,'tiktok',fetcher);expect(result.headers.get('location')).toBe('/?oauth=connected&provider=tiktok');expect(result.headers.get('set-cookie')).toContain('orbit_oauth_tiktok=;');expect((fetcher.mock.calls[0] as unknown as [string,RequestInit])[0]).toBe('https://api.orbit.test/v1/oauth/tiktok/callback');
+ const wrong=await socialOAuthCallback(req,'tiktok',vi.fn(async()=>Response.json({provider:'threads',status:'connected'})));expect(wrong.headers.get('location')).toBe('/?oauth=failed&provider=tiktok');
+ const noCookie=await socialOAuthCallback(request(),'tiktok',fetcher);expect(noCookie.headers.get('location')).toBe('/?oauth=failed&provider=tiktok');expect(fetcher).toHaveBeenCalledOnce();
+});

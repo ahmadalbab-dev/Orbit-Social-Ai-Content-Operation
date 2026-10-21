@@ -5,6 +5,7 @@ export function OrbitMark({ small=false }: { small?:boolean }) {
   return <svg className={small?"orbit-mark small":"orbit-mark"} viewBox="0 0 48 48" fill="none" aria-hidden="true"><circle cx="24" cy="24" r="15" stroke="currentColor" strokeWidth="3"/><ellipse cx="24" cy="24" rx="22" ry="9" transform="rotate(-35 24 24)" stroke="currentColor" strokeWidth="2"/><circle cx="24" cy="24" r="4" fill="currentColor"/><circle cx="41" cy="12" r="4" fill="var(--accent)"/></svg>;
 }
 export function PlatformIcon({ platform, size=22 }: { platform:string; size?:number }) {
+  if(platform==="tiktok")return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 3h3c0 2.2 1.6 4 4 4v3c-1.6 0-3-.5-4-1.3V16a6 6 0 1 1-6-6h1v3h-1a3 3 0 1 0 3 3V3Z"/></svg>;
   const supported=["facebook","instagram","threads"].includes(platform);
   if(!supported)return <span aria-hidden="true" style={{width:size,height:size,display:"inline-grid",placeItems:"center"}}>?</span>;
   return <img className={`platform-icon platform-icon-${platform}`} src={`/social/${platform}.svg`} width={size} height={size} alt="" aria-hidden="true"/>;

@@ -62,3 +62,8 @@ it('sets an independent HttpOnly OAuth browser binding only after an authenticat
  const init=(fetcher.mock.calls[0] as unknown as [string,RequestInit])[1];const nonce=new Headers(init.headers).get('x-orbit-oauth-browser');
  expect(nonce).toMatch(/^[A-Za-z0-9_-]{43}$/);expect(response.headers.get('set-cookie')).toContain(`orbit_oauth_meta=${nonce};`);expect(response.headers.get('set-cookie')).toContain('HttpOnly; SameSite=Lax; Max-Age=600; Secure');expect(await response.text()).not.toContain(nonce!);
 });
+it('isolates TikTok browser binding and keeps the same-origin start requirement',async()=>{
+ const segments=['integrations','oauth','tiktok','start'],fetcher=vi.fn(async()=>Response.json({authorizationUrl:'https://www.tiktok.com/v2/auth/authorize/?state=opaque'}));
+ expect((await relayWorkspace(request(segments.join('/'),{method:'POST',body:'{}'}),segments,fetcher)).status).toBe(403);expect(fetcher).not.toHaveBeenCalled();
+ const response=await relayWorkspace(request(segments.join('/'),{method:'POST',headers:{Origin:origin},body:'{}'}),segments,fetcher);expect(response.status).toBe(200);expect(response.headers.get('set-cookie')).toMatch(/orbit_oauth_tiktok=[A-Za-z0-9_-]{43};/);expect(response.headers.get('set-cookie')).toContain('HttpOnly; SameSite=Lax; Max-Age=600; Secure');
+});
