@@ -17,3 +17,9 @@ it('cancels an audio stream once its actual bytes exceed the limit', async () =>
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { headers: { 'content-type': 'audio/wav' } })));
   await expect(boundedAudioFile(librarySounds({ results: [row] })[0], new AbortController().signal)).rejects.toThrow('20 MB'); expect(cancel).toHaveBeenCalled();
 });
+
+it('filters unsupported catalog entries before limiting selectable results', () => {
+  const unsupported = Array.from({ length: 12 }, (_, index) => ({ ...row, id: `midi-${index}`, url: row.url.replace('.wav', '.mid') }));
+  expect(librarySounds({ results: [...unsupported, row] })).toHaveLength(1);
+  expect(librarySounds({ results: Array.from({ length: 40 }, (_, index) => ({ ...row, id: String(index) })) })).toHaveLength(12);
+});

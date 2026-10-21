@@ -8,7 +8,7 @@ function safeUrl(value: unknown, host: string, prefix: string) {
 export function librarySounds(input: unknown): LibrarySound[] {
   const rows = (input as { results?: unknown[] })?.results;
   if (!Array.isArray(rows)) return [];
-  return rows.slice(0, 12).flatMap(item => {
+  return rows.slice(0, 40).flatMap(item => {
     if (!item || typeof item !== 'object') return [];
     const row = item as Record<string, unknown>, url = safeUrl(row.url, 'upload.wikimedia.org', '/wikipedia/commons/');
     const source = safeUrl(row.foreign_landing_url, 'commons.wikimedia.org', '/');
@@ -16,7 +16,7 @@ export function librarySounds(input: unknown): LibrarySound[] {
     const extension = url?.pathname.match(/\.(mp3|wav|m4a|aac|ogg|oga|webm)$/i)?.[1]?.toLowerCase();
     if (row.license !== 'cc0' || row.source !== 'wikimedia_audio' || row.mature !== false || row.category === 'pronunciation' || !url || !source || !license || !extension || typeof row.id !== 'string' || typeof row.title !== 'string' || (typeof row.filesize === 'number' && row.filesize > MAX_BYTES) || (typeof row.duration === 'number' && row.duration > 600_000)) return [];
     return [{ id: row.id.slice(0, 100), title: row.title.slice(0, 160), creator: typeof row.creator === 'string' ? row.creator.slice(0, 160) : 'Wikimedia contributor', url: url.href, source: source.href, license: license.href, extension: extension === 'oga' ? 'ogg' : extension }];
-  });
+  }).slice(0, 12);
 }
 export async function boundedAudioFile(track: LibrarySound, signal: AbortSignal): Promise<File> {
   const response = await fetch(track.url, { signal, credentials: 'omit', redirect: 'error', referrerPolicy: 'no-referrer' });

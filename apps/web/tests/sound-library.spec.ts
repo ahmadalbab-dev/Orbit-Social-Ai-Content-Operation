@@ -6,7 +6,7 @@ for (const kind of ['Image', 'Video'] as const) test(`${kind} editor imports a b
   await page.route('https://api.openverse.org/v1/audio/**', route => { const url = new URL(route.request().url()); expect(url.searchParams.get('license')).toBe('cc0'); expect(url.searchParams.get('source')).toBe('wikimedia_audio'); return route.fulfill({ json: { results: [result, { ...result, id: 'excluded', license: 'by-nc', title: 'Restricted song' }] } }); });
   await page.route(result.url, route => route.fulfill({ contentType: 'audio/wav', body: toneWav() }));
   await page.goto(`/preview/editor/${kind.toLowerCase()}`); await selectEditorTool(page, kind, 'Music');
-  await page.getByText('Search music & sound library', { exact: true }).click();
+  await expect(page.getByLabel('Sound library search')).toBeVisible();
   await page.getByRole('button', { name: 'Search sounds', exact: true }).click();
   await page.getByRole('button', { name: /Library piano Fixture composer/ }).click();
   await expect(page.getByText('Restricted song', { exact: true })).toHaveCount(0);
@@ -19,6 +19,6 @@ for (const kind of ['Image', 'Video'] as const) test(`${kind} editor imports a b
 });
 test('library limits are reported without inventing an import', async ({ page }) => {
   await page.route('https://api.openverse.org/v1/audio/**', route => route.fulfill({ status: 429, json: {} }));
-  await page.goto('/preview/editor/image'); await selectEditorTool(page, 'Image', 'Music'); await page.getByText('Search music & sound library', { exact: true }).click(); await page.getByRole('button', { name: 'Search sounds', exact: true }).click();
+  await page.goto('/preview/editor/image'); await selectEditorTool(page, 'Image', 'Music'); await expect(page.getByLabel('Sound library search')).toBeVisible(); await page.getByRole('button', { name: 'Search sounds', exact: true }).click();
   await expect(page.getByText(/public sound library reached its request limit/)).toBeVisible(); await expect(page.getByLabel('Soundtrack offset', { exact: true })).toHaveCount(0);
 });
