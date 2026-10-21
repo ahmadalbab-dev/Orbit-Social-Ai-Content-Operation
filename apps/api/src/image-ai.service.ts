@@ -12,6 +12,7 @@ import {
   HF_IMAGE_MODEL,
   HuggingFaceImageEditor,
   validateImageEdit,
+  validateCloudflareImageEdit,
 } from "@sma/ai";
 import { DatabaseService } from "./database.service";
 import { BillingService } from "./billing.service";
@@ -78,12 +79,18 @@ export class ImageAiService {
   }
   async edit(identity: RequestIdentity, input: unknown) {
     requireRole(identity);
+    const config = this.imageConfig();
     let body: ReturnType<typeof validateImageEdit>;
     try {
-      body = validateImageEdit(input);
+      body =
+        config.provider === "cloudflare"
+          ? validateCloudflareImageEdit(input)
+          : validateImageEdit(input);
     } catch {
       throw new BadRequestException(
-        "Upload a PNG or JPEG up to 2 MiB and an editing instruction up to 2,000 characters.",
+        config.provider === "cloudflare"
+          ? "Upload a PNG or JPEG smaller than 512 pixels on each edge and up to 2 MiB, with an editing instruction up to 2,000 characters. Reopen the image editor to prepare a smaller preview."
+          : "Upload a PNG or JPEG up to 2 MiB and an editing instruction up to 2,000 characters.",
       );
     }
     if (
@@ -94,7 +101,6 @@ export class ImageAiService {
       throw new BadRequestException(
         "Music cannot be embedded in a PNG or JPEG. Open Music & sound under Turn your image or carousel into a movie, upload audio, then export an image movie. No AI request was sent.",
       );
-    const config = this.imageConfig();
     await this.reserveAttempt(identity, config.configured);
     try {
       if (config.provider === "cloudflare")

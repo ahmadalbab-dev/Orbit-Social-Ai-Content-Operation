@@ -16,7 +16,11 @@ The explicit Edit image with AI action sends a reduced copy and instruction to
 Cloudflare FLUX.2 Klein 4B. Cloudflare's published launch example uses multipart
 `prompt` and binary `input_image_0`; reference images must be smaller than
 512 by 512. The browser bounds the longest preview side to 511 pixels for this
-provider. Original files remain on the device. This generates/edits still pixels;
+provider. The API independently checks PNG IHDR or JPEG frame dimensions before
+billing checks or quota reservation. Missing, malformed, zero-sized or 512px+
+references return HTTP 400 without consuming quota or calling a provider. The
+adapter repeats this validation for direct use. This also protects cached older
+frontends that prepare 1024px previews. Original files remain on the device. This generates/edits still pixels;
 it does not generate video or animate subjects. Existing local motion remains
 independent.
 
@@ -44,3 +48,38 @@ test fixtures, chat, source files or logs.
 - https://developers.cloudflare.com/workers-ai/models/flux-2-klein-4b/
 - https://developers.cloudflare.com/workers-ai/get-started/rest-api/
 - https://developers.cloudflare.com/workers-ai/platform/pricing/
+
+
+## Review and owner test checklist
+
+The PR preview is protected by Vercel login. Sign in with the owner account first.
+A web preview alone does not install this adapter on the API: GitHub currently
+reports the API deployment for this branch as skipped. Credentials were saved in
+Production, which does not establish that a preview API has them. Do not copy
+Production secrets into local files or fixtures. No Production release is made
+by this follow-up.
+
+Before a real edit, verify the intended Cloudflare account is Workers Free and
+that the authenticated workspace status identifies `cloudflare` and
+`configured: true`. Keep `verified: false` until actual inference succeeds. Use a
+dedicated configured non-production API for acceptance, or release only through
+the separately approved Production process. A simulated image response proves UI
+wiring, not account access, quota availability or real generated pixels.
+
+1. Sign into the test workspace and open Image > AI editor, then expand the
+   generative image panel. Upload a non-sensitive test image and check that
+   Cloudflare is named before clicking **Edit image with AI**.
+2. Request a simple background change. Confirm returned pixels appear in the
+   canvas and the exported PNG/JPEG opens correctly. Record a sanitized error
+   code if this fails; do not enable payments to clear a provider error.
+3. Try the existing local crop/filter/export controls and confirm they still work.
+4. Under **Music & sound**, preview an included CC0 track, review its source,
+   import it, and export an image movie. Confirm actual playback has sound.
+   Live search may explicitly fall back to the included starter tracks.
+5. On a physical iPhone, repeat music playback and export. CI WebKit is not a
+   substitute for device acceptance; recording support varies by browser.
+
+Music integration and provider limitations are recorded in
+[MUSIC_INTEGRATION.md](MUSIC_INTEGRATION.md). No MusicAPI/MassiveMusic credentials,
+licence agreement, provider billing, social publishing or AI-generated video is
+activated by this change.
