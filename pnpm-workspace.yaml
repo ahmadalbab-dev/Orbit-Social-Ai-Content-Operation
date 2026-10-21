@@ -14,8 +14,26 @@ allowBuilds:
   prisma: true
   sharp: true
 
+minimumReleaseAgeExclude:
+  - '@next/env@15.5.28'
+  - '@next/swc-darwin-arm64@15.5.28'
+  - '@next/swc-darwin-x64@15.5.28'
+  - '@next/swc-linux-arm64-gnu@15.5.28'
+  - '@next/swc-linux-arm64-musl@15.5.28'
+  - '@next/swc-linux-x64-gnu@15.5.28'
+  - '@next/swc-linux-x64-musl@15.5.28'
+  - '@next/swc-win32-arm64-msvc@15.5.28'
+  - '@next/swc-win32-x64-msvc@15.5.28'
+  - next@15.5.28
+
 # Next.js currently pins older transitive releases. Keep the framework version
 # stable while selecting upstream security-patched compatible releases.
 overrides:
   'next>postcss': 8.5.23
-  'next>sharp': 0.35.3
+  'next>sharp': 0.35.5
+  nanoid@^3.3.0: 3.3.18
+  deepmerge-ts: 8.0.0
+  qs: 6.16.0
+  multer: 2.4.0
+  source-map-js: 1.2.2
+  proxy-addr: 2.0.8

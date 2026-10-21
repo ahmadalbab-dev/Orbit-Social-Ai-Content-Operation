@@ -1,0 +1,37 @@
+import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+
+test('touch dragging edits uploaded layers while pinch and fit only affect the viewport', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });
+  const page = await context.newPage(), uploads: string[] = [];
+  page.on('request', request => { if (request.method() === 'POST') uploads.push(request.url()); });
+  await page.goto('/preview/editor/image');
+  const asset = async (color: string) => Buffer.from(await page.evaluate(color => { const canvas = document.createElement('canvas'); canvas.width = 200; canvas.height = 200; const ctx = canvas.getContext('2d')!; ctx.fillStyle = color; ctx.fillRect(0, 0, 200, 200); return canvas.toDataURL('image/png').split(',')[1]; }, color), 'base64');
+  await page.getByLabel('Choose image', { exact: true }).setInputFiles({ name: 'base.png', mimeType: 'image/png', buffer: await asset('#ff0000') });
+  await page.getByRole('navigation',{name:'Image editing tools'}).getByRole('button',{name:'Layers',exact:true}).click();
+  await page.getByLabel('Add image overlay', { exact: true }).setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: await asset('#0000ff') });
+  await expect(page.getByLabel('Layer opacity', { exact: true })).toBeVisible();
+  const canvas = page.getByLabel('Edited image preview', { exact: true });
+  await canvas.scrollIntoViewIfNeeded();
+  const box = (await canvas.boundingBox())!, x = box.x + box.width / 2, y = box.y + box.height / 2;
+  const session = await context.newCDPSession(page);
+  const touch = (type: 'touchStart' | 'touchMove' | 'touchEnd', points: {x:number;y:number;id:number}[]) => session.send('Input.dispatchTouchEvent', { type, touchPoints: points });
+  await touch('touchStart', [{ x, y, id: 1 }]);
+  await touch('touchMove', [{ x: x + box.width * .2, y: y - box.height * .1, id: 1 }]);
+  await touch('touchEnd', []);
+  await expect(page.getByLabel('Horizontal position', { exact: true })).toHaveValue('70');
+  await expect(page.getByLabel('Vertical position', { exact: true })).toHaveValue('40');
+  const beforeZoom = await canvas.evaluate(node => (node as HTMLCanvasElement).toDataURL());
+  await touch('touchStart', [{ x: x - 25, y, id: 1 }, { x: x + 25, y, id: 2 }]);
+  await touch('touchMove', [{ x: x - 50, y, id: 1 }, { x: x + 50, y, id: 2 }]);
+  await touch('touchEnd', []);
+  await expect.poll(async () => Number((await page.getByLabel('Image preview zoom', { exact: true }).textContent())!.replace('%', ''))).toBeGreaterThan(130);
+  expect(await canvas.evaluate(node => (node as HTMLCanvasElement).toDataURL())).toBe(beforeZoom);
+  await page.getByRole('button', { name: 'Fit image preview', exact: true }).click();
+  await expect(page.getByLabel('Image preview zoom', { exact: true })).toHaveText('100%');
+  await page.getByRole('navigation',{name:'Image editing tools'}).getByRole('button',{name:'Export',exact:true}).click();
+  const download = page.waitForEvent('download'); await page.getByRole('button', { name: 'Export image', exact: true }).click();
+  const bytes = await readFile((await (await download).path())!); expect(bytes.readUInt32BE(16)).toBe(200); expect(bytes.readUInt32BE(20)).toBe(200);
+  expect(uploads).toEqual([]); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await context.close();
+});

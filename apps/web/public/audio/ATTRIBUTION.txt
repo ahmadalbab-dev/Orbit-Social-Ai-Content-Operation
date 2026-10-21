@@ -1,0 +1,25 @@
+Orbit included music and sound selection
+Source licences verified 21 October 2026 on each Freesound source page.
+All included audio is CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/
+These are source-authored recordings, not AI-generated or popular-song streaming access.
+
+1. action-ambient-155139.mp3
+Original title: Action music loop with dark ambient drones
+Author: burning-mir
+Source: https://freesound.org/people/burning-mir/sounds/155139/
+Public preview source: https://cdn.freesound.org/previews/155/155139_2098884-hq.mp3
+Original preview SHA256: 63d959c9578fd51fc696dce390b5ea9ab86f04dedec972b8290ab788e7b743b9
+Orbit derivative: MP3, stereo, 44.1kHz,96kbps; metadata stripped, full29.18second loop.
+Derivative SHA256: 0cf0f8dd258af83c92c57b9551a4f56914c72875a47472881414ce49d8b5f390
+
+2. jungle-rain-38487.mp3
+Original title: Ambient-01_JungleHills.wav
+Author: larval1977
+Source: https://freesound.org/people/larval1977/sounds/38487/
+Public preview source: https://cdn.freesound.org/previews/38/38487_392832-hq.mp3
+Original preview SHA256: 055c8b7239cc11ced3294178860997878ccedd69d4679f71a7fff0c01674d3eb
+Orbit derivative: first45seconds, MP3, stereo,44.1kHz,96kbps; metadata stripped.
+Derivative SHA256: 42891fc2f877f3b8e3ce0bafa4bc34f61a3244343f2f6aa98b60582496452f3a
+
+Source CC0 grants permit copying, modifying, distribution and commercial use.
+Source links remain available in the editor for each track; users review suitability/rights before import.

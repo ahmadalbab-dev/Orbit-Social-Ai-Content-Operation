@@ -19,6 +19,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/social_automation
       REDIS_URL: redis://localhost:6379
+      ORBIT_DATABASE_TESTS: "true"
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v4
@@ -26,11 +27,23 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      - run: pnpm db:generate
       - run: pnpm db:validate
+      - run: pnpm db:migrate
+      - name: Verify opt-in release configuration
+        run: node --test scripts/api-release.test.mjs
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - name: Verify compiled backend modules without require ESM interop
+        run: node scripts/check-runtime-modules.mjs
+      - name: Install codec for trusted fixture acceptance
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Compiled HTTP upload, restart, real worker and private download
+        run: node scripts/staging-smoke.mjs
+        env:
+          ORBIT_STAGING_SMOKE: "true"
       # Runtime dependencies are release blockers. Build-only tooling is
       # monitored separately because some upstream tools have no patched line.
       - run: pnpm audit --prod --audit-level high
@@ -42,3 +55,48 @@ jobs:
       - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  staging-images:
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - name: Prepare disposable container configuration
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import {randomBytes} from 'node:crypto';
+          import {readFileSync,writeFileSync} from 'node:fs';
+          const example=readFileSync('deploy/staging/.env.example','utf8');
+          writeFileSync('deploy/staging/.env',example.replace('replace_with_random_hex_password',randomBytes(32).toString('hex')),{mode:0o600});
+          JS
+      - name: Build and verify private staging images
+        run: bash scripts/check-staging-containers.sh
+        env:
+          ORBIT_DISPOSABLE_CONTAINERS: "true"
+
+  web-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with: { version: 11.17.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Install browser for local-only preview acceptance
+        run: pnpm --filter @sma/web exec playwright install --with-deps chromium webkit
+      - name: Verify phone preview, navigation and local image export
+        run: pnpm --filter @sma/web test:e2e --output=test-results/chromium
+      - name: Verify WebKit mobile tools and session restoration
+        run: pnpm --filter @sma/web exec playwright test --browser=webkit --output=test-results/webkit tests/mobile-editor-tools.spec.ts tests/preview.spec.ts tests/session-persistence.spec.ts tests/auth.spec.ts tests/home-presentation.spec.ts tests/media-entry-presentation.spec.ts tests/editor-neutral-media.spec.ts tests/sound-library.spec.ts tests/uploaded-image-background.spec.ts tests/image-motion.spec.ts tests/video-lightning.spec.ts tests/connections.spec.ts
+      - name: Save editor and navigation visual acceptance artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbit-editor-navigation-browser-results
+          path: apps/web/test-results
+          if-no-files-found: warn
+          retention-days: 7

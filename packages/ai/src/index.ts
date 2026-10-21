@@ -14,8 +14,13 @@ export interface UsageStore { find(workspaceId: string, requestHash: string): Pr
 export class MemoryUsageStore implements UsageStore {
   private cache = new Map<string, ContentVariant[]>();
   async find(workspaceId: string, hash: string) { return this.cache.get(`${workspaceId}:${hash}`) ?? null; }
-  async monthlyCost() { return 0; }
-  async save(workspaceId: string, variants: ContentVariant[], usage: UsageRecord) { this.cache.set(`${workspaceId}:${usage.requestHash}`, variants); }
+  private costs = new Map<string, number>();
+  async monthlyCost(workspaceId: string) { return this.costs.get(`${workspaceId}:${new Date().toISOString().slice(0, 7)}`) ?? 0; }
+  async save(workspaceId: string, variants: ContentVariant[], usage: UsageRecord) {
+    this.cache.set(`${workspaceId}:${usage.requestHash}`, structuredClone(variants));
+    const monthKey = `${workspaceId}:${new Date().toISOString().slice(0, 7)}`;
+    if (!usage.cached) this.costs.set(monthKey, (this.costs.get(monthKey) ?? 0) + usage.estimatedCostUsd);
+  }
 }
 export class AiBudgetExceededError extends Error {}
 
@@ -51,3 +56,11 @@ export function estimateCost(model: string, inputTokens: number, outputTokens: n
   const rate = model.includes("nano") ? { input: 0.1, output: 0.4 } : { input: 0.4, output: 1.6 };
   return (inputTokens * rate.input + outputTokens * rate.output) / 1_000_000;
 }
+
+export { GroqContentProvider, HuggingFaceContentProvider, AiProviderError, GROQ_CHAT_ENDPOINT, DEFAULT_GROQ_MODEL, HF_CHAT_ENDPOINT, DEFAULT_HF_MODEL, aiModes, parseSocialDrafts, socialMessages, readBoundedAiJson, validateAiGenerationInput, socialDraftLimitViolation, isValidTextModel } from "./huggingface.js";
+export type { AiGenerationInput, AiProviderFailure } from "./huggingface.js";
+export { HuggingFaceImageEditor, ImageEditError, validateImageEdit, HF_IMAGE_MODEL, HF_IMAGE_ENDPOINT } from "./huggingface-image.js";
+export { GroqVideoPlanner, HuggingFaceVideoPlanner, parseVideoPlan, validateVideoPlanInput } from "./huggingface-video-plan.js";
+export type { VideoPlan } from "./huggingface-video-plan.js";
+export {EditorPlanner,validateEditorInput,parseEditorPlan} from './editor-planner.js';
+export { GeminiImageEditor, GEMINI_IMAGE_MODEL, GEMINI_IMAGE_ENDPOINT, parseGeminiImageResponse } from './gemini-image.js';
