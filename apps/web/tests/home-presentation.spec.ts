@@ -86,7 +86,7 @@ test('example platform tabs support keyboard selection and open Content Studio',
   await facebook.focus();
   await expect(facebook).toHaveAttribute('aria-selected', 'true');
   await expect(showcase.getByRole('article', { name: 'Facebook example post', exact: true })).toBeVisible();
-  for (const platform of ['Instagram', 'Threads']) {
+  for (const platform of ['Instagram', 'Threads', 'TikTok']) {
     await page.keyboard.press('ArrowRight');
     const active = tabs.getByRole('tab', { name: platform, exact: true });
     await expect(active).toBeFocused();
@@ -101,11 +101,11 @@ test('example platform tabs support keyboard selection and open Content Studio',
   await expect(facebook).toBeFocused();
   await expect(facebook).toHaveAttribute('aria-selected', 'true');
   await page.keyboard.press('End');
-  await expect(tabs.getByRole('tab', { name: 'Threads', exact: true })).toBeFocused();
+  await expect(tabs.getByRole('tab', { name: 'TikTok', exact: true })).toBeFocused();
   // Focus moves inside the key handler before React commits the selected panel.
   // Wait for that content before scrolling to and clicking the following action.
-  await expect(tabs.getByRole('tab', { name: 'Threads', exact: true })).toHaveAttribute('aria-selected', 'true');
-  await expect(showcase.getByRole('article', { name: 'Threads example post', exact: true })).toBeVisible();
+  await expect(tabs.getByRole('tab', { name: 'TikTok', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(showcase.getByRole('article', { name: 'TikTok example post', exact: true })).toBeVisible();
   const create = showcase.getByRole('button', { name: 'Create your own post', exact: true });
   await create.scrollIntoViewIfNeeded();
   await expect(create).toBeInViewport();
@@ -181,4 +181,17 @@ test('hero records a complete live Orbit to ai studio and back handoff', async (
   } finally {
     await context.close();
   }
+});
+
+test('TikTok uses the official icon in existing social rows and a working calendar filter', async ({ page }) => {
+  await page.goto('/preview');
+  const heroIcon = page.locator('.hero-platforms .platform-icon-tiktok');
+  await expect(heroIcon).toBeVisible();
+  await expect(heroIcon).toHaveAttribute('src', '/social/tiktok.png');
+  await expect.poll(() => heroIcon.evaluate(node => (node as HTMLImageElement).complete && (node as HTMLImageElement).naturalWidth > 0)).toBe(true);
+  await page.getByRole('navigation', { name: 'Workspace', exact: true }).getByRole('button', { name: 'Calendar', exact: true }).click();
+  const filter = page.getByRole('button', { name: 'Filter tiktok', exact: true });
+  await filter.click(); await expect(filter).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'All', exact: true }).click();
+  await expect(filter).toHaveAttribute('aria-pressed', 'false');
 });

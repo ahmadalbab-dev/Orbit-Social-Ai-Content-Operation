@@ -38,3 +38,5 @@
 @media(max-width:400px){.home-post-tabs{gap:2px}.home-post-tabs button{padding:8px;font-size:11px;gap:5px}.home-post-stage{padding:12px;border-radius:22px}.home-post-account{padding:14px;gap:8px}.home-post-caption{padding-inline:14px}.home-post-format{padding-inline:14px}.home-post-format>span{margin-left:0}.home-post-explanation dl>div{gap:12px;grid-template-columns:52px minmax(0,1fr)}}
 @media(prefers-reduced-motion:reduce){.home-post-tabs button{transition:none}}
 html[data-motion=paused] .home-post-tabs button{transition:none}
+
+.home-post-example[data-platform=tiktok] .home-post-photo{aspect-ratio:4/5;object-position:center}
