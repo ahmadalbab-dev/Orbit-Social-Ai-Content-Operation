@@ -28,6 +28,7 @@ test('Cloudflare image edit shares a bounded preview only on click and loads ret
   output=await asset('#0000ff');
   await page.getByLabel('Choose image',{exact:true}).setInputFiles({name:'source.png',mimeType:'image/png',buffer:await asset('#ff0000')});
   await selectEditorTool(page,'Image','AI editor');
+  await page.getByText('Generate a new background or visual with AI',{exact:true}).click();
   await expect(page.getByText(/this preview and your instruction to Cloudflare Workers AI/)).toBeVisible();
   await page.getByLabel('AI image edit instruction',{exact:true}).fill('Replace the background with blue');
   expect(submitted).toBeUndefined();
