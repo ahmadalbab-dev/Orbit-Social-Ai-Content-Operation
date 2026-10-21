@@ -53,9 +53,10 @@ test fixtures, chat, source files or logs.
 ## Review and owner test checklist
 
 The PR preview is protected by Vercel login. Sign in with the owner account first.
-A web preview alone does not install this adapter on the API: GitHub currently
-reports the API deployment for this branch as skipped. Credentials were saved in
-Production, which does not establish that a preview API has them. Do not copy
+Verify that both web and API previews are built from the intended PR revision
+and that the web preview routes to that API. A web deployment alone does not
+update the API. Credentials were saved in Production, which does not establish
+that a preview API has them. Do not copy
 Production secrets into local files or fixtures. No Production release is made
 by this follow-up.
 
@@ -83,3 +84,32 @@ Music integration and provider limitations are recorded in
 [MUSIC_INTEGRATION.md](MUSIC_INTEGRATION.md). No MusicAPI/MassiveMusic credentials,
 licence agreement, provider billing, social publishing or AI-generated video is
 activated by this change.
+
+## Continuation checkpoint, 22 October 2026
+
+Resume from PR #12, branch `feat/cloudflare-image-editing`. Application commit
+`42734273b745088cd7a5d63bc23edfb7817df5a0` passed CI #93, including quality,
+secret scanning, Chromium/WebKit acceptance and staging container checks.
+Local AI103/API212/web173 tests and all 10 package build/typecheck/lint checks
+passed; 8 local DB tests were skipped, with DB acceptance covered separately by CI.
+This follow-up documentation update changes no application code.
+
+GitHub's Vercel integration reports both previews READY for that application
+commit. Web: https://orbit-ai-studio-git-feat-5d2791-ahmadfaizyaakop-7657s-projects.vercel.app
+API: https://orbit-ai-studio-api-git-f-10cbe0-ahmadfaizyaakop-7657s-projects.vercel.app
+Readiness here is deployment metadata, not authenticated application acceptance.
+
+Remaining work is access-dependent: the cloud browser reaches Vercel login;
+Vercel's connector explicitly denied deployment access with HTTP403 at
+`read_protection_bypass`. DESKTOP-ALBAB subsequently went offline. Resume with
+authorized access to these projects, then check preview API pairing, safe
+provider configuration status, Workers Free account status and one actual image
+edit/export. Physical iPhone audio/export acceptance remains pending. Do not
+repeat source discovery or passed tests unless application code changes or new
+failures justify it. Do not retrieve provider secrets, activate billing, merge,
+publish socially, or deploy Production as part of this checkpoint.
+
+No tool/event in this session exposes ChatGPT credit-restoration notifications.
+Automatic resumption at that exact event has not been configured. The named
+`ponytail` skill was absent from both skill catalogs; remote local-skill lookup
+was blocked by the offline device. Do not claim it was used.
