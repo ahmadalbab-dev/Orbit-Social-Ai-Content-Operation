@@ -1,4 +1,5 @@
 import { drawLightning, scheduleThunder, validateLightning, type LightningEffect } from "./local-video-effects";
+import { validateRecordedMovie } from "./recorded-movie";
 import {
   prepareSoundtrack,
   startSoundtrack,
@@ -464,6 +465,7 @@ export async function exportLocalVideo(
         });
     });
     const blob = await result;
+    await validateRecordedMovie(blob, edit.duration / edit.speed, signal);
     progress(100);
     return blob;
   } finally {

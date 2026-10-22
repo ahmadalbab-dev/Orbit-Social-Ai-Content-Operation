@@ -1,3 +1,4 @@
+import { validateRecordedMovie } from "./recorded-movie";
 /** Local media only. Music timings are seconds in the finished output. */
 export interface LocalSoundtrack {
   src: string;
@@ -148,7 +149,7 @@ export async function exportCanvasMovie(
       mimeType: mime,
       videoBitsPerSecond: 4_000_000,
     });
-    return await new Promise<Blob>((resolve, reject) => {
+    const blob = await new Promise<Blob>((resolve, reject) => {
       const chunks: Blob[] = [];
       let bytes = 0,
         complete = false,
@@ -196,7 +197,6 @@ export async function exportCanvasMovie(
         if (error || !complete || !bytes)
           reject(error ?? new Error("Movie export incomplete."));
         else {
-          progress(100);
           resolve(new Blob(chunks, { type: recorder!.mimeType }));
         }
       };
@@ -222,6 +222,9 @@ export async function exportCanvasMovie(
       frame = requestAnimationFrame(draw);
       if (signal.aborted) abort();
     });
+    await validateRecordedMovie(blob, seconds, signal);
+    progress(100);
+    return blob;
   } finally {
     cancelAnimationFrame(frame);
     stopMusic();
