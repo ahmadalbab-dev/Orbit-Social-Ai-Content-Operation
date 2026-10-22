@@ -81,6 +81,7 @@ test('a 12MP overlay survives resizing and remains present in the exported movie
  const output=await page.evaluate(async encoded=>{
   const bytes=Uint8Array.from(atob(encoded),x=>x.charCodeAt(0)),url=URL.createObjectURL(new Blob([bytes],{type:'video/webm'}));
   try{const v=document.createElement('video');v.muted=true;v.src=url;await new Promise<void>((resolve,reject)=>{v.onloadeddata=()=>resolve();v.onerror=()=>reject(Error('Export decode failed'));});
+   await new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('Export seek timed out')),5000);v.onseeked=()=>{clearTimeout(timer);resolve();};v.currentTime=.3;});
    const c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d')!.drawImage(v,0,0);
    return {width:v.videoWidth,height:v.videoHeight,pixel:Array.from(c.getContext('2d')!.getImageData(Math.round(c.width*.1),Math.round(c.height*.1),1,1).data)};
   }finally{URL.revokeObjectURL(url);}
