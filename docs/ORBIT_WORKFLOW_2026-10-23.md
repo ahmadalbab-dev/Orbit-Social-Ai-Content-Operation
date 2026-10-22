@@ -26,12 +26,12 @@ flowchart TD
 | 1 | API/auth/database | Shared feature Preview ready, database connected. Production remains separate | Signed-in workspace flow on matching web/API |
 | 2 | Gemini Studio and media planning | Three real synthetic provider paths passed on 3.5 Flash Lite. Strict plan validators remain | Signed-in generation, save/reload, Apply/Undo and usage limits |
 | 2 | Cloudflare image pixels | Real provider returned a valid image. Visual instruction correctness not assessed | Use a reviewable input, inspect resulting image, reload final asset |
-| 3 | Media engine | Layer resizing fixed and real exported pixels verified. Chroma-key code ready for browser acceptance | Preview/export agreement, audio/timing, cleanup, source replacement |
-| 3 | Sequential stitch | Not yet implemented | Two real clips, bounded ranges, audio, decoded output at both segments |
+| 3 | Media engine | Layer resizing fixed and real exported pixels verified. Chroma key passed real export pixel acceptance | Preview/export agreement, audio/timing, cleanup, source replacement |
+| 3 | Sequential stitch | Sequential two-clip stitch passed preview/export pixel and source audio checks | Simultaneous reaction layout and native social-platform Stitch remain separate |
 | 4 | Music | Anonymous upstream access denied; server-side registered access adapter added, no credentials supplied | Real search, preview, selection, audible export with legitimate catalogue access |
-| 4 | Templates | Before/After recipe being validated using uploaded media | Editable slots/text, missing-slot guard, real export and Undo |
+| 4 | Templates | Before/After uploaded media recipe passed browser acceptance | Editable slots/text, missing-slot guard, real export and Undo |
 | 5 | OAuth connection | Facebook prior grant verified. Instagram/Threads consent still unresolved. TikTok owner setup deferred | Actual provider consent and workspace account record for each provider |
-| 6 | Social Share | Native file sharing exists. Real provider publishing absent. Truthful per-account capabilities added | Approved destination/revision, durable media upload, job idempotency and confirmed provider result |
+| 6 | Social Share | Native file sharing exists. Real provider publishing absent. Studio draft account selection saved against revision; per-account capabilities are truthful | Approved destination/revision, durable media upload, job idempotency and confirmed provider result |
 | 7 | Ponytail design/motion | Source read, MIT attribution retained; Home spacing/type/colour adaptation verified at four widths | Full design and animation parity review across requested screens |
 
 ## Ownership and integration
@@ -46,7 +46,7 @@ flowchart TD
 
 ## Publishing work that must precede enabling live delivery
 
-1. Save selected account IDs against the current workspace and draft revision.
+1. Studio now saves selected account IDs against the current workspace and draft revision. Media must be connected to that reviewed asset/destination contract next.
    Verify ownership on the server. Editing text, media or destinations invalidates
    previous approval and schedules.
 2. Store the actual exported bytes durably with checksum and immutable asset ID.

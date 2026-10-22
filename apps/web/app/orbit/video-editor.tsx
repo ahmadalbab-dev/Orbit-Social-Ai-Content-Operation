@@ -99,7 +99,7 @@ export function VideoEditor({
   const stitchPreviewGeneration = useRef(0);
   function setStitchPreview(phase:'reference'|'response'|null){stitchPreviewState.current=phase;setStitchPreviewState(phase);}
   function stopStitchPreview(){stitchPreviewGeneration.current++;referenceVideoRef.current?.pause();videoRef.current?.pause();setStitchPreview(null);}
-  useEffect(()=>()=>{if(stitchIntro)URL.revokeObjectURL(stitchIntro.src);},[stitchIntro?.src]);
+  useEffect(()=>{const element=referenceVideoRef.current;return()=>{element?.pause();if(stitchIntro)URL.revokeObjectURL(stitchIntro.src);};},[stitchIntro?.src]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{

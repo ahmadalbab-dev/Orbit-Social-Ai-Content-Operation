@@ -23,6 +23,14 @@ Registered Openverse server-side authentication is now implemented with bounded 
 
 Current-head CI `39838261153`: quality, secret-scan and staging-images succeeded; web-preview was cancelled. Do not report all-CI success.
 
+## Media and draft acceptance
+
+- Final combined DESKTOP-ALBAB Chrome run: **16/16 passed**. It covers real decoded green-screen video pixels, retained image background/removal/Undo/source reset, two-clip stitch preview and export, both source audio frequencies in order, trim bounds, cancellation with no download, Before/After actual PNG export, Studio destination save/reload/clear, Channels return/status and AI stale-preview/privacy boundaries. AI/OAuth browser network responses are fixtures; these are not live consent/provider UI tests.
+- Web unit suite: **231/231 passed** across 34 files. Focused API Workflow/OAuth: **102/102 passed**. Web TypeScript passed after combined integration. API TypeScript passed for the destination changes.
+- Studio destination selection is server-validated for ownership, matching platform, connection scopes and future grant expiry. Changes create a new DRAFT revision and remove old schedules. Immutable dispatch snapshots/jobs remain future publishing work.
+- Read-only current Orbit database check: one connected Facebook account with one unexpired grant; no Instagram/Threads/TikTok account record. Supabase storage buckets query returned empty. No data or schema was modified.
+- Supabase security advisor: no ERROR findings, 25 INFO notices for RLS enabled without policies (server-only tables intentionally deny direct client access), and one WARN for leaked-password protection disabled. This is not a full security certification. Remediation: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection . Do not add broad client policies to silence the INFO notices.
+
 ## Integration and work order
 
 Use the existing configured `feat/cloudflare-image-editing` Preview as the shared acceptance environment, integrating feature work with a fast-forward after checking its unchanged base. Reuse its database/auth/Cloudflare configuration. Keep production release separate from feature integration. Preview's server-only Gemini configuration uses the tested 3.5 model; the server permits reduced preview sharing, while each editor's independent checkbox remains off by default.
@@ -44,9 +52,9 @@ Use the existing configured `feat/cloudflare-image-editing` Preview as the share
 | Music streaming catalogue | Openverse denies live search; no replacement commercial catalogue credentials supplied |
 | Studio and media assistant | Live Gemini provider paths passed; signed-in end-to-end workspace acceptance still required |
 | Image pixel editing | Real Cloudflare synthetic request returned a valid image; visual instruction correctness not assessed |
-| Green screen/stitch/multi-video timeline | Local chroma-key implementation and unit boundaries pass; browser export acceptance pending. Sequential stitch not yet implemented |
-| Dynamic/trending templates | Before/After recipe uses two actual uploaded photos and editable labels, with shared preview/export state. Browser acceptance pending; no verified trending claim |
-| Social account selection/publishing | Current native Share and preview publishing do not fulfil actual social publishing; Channels now reports separate, truthful posting capability and missing scopes |
+| Green screen/stitch/multi-video timeline | Local chroma key and sequential two-clip stitch passed actual decoded export pixel/audio tests. Simultaneous split screen and native platform Stitch are not implemented |
+| Dynamic/trending templates | Before/After recipe passed actual uploaded-photo preview/apply/export/Undo browser acceptance; no verified trending claim |
+| Social account selection/publishing | Studio now saves connected destination accounts with revision/approval invalidation. Media uses native Share; direct provider publishing and Media saved destinations are still absent. Channels reports truthful posting capabilities |
 | Design | Home source adaptation verified, full application parity incomplete |
 
 No new billing, production promotion, database migration or social post was performed.
