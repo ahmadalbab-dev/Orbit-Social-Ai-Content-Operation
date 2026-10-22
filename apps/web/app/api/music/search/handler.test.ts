@@ -25,3 +25,13 @@ it('handles timeout or invalid upstream body without inventing search results', 
  for (const [term, response] of [['html', new Response('<html>challenge</html>', { headers: { 'Content-Type': 'text/html' } })], ['broken', new Response('{', { headers: { 'Content-Type': 'application/json' } })]] as const) expect(await (await searchMusic(request(`q=${term}`), vi.fn().mockResolvedValue(response))).json()).toMatchObject({ mode: 'starter', results: [] });
  expect(await (await searchMusic(request('q=timeout'), vi.fn().mockRejectedValue(new DOMException('Timed out', 'TimeoutError')))).json()).toMatchObject({ mode: 'starter', results: [] });
 });
+it.each([[403,'access_denied'],[429,'rate_limited'],[500,'upstream']])('does not cache degraded %s responses or log private payloads',async(status,reason)=>{
+ const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+ try{
+  const response=await searchMusic(request(`q=private-input-${status}`),vi.fn().mockResolvedValue(new Response('secret-provider-body',{status:Number(status)})));
+  expect(response.headers.get('cache-control')).toBe('no-store');
+  expect(await response.json()).toMatchObject({mode:'starter',reason,requestId:expect.any(String)});
+  expect(warn).toHaveBeenCalledWith('orbit.music.search',{reason,upstreamStatus:status,requestId:expect.any(String)});
+  expect(JSON.stringify(warn.mock.calls)).not.toMatch(/private-input|secret-provider-body|Bearer/);
+ }finally{warn.mockRestore();}
+});

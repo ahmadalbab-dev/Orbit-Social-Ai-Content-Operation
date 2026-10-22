@@ -1,4 +1,5 @@
 "use client";
+import {prepareVideoOverlay} from "./video-overlay-image";
 
 import { useEffect, useRef, useState } from "react";
 import {
@@ -389,50 +390,32 @@ export function VideoEditor({
     const generation = sourceGeneration.current;
     const room = 6 - overlays.length;
     const next: VideoImageOverlay[] = [];
-    for (const file of Array.from(files).slice(0, room)) {
-      if (
-        !["image/png", "image/jpeg", "image/webp"].includes(file.type) ||
-        file.size > 8 * 1024 * 1024
-      ) {
-        setNotice("Use PNG, JPEG or WebP images up to 8 MB each.");
-        continue;
+    try {
+      for (const file of Array.from(files).slice(0, room)) {
+        try {
+          const prepared = await prepareVideoOverlay(file);
+          if (!mounted.current || generation !== sourceGeneration.current) {
+            URL.revokeObjectURL(prepared.src);
+            break;
+          }
+          const id = crypto.randomUUID();
+          overlayUrls.current.add(prepared.src);
+          overlayImages.current.set(id, prepared.image);
+          next.push({id, src:prepared.src, x:0.05, y:0.05, width:0.3, opacity:1, start:0, end:duration});
+          if (prepared.resized) setNotice('The overlay was resized for editing. Your original file is unchanged.');
+        } catch (error) {
+          if (mounted.current && generation === sourceGeneration.current)
+            setNotice(error instanceof Error ? error.message : 'This image could not be opened.');
+        }
       }
-      const src = URL.createObjectURL(file);
-      overlayUrls.current.add(src);
-      try {
-        const image = new Image();
-        image.src = src;
-        await image.decode();
-        if (
-          !mounted.current ||
-          generation !== sourceGeneration.current ||
-          image.naturalWidth * image.naturalHeight > 4_000_000
-        )
-          throw new Error("Use an overlay below 4 megapixels.");
-        const id = crypto.randomUUID();
-        overlayImages.current.set(id, image);
-        next.push({
-          id,
-          src,
-          x: 0.05,
-          y: 0.05,
-          width: 0.3,
-          opacity: 1,
-          start: 0,
-          end: duration,
-        });
-      } catch {
-        URL.revokeObjectURL(src);
-        overlayUrls.current.delete(src);
-        if (mounted.current)
-          setNotice(
-            "The image could not be loaded. Use an image below 4 megapixels.",
-          );
+      if (mounted.current && generation === sourceGeneration.current)
+        setOverlays((old) => [...old, ...next].slice(0, 6));
+      else for (const item of next) {
+        URL.revokeObjectURL(item.src);
+        overlayUrls.current.delete(item.src);
+        overlayImages.current.delete(item.id);
       }
-    }
-    overlayLoading.current = false;
-    if (mounted.current && generation === sourceGeneration.current)
-      setOverlays((old) => [...old, ...next].slice(0, 6));
+    } finally { overlayLoading.current = false; }
   }
   const aiCurrent: VideoEditorState = {
     sourceDuration,

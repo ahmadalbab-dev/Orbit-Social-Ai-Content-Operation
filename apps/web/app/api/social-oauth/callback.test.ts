@@ -26,3 +26,13 @@ it('binds TikTok callback to its browser cookie and matching provider',async()=>
  const wrong=await socialOAuthCallback(req,'tiktok',vi.fn(async()=>Response.json({provider:'threads',status:'connected'})));expect(wrong.headers.get('location')).toBe('/?oauth=failed&provider=tiktok');
  const noCookie=await socialOAuthCallback(request(),'tiktok',fetcher);expect(noCookie.headers.get('location')).toBe('/?oauth=failed&provider=tiktok');expect(fetcher).toHaveBeenCalledOnce();
 });
+
+it('aligns the code boundary with the API without leaking long codes',async()=>{
+ const fetcher=vi.fn(async()=>Response.json({provider:'threads',status:'connected'}));
+ const req=(code:string)=>new Request(`https://web.orbit.test/api/social-oauth/threads/callback?state=${state}&code=${encodeURIComponent(code)}`,{headers:{cookie:`orbit_oauth_threads=${nonce}`}});
+ expect((await socialOAuthCallback(req('x'.repeat(4096)),'threads',fetcher)).headers.get('location')).toBe('/?oauth=connected&provider=threads');
+ expect(fetcher).toHaveBeenCalledOnce();
+ fetcher.mockClear();
+ for(const code of ['x'.repeat(4097),'private\rcode','private\ncode'])expect((await socialOAuthCallback(req(code),'threads',fetcher)).headers.get('location')).toBe('/?oauth=failed&provider=threads');
+ expect(fetcher).not.toHaveBeenCalled();
+});

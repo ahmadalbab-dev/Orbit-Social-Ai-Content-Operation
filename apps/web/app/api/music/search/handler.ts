@@ -12,7 +12,7 @@ async function json(response: Response) {
   const data = new Uint8Array(bytes); let offset = 0; for (const chunk of chunks) { data.set(chunk, offset); offset += chunk.length; }
   return JSON.parse(new TextDecoder().decode(data));
 }
-function reply(body: unknown, status = 200) { return Response.json(body, { status, headers: { 'Cache-Control': status === 200 ? 'public, max-age=30, s-maxage=60' : 'no-store', 'X-Content-Type-Options': 'nosniff' } }); }
+function reply(body: unknown, status = 200, cacheable = true) { return Response.json(body, { status, headers: { 'Cache-Control': status === 200 && cacheable ? 'public, max-age=30, s-maxage=60' : 'no-store', 'X-Content-Type-Options': 'nosniff' } }); }
 /** Public read-only catalogue: fixed provider, fixed CC0 source, no forwarded cookies or arbitrary URLs. */
 export async function searchMusic(request: Request, fetcher: typeof fetch = fetch) {
   const params = new URL(request.url).searchParams, terms = params.getAll('q');
@@ -20,16 +20,24 @@ export async function searchMusic(request: Request, fetcher: typeof fetch = fetc
   const term = terms[0].trim().toLowerCase(), saved = cache.get(term);
   if (saved && saved.expires > Date.now()) return reply(saved.body);
   const unavailable = { results: [], mode: 'starter', notice: 'Live music search is temporarily unavailable. The included CC0 starter tracks below are ready to preview and use.' };
-  if (active >= 4) return reply(unavailable);
+  const requestId = crypto.randomUUID();
+  const degraded = (reason: string, upstreamStatus?: number) => {
+    console.warn('orbit.music.search', {requestId, reason, ...(upstreamStatus === undefined ? {} : {upstreamStatus})});
+    return reply({...unavailable, reason, requestId}, 200, false);
+  };
+  if (active >= 4) return degraded('capacity');
+  let reason = 'network', upstreamStatus: number | undefined;
+  const signal = AbortSignal.timeout(8000);
   active++;
   try {
     const url = new URL(ENDPOINT); url.search = new URLSearchParams({ q: term, license: 'cc0', source: 'freesound', page_size: '40' }).toString();
-    const response = await fetcher(url.href, { method: 'GET', credentials: 'omit', redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(8000), headers: { Accept: 'application/json' } });
-    if (!response.ok) { await response.body?.cancel(); throw Error('Catalogue unavailable'); }
+    const response = await fetcher(url.href, { method: 'GET', credentials: 'omit', redirect: 'error', cache: 'no-store', signal, headers: { Accept: 'application/json' } });
+    if (!response.ok) { upstreamStatus = response.status; reason = response.status === 429 ? 'rate_limited' : response.status === 401 || response.status === 403 ? 'access_denied' : 'upstream'; await response.body?.cancel(); throw Error('Catalogue unavailable'); }
+    reason = 'invalid_response';
     const tracks = librarySounds(await json(response));
     const body = { mode: 'live', results: tracks.map(track => ({ id: track.id, title: track.title, creator: track.creator, url: track.url, foreign_landing_url: track.source, license: 'cc0', license_url: track.license, source: 'freesound', mature: false })) };
     if (cache.size >= 32) cache.delete(cache.keys().next().value!);
     cache.set(term, { expires: Date.now() + 60000, body }); return reply(body);
-  } catch { return reply(unavailable); }
+  } catch { return degraded(signal.aborted ? 'timeout' : reason, upstreamStatus); }
   finally { active--; }
 }
