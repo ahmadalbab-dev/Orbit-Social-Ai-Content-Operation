@@ -54,3 +54,14 @@ it('fails partial registered credentials before provider dispatch without leakin
   expect(JSON.stringify([body,warn.mock.calls])).not.toContain('private-client-only');
  }finally{warn.mockRestore();vi.unstubAllEnvs();}
 });
+it('does not replay a rejected bearer search and refreshes on the next explicit search',async()=>{
+ vi.stubEnv('OPENVERSE_CLIENT_ID','recovery-client');vi.stubEnv('OPENVERSE_CLIENT_SECRET','recovery-secret');
+ const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+ try{
+  const fetcher=vi.fn().mockResolvedValueOnce(Response.json({access_token:'rejected-token',token_type:'Bearer',expires_in:3600})).mockResolvedValueOnce(new Response('private upstream rejection',{status:401})).mockResolvedValueOnce(Response.json({access_token:'renewed-token',token_type:'Bearer',expires_in:3600})).mockResolvedValueOnce(Response.json({results:[row]}));
+  expect(await(await searchMusic(request('q=expired-catalogue-token'),fetcher)).json()).toMatchObject({mode:'starter',reason:'access_denied'});
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(await(await searchMusic(request('q=explicit-catalogue-retry'),fetcher)).json()).toMatchObject({mode:'live'});
+  expect(fetcher).toHaveBeenCalledTimes(4);expect(new Headers(fetcher.mock.calls[3][1].headers).get('authorization')).toBe('Bearer renewed-token');
+ }finally{warn.mockRestore();vi.unstubAllEnvs();}
+});

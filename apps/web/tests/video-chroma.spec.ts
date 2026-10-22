@@ -5,7 +5,7 @@ import { selectEditorTool } from './editor-helpers';
 async function previewPixels(page: Page) {
   return page.getByLabel('Edited video preview', {exact:true}).evaluate((element: HTMLCanvasElement) => {
     const context=element.getContext('2d')!;
-    return {background:Array.from(context.getImageData(20,20,1,1).data),subject:Array.from(context.getImageData(element.width/2,element.height/2,1,1).data)};
+    return {background:Array.from(context.getImageData(20,element.height-20,1,1).data),subject:Array.from(context.getImageData(element.width/2,element.height*.75,1,1).data)};
   });
 }
 test('green screen previews, applies, exports actual keyed pixels and supports undo without uploads', async ({page}) => {
@@ -39,7 +39,7 @@ test('green screen previews, applies, exports actual keyed pixels and supports u
       await new Promise<void>((resolve,reject)=>{video.onloadedmetadata=()=>resolve();video.onerror=()=>reject(Error('Export could not be decoded'));});
       const ready=new Promise<void>(resolve=>{video.onseeked=()=>resolve();});video.currentTime=.4;await ready;
       const canvas=document.createElement('canvas');canvas.width=video.videoWidth;canvas.height=video.videoHeight;const context=canvas.getContext('2d')!;context.drawImage(video,0,0);
-      return {width:video.videoWidth,height:video.videoHeight,duration:video.duration,background:Array.from(context.getImageData(20,20,1,1).data),subject:Array.from(context.getImageData(canvas.width/2,canvas.height/2,1,1).data)};
+      return {width:video.videoWidth,height:video.videoHeight,duration:video.duration,background:Array.from(context.getImageData(20,canvas.height-20,1,1).data),subject:Array.from(context.getImageData(canvas.width/2,canvas.height*.75,1,1).data)};
     }finally{video.remove();URL.revokeObjectURL(url);}
   },bytes.toString('base64'));
   expect(result.width).toBe(320);expect(result.height).toBe(180);expect(result.duration).toBeGreaterThan(1.1);

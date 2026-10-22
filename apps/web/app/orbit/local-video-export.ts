@@ -1,6 +1,7 @@
 import { drawLightning, scheduleThunder, validateLightning, type LightningEffect } from "./local-video-effects";
 import { validateRecordedMovie } from "./recorded-movie";
 import { keyedVideoFrame, releaseVideoChromaKey, validateVideoChromaKey, type VideoChromaKey } from "./video-chroma-key";
+import { stitchedDuration, stitchIntroEdit, validateVideoStitch, type VideoStitchIntro } from "./video-stitch";
 import {
   prepareSoundtrack,
   startSoundtrack,
@@ -34,6 +35,7 @@ export interface LocalVideoEdit {
   soundtrack?: LocalSoundtrack | null;
   lightning?: LightningEffect | null;
   chromaKey?: VideoChromaKey | null;
+  intro?: VideoStitchIntro | null;
   titleCard?: {
     text: string;
     kicker: string;
@@ -55,6 +57,7 @@ export function recorderMime(
   ].find(supported);
 }
 export function validateVideoEdit(edit: LocalVideoEdit) {
+  if (edit.intro) validateVideoStitch(edit.intro, edit);
   if (edit.chromaKey) {
     validateVideoChromaKey(edit.chromaKey);
     if (edit.chromaKey.backgroundLayerId && !edit.overlays?.some(layer => layer.id === edit.chromaKey!.backgroundLayerId)) throw Error("Choose an existing image layer for the green-screen background.");
@@ -296,7 +299,7 @@ export async function exportLocalVideo(
   validateVideoEdit(edit);
   signal.throwIfAborted();
   if (
-    (edit.volume > 0 || edit.soundtrack || (edit.lightning?.thunderVolume ?? 0) > 0) &&
+    (edit.volume > 0 || (edit.intro?.volume ?? 0) > 0 || edit.soundtrack || (edit.lightning?.thunderVolume ?? 0) > 0) &&
     typeof AudioContext === "undefined"
   )
     throw new Error(
@@ -312,9 +315,13 @@ export async function exportLocalVideo(
   video.preload = "auto";
   video.src = source;
   video.playbackRate = edit.speed;
+  const introEdit = edit.intro ? stitchIntroEdit(edit, edit.intro) : null;
+  const reference = edit.intro ? document.createElement('video') : null;
+  if (reference) { reference.playsInline = true; reference.preload = 'auto'; reference.src = edit.intro!.src; }
+  const outputDuration = stitchedDuration(edit, edit.intro);
   // Create/resume audio during the export button gesture. Audio is routed to the recording, not speakers.
   const audio =
-    (edit.volume > 0 || edit.soundtrack || (edit.lightning?.thunderVolume ?? 0) > 0) && typeof AudioContext !== "undefined"
+    (edit.volume > 0 || (edit.intro?.volume ?? 0) > 0 || edit.soundtrack || (edit.lightning?.thunderVolume ?? 0) > 0) && typeof AudioContext !== "undefined"
       ? new AudioContext()
       : null;
   const audioReady = audio?.resume();
@@ -330,7 +337,7 @@ export async function exportLocalVideo(
     () => {
       if (recorder?.state === "recording") recorder.stop();
     },
-    (edit.duration / edit.speed + 20) * 1000,
+    (outputDuration + 20) * 1000,
   );
   try {
     await audioReady;
@@ -356,11 +363,15 @@ export async function exportLocalVideo(
       gain.gain.value = edit.volume;
       input.connect(gain);
       gain.connect(output);
+      if (reference) {
+        const referenceInput = audio.createMediaElementSource(reference), referenceGain = audio.createGain();
+        referenceGain.gain.value = edit.intro!.volume; referenceInput.connect(referenceGain); referenceGain.connect(output);
+      }
       output.stream.getAudioTracks().forEach((track) => stream.addTrack(track));
       if (edit.soundtrack)
         musicBuffer = await prepareSoundtrack(audio, edit.soundtrack, signal);
-    } else video.muted = true;
-    const wait = (event: string) =>
+    } else { video.muted = true; if (reference) reference.muted = true; }
+    const wait = (target: HTMLVideoElement, event: string) =>
       new Promise<void>((resolve, reject) => {
         const timer = setTimeout(
           () =>
@@ -375,26 +386,31 @@ export async function exportLocalVideo(
         const cancelled = () => finish(new Error("Export cancelled."));
         function finish(error?: Error) {
           clearTimeout(timer);
-          video.removeEventListener(event, done);
-          video.removeEventListener("error", failed);
+          target.removeEventListener(event, done);
+          target.removeEventListener("error", failed);
           signal.removeEventListener("abort", cancelled);
           error ? reject(error) : resolve();
         }
-        video.addEventListener(event, done, { once: true });
-        video.addEventListener("error", failed, { once: true });
+        target.addEventListener(event, done, { once: true });
+        target.addEventListener("error", failed, { once: true });
         signal.addEventListener("abort", cancelled, { once: true });
         if (signal.aborted) cancelled();
       });
-    if (video.readyState < 2) await wait("loadeddata");
+    if (video.readyState < 2) await wait(video,"loadeddata");
     if (edit.start + edit.duration > video.duration + 0.05)
       throw new Error("Trim range extends beyond the source video.");
     if (edit.start > 0) {
-      const seek = wait("seeked");
+      const seek = wait(video,"seeked");
       video.currentTime = edit.start;
       await seek;
     }
+    if (reference && introEdit) {
+      if (reference.readyState < 2) await wait(reference,'loadeddata');
+      if (!Number.isFinite(reference.duration) || introEdit.start + introEdit.duration > reference.duration + .05) throw Error('The reference trim extends beyond this video.');
+      if (introEdit.start > 0) { const seek=wait(reference,'seeked');reference.currentTime=introEdit.start;await seek; }
+    }
     signal.throwIfAborted();
-    drawEditedFrame(ctx, video, edit, 0, images);
+    drawEditedFrame(ctx, reference ?? video, introEdit ?? edit, 0, images);
     recorder = new MediaRecorder(stream, {
       mimeType: mime,
       videoBitsPerSecond: 4_000_000,
@@ -404,6 +420,7 @@ export async function exportLocalVideo(
       let bytes = 0;
       let complete = false;
       let error: Error | undefined;
+      let referencePhase = !!reference, switching = false;
       const stop = () => {
         if (recorder?.state === "recording") recorder.stop();
       };
@@ -443,6 +460,7 @@ export async function exportLocalVideo(
         signal.removeEventListener("abort", abort);
         document.removeEventListener("visibilitychange", hidden);
         video.pause();
+        reference?.pause();
         if (error || !complete || !bytes)
           reject(
             error ??
@@ -453,37 +471,37 @@ export async function exportLocalVideo(
         else resolve(new Blob(chunks, { type: recorder!.mimeType }));
       };
       const draw = () => {
-        const elapsed = Math.max(0, video.currentTime - edit.start);
-        try { drawEditedFrame(ctx, video, edit, elapsed, images); }
+        if (switching) { frame=requestAnimationFrame(draw);return; }
+        const currentVideo=referencePhase?reference!:video,currentEdit=referencePhase?introEdit!:edit;
+        const elapsed = Math.max(0, currentVideo.currentTime - currentEdit.start);
+        try { drawEditedFrame(ctx, currentVideo, currentEdit, elapsed, images); }
         catch { error = new Error("Video effects were interrupted. Keep this tab open and try exporting again."); stop(); return; }
-        progress(Math.min(99, (elapsed / edit.duration) * 100));
-        if (elapsed >= edit.duration - 0.025 || video.ended) {
-          complete = true;
-          stop();
+        const finishedSeconds=referencePhase?elapsed:(edit.intro?.duration??0)+elapsed/edit.speed;
+        progress(Math.min(99, (finishedSeconds / outputDuration) * 100));
+        if (elapsed >= currentEdit.duration - 0.025 || currentVideo.ended) {
+          if (referencePhase) {
+            reference!.pause();referencePhase=false;switching=true;
+            void playResponse().then(()=>{switching=false;}).catch(()=>{error=Error('Response playback was blocked. Tap Export again.');stop();});
+            frame=requestAnimationFrame(draw);
+          } else { complete = true; stop(); }
         } else frame = requestAnimationFrame(draw);
+      };
+      const playResponse = async () => {
+        await video.play();
+        if (signal.aborted || recorder?.state !== 'recording') { video.pause();return; }
+        if (audio && edit.lightning && destination) stopThunder = scheduleThunder(audio, edit.lightning, destination, 0, edit.duration / edit.speed);
+        if (audio && musicBuffer && edit.soundtrack && destination) stopMusic = startSoundtrack(audio,musicBuffer,edit.soundtrack,destination,edit.duration/edit.speed);
       };
       recorder!.start(500);
       frame = requestAnimationFrame(draw);
-      void video
-        .play()
-        .then(() => {
-          if (audio && edit.lightning && destination) stopThunder = scheduleThunder(audio, edit.lightning, destination, 0, edit.duration / edit.speed);
-          if (audio && musicBuffer && edit.soundtrack && destination)
-            stopMusic = startSoundtrack(
-              audio,
-              musicBuffer,
-              edit.soundtrack,
-              destination,
-              edit.duration / edit.speed,
-            );
-        })
+      void (reference ? reference.play() : playResponse())
         .catch(() => {
           error = new Error("Playback was blocked. Tap Export again.");
           stop();
         });
     });
     const blob = await result;
-    await validateRecordedMovie(blob, edit.duration / edit.speed, signal);
+    await validateRecordedMovie(blob, outputDuration, signal);
     progress(100);
     return blob;
   } finally {
@@ -497,6 +515,7 @@ export async function exportLocalVideo(
     video.pause();
     video.removeAttribute("src");
     video.load();
+    if (reference) { reference.pause();reference.removeAttribute('src');reference.load(); }
     stream.getTracks().forEach((track) => track.stop());
     await audio?.close().catch(() => {});
   }
