@@ -3,6 +3,7 @@ import {createHash,randomBytes} from 'node:crypto';
 import {DatabaseService} from './database.service';
 import {TokenVault,type RequestIdentity} from './security';
 import {requireRole} from './workflow.service';
+import {socialConnectionScopes as scopes} from './social-oauth.scopes';
 export const socialProviders=['facebook','instagram','threads','tiktok'] as const;
 export type SocialProvider=typeof socialProviders[number];
 const hash=(value:string)=>createHash('sha256').update(value).digest('hex');
@@ -21,7 +22,6 @@ export function socialOAuthConfig(provider:SocialProvider,env:NodeJS.ProcessEnv=
  }catch{return null;}
 }
 export function parseSocialProvider(value:string):SocialProvider{if(!(socialProviders as readonly string[]).includes(value))throw new BadRequestException('Unsupported social provider');return value as SocialProvider;}
-const scopes=(p:SocialProvider)=>p==='tiktok'?['user.info.basic']:p==='threads'?['threads_basic']:p==='instagram'?['pages_show_list','pages_read_engagement','instagram_basic']:['pages_show_list','pages_read_engagement'];
 @Injectable()
 export class SocialOAuthService {
  constructor(private readonly db:DatabaseService){}

@@ -9,17 +9,19 @@ import { socialPlatforms, type ContentVariant, type SocialPlatform } from "@sma/
 import { z } from "zod";
 import { DatabaseService } from "./database.service";
 import type { RequestIdentity } from "./security";
+import { socialConnectionScopes } from "./social-oauth.scopes";
 
 const brandSchema = z.object({ name: z.string().trim().min(1).max(120), voice: z.string().trim().min(1).max(2000), audience: z.string().trim().min(1).max(2000), language:z.string().max(80).optional(), topics:z.array(z.string().max(200)).max(20).optional() }).strict();
 const variantSchema = z.object({ platform: z.enum(socialPlatforms), copy: z.string().trim().min(1).max(10000), hashtags: z.array(z.string().max(120)).max(30), callToAction: z.string().max(500) }).strict();
 const variantsSchema = z.array(variantSchema).min(1).max(8).refine(v => new Set(v.map(i => i.platform)).size === v.length, "Duplicate platforms");
+const destinationIdsSchema=z.array(z.string().regex(/^[A-Za-z0-9_-]{1,100}$/)).max(20).refine(ids=>new Set(ids).size===ids.length,'Duplicate destinations');
 function parse<T>(schema: z.ZodType<T>, input: unknown): T { const result = schema.safeParse(input); if (!result.success) throw new BadRequestException("Invalid input"); return result.data; }
 export function assertRevision(actual: number, expected: number) { if (!Number.isSafeInteger(expected) || expected !== actual) throw new ConflictException("Content changed; reload before continuing"); }
 export function requireRole(identity: RequestIdentity, roles = ["OWNER", "ADMIN", "EDITOR"]) { if (!roles.includes(identity.role)) throw new ForbiddenException("Role cannot perform this action"); }
 function json(value: unknown) { return value as Prisma.InputJsonValue; }
 export function present(item: ContentItem & { schedules?: {scheduledFor: Date}[] }) {
-  const metadata = item.metadata as {variants?: ContentVariant[]; generationMode?: string; publishResult?: unknown} | null;
-  return { id: item.id, workspaceId: item.workspaceId, brandId: item.brandId, topic: item.title, variants: metadata?.variants ?? [], revision: item.revision, status: item.status, generationMode: metadata?.generationMode, publishResult: metadata?.publishResult, scheduledFor: item.schedules?.[0]?.scheduledFor.toISOString(), updatedAt: item.updatedAt };
+  const metadata = item.metadata as {variants?: ContentVariant[]; generationMode?: string; publishResult?: unknown; socialAccountIds?:string[]} | null;
+  return { id: item.id, workspaceId: item.workspaceId, brandId: item.brandId, topic: item.title, variants: metadata?.variants ?? [], socialAccountIds:metadata?.socialAccountIds??[], revision: item.revision, status: item.status, generationMode: metadata?.generationMode, publishResult: metadata?.publishResult, scheduledFor: item.schedules?.[0]?.scheduledFor.toISOString(), updatedAt: item.updatedAt };
 }
 @Injectable()
 export class WorkflowService {
@@ -87,12 +89,21 @@ export class WorkflowService {
     // repeated malformed outputs could bypass the platform spending allowance.
   }
   async review(identity: RequestIdentity, id: string, input: unknown) {
-    requireRole(identity); const body=parse(z.object({expectedRevision:z.number().int().positive(),variants:variantsSchema}).strict(),input);
+    requireRole(identity); const body=parse(z.object({expectedRevision:z.number().int().positive(),variants:variantsSchema,socialAccountIds:destinationIdsSchema.optional()}).strict(),input);
     return this.db.$transaction(async tx=>{
       const item=await this.requireItem(tx,identity.workspaceId,id); assertRevision(item.revision,body.expectedRevision);
       if (["PUBLISHED","PUBLISHING"].includes(item.status)) throw new ConflictException("Published content must be duplicated before editing");
+      const socialAccountIds=body.socialAccountIds??parse(destinationIdsSchema,(item.metadata as {socialAccountIds?:unknown}|null)?.socialAccountIds??[]);
+      if(socialAccountIds.length){
+        const accounts=await tx.socialAccount.findMany({where:{workspaceId:identity.workspaceId,id:{in:socialAccountIds}},select:{id:true,platform:true,status:true,token:{select:{expiresAt:true,scopes:true}}}});
+        const valid=accounts.length===socialAccountIds.length&&accounts.every(account=>{
+          const platform=account.platform.toLowerCase(),required= socialConnectionScopes(platform);
+          return body.variants.some(variant=>variant.platform===platform)&&required.length>0&&account.status==='connected'&&!!account.token?.expiresAt&&account.token.expiresAt>new Date()&&required.every(scope=>account.token!.scopes.includes(scope));
+        });
+        if(!valid)throw new BadRequestException('Choose connected accounts in this workspace that match the draft channels.');
+      }
       const next=item.revision+1;
-      const changed=await tx.contentItem.updateMany({where:{id,workspaceId:identity.workspaceId,revision:body.expectedRevision,status:{notIn:["PUBLISHED","PUBLISHING"]}},data:{revision:next,status:"DRAFT",body:body.variants[0].copy,metadata:json({variants:body.variants,generationMode:"edited"})}});
+      const changed=await tx.contentItem.updateMany({where:{id,workspaceId:identity.workspaceId,revision:body.expectedRevision,status:{notIn:["PUBLISHED","PUBLISHING"]}},data:{revision:next,status:"DRAFT",body:body.variants[0].copy,metadata:json({variants:body.variants,generationMode:"edited",socialAccountIds})}});
       if(!changed.count) throw new ConflictException("Content changed; reload");
       await tx.schedule.deleteMany({where:{contentItemId:id,workspaceId:identity.workspaceId}});
       await tx.contentRevision.create({data:{contentItemId:id,revision:next,variants:json(body.variants),actorId:identity.userId}});

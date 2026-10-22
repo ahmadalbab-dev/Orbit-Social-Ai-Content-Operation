@@ -7,7 +7,7 @@ import {api} from "./session-api";
 import {socialOAuthAuthorization} from "./social-oauth";
 import "./connections-panel.css";
 type PublishingCapability={implemented:boolean;canPublishText:boolean;canPublishImage:boolean;canPublishVideo:boolean;reason:string;missingScopes?:string[]};
-export type IntegrationStatus={connectorMode?:string;livePublishing?:boolean;providers:Record<string,{configured?:boolean;credentialsConfigured?:boolean;connected?:boolean;oauthImplemented?:boolean;reason?:string;publishing?:PublishingCapability;accounts?:{name:string;accountType:string|null;publishing?:PublishingCapability}[]}>};
+export type IntegrationStatus={connectorMode?:string;livePublishing?:boolean;providers:Record<string,{configured?:boolean;credentialsConfigured?:boolean;connected?:boolean;oauthImplemented?:boolean;reason?:string;publishing?:PublishingCapability;accounts?:{id?:string;name:string;accountType:string|null;connected?:boolean;publishing?:PublishingCapability}[]}>};
 const providers=[
  {id:"facebook",name:"Facebook",account:"Facebook Pages",docs:"https://developers.facebook.com/docs/pages-api/getting-started/",requirement:"Choose a Facebook Page you are authorised to manage. Facebook will show the permissions requested by Orbit."},
  {id:"instagram",name:"Instagram",account:"Business + Creator",docs:"https://developers.facebook.com/docs/instagram-platform/instagram-api-with-facebook-login/",requirement:"Connect your Instagram professional account (Business or Creator) linked to a Facebook Page you manage. Facebook will show the permissions requested by Orbit."},

@@ -5,8 +5,8 @@ import type { DatabaseService } from "./database.service";
 const identity={sub:"auth-a",userId:"user-a",workspaceId:"workspace-a",role:"OWNER"};
 const variants=[{platform:"facebook",copy:"Updated copy",hashtags:[],callToAction:"Read more"}];
 function setup(item:any={id:"content-a",workspaceId:"workspace-a",revision:2,status:"APPROVED",updatedAt:new Date(),metadata:{variants}}){
-  const contentItem={findFirst:vi.fn(async({where}:any)=>where.workspaceId===item?.workspaceId?item:null),updateMany:vi.fn(async({data}:any)=>{Object.assign(item,data);return {count:1};})};
-  const tx={contentItem,approval:{findFirst:vi.fn(async()=>({status:"APPROVED"})),create:vi.fn()},schedule:{deleteMany:vi.fn(),create:vi.fn()},contentRevision:{create:vi.fn()}};
+  const contentItem={findFirst:vi.fn(async({where}:any)=>where.workspaceId===item?.workspaceId?item:null),findMany:vi.fn(async()=>[item]),updateMany:vi.fn(async({data}:any)=>{Object.assign(item,data);return {count:1};})};
+  const tx={contentItem,socialAccount:{findMany:vi.fn(async(_query:any)=>[{id:'account-a',platform:'FACEBOOK',status:'connected',token:{expiresAt:new Date(Date.now()+60000),scopes:['pages_show_list','pages_read_engagement']}}])},approval:{findFirst:vi.fn(async()=>({status:"APPROVED"})),create:vi.fn()},schedule:{deleteMany:vi.fn(),create:vi.fn()},contentRevision:{create:vi.fn()}};
   const db={...tx,$transaction:async(fn:any)=>fn(tx)} as unknown as DatabaseService;
   return {service:new WorkflowService(db, new BillingService(db)),tx,item};
 }
@@ -51,6 +51,58 @@ describe("tenant and revision workflow",()=>{
     const {service,tx}=setup();tx.contentItem.updateMany.mockResolvedValue({count:0});
     await expect(service.review(identity,"content-a",{expectedRevision:2,variants})).rejects.toThrow("Content changed");
     expect(tx.contentRevision.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('saved social account destinations',()=>{
+  it('persists workspace-owned connected accounts on a new draft revision and restores them in the list',async()=>{
+    const {service,tx}=setup();
+    const result=await service.review(identity,'content-a',{expectedRevision:2,variants,socialAccountIds:['account-a']});
+    expect(tx.socialAccount.findMany).toHaveBeenCalledWith(expect.objectContaining({where:{workspaceId:'workspace-a',id:{in:['account-a']}}}));
+    expect(result).toMatchObject({revision:3,status:'DRAFT',socialAccountIds:['account-a']});
+    expect(tx.schedule.deleteMany).toHaveBeenCalledWith({where:{contentItemId:'content-a',workspaceId:'workspace-a'}});
+    expect((await service.list('workspace-a'))[0].socialAccountIds).toEqual(['account-a']);
+    await expect(service.schedule(identity,'content-a',{expectedRevision:3,scheduledFor:'2099-01-01T12:00:00Z'})).rejects.toThrow('Current revision needs approval');
+    expect(tx.approval.create).not.toHaveBeenCalled();
+  });
+  it('preserves destinations for clients that omit the new optional field',async()=>{
+    const {service}=setup({id:'content-a',workspaceId:'workspace-a',revision:2,status:'APPROVED',metadata:{variants,socialAccountIds:['account-a']}});
+    expect((await service.review(identity,'content-a',{expectedRevision:2,variants})).socialAccountIds).toEqual(['account-a']);
+  });
+  it('explicitly clears destinations and invalidates approval without looking up accounts',async()=>{
+    const {service,tx}=setup({id:'content-a',workspaceId:'workspace-a',revision:2,status:'APPROVED',metadata:{variants,socialAccountIds:['account-a']}});
+    expect(await service.review(identity,'content-a',{expectedRevision:2,variants,socialAccountIds:[]})).toMatchObject({socialAccountIds:[],revision:3,status:'DRAFT'});
+    expect(tx.socialAccount.findMany).not.toHaveBeenCalled();
+  });
+  it.each([['account-a','account-a'],[''],['https://example.test/account'],Array.from({length:21},(_,i)=>`account-${i}`)])('rejects malformed or duplicate destinations %j before writing',async socialAccountIds=>{
+    const {service,tx}=setup();
+    await expect(service.review(identity,'content-a',{expectedRevision:2,variants,socialAccountIds})).rejects.toThrow('Invalid input');
+    expect(tx.socialAccount.findMany).not.toHaveBeenCalled();expect(tx.contentItem.updateMany).not.toHaveBeenCalled();
+  });
+  it('rejects an unknown or other-workspace account without mutating the draft',async()=>{
+    const {service,tx}=setup();tx.socialAccount.findMany.mockResolvedValue([]);
+    await expect(service.review(identity,'content-a',{expectedRevision:2,variants,socialAccountIds:['foreign-account']})).rejects.toThrow('Choose connected accounts');
+    expect(tx.socialAccount.findMany.mock.calls[0][0].where.workspaceId).toBe('workspace-a');
+    expect(tx.contentItem.updateMany).not.toHaveBeenCalled();expect(tx.schedule.deleteMany).not.toHaveBeenCalled();
+  });
+  it.each(['disconnected','expired','missing token','missing scopes','wrong platform'])('rejects %s destinations before mutating the revision',async reason=>{
+    const {service,tx}=setup();
+    const account={id:'account-a',platform:reason==='wrong platform'?'THREADS':'FACEBOOK',status:reason==='disconnected'?'disconnected':'connected',token:reason==='missing token'?null:{expiresAt:new Date(reason==='expired'?0:Date.now()+60000),scopes:reason==='missing scopes'?[]:['pages_show_list','pages_read_engagement']}};
+    tx.socialAccount.findMany.mockResolvedValue([account] as any);
+    await expect(service.review(identity,'content-a',{expectedRevision:2,variants,socialAccountIds:['account-a']})).rejects.toThrow('Choose connected accounts');
+    expect(tx.contentItem.updateMany).not.toHaveBeenCalled();expect(tx.contentRevision.create).not.toHaveBeenCalled();
+  });
+  it('rejects a stale destination edit before account lookup',async()=>{
+    const {service,tx}=setup();
+    await expect(service.review(identity,'content-a',{expectedRevision:1,variants,socialAccountIds:['account-a']})).rejects.toThrow('Content changed');
+    expect(tx.socialAccount.findMany).not.toHaveBeenCalled();
+  });
+  it('rejects unsupported OAuth platforms even when a draft variant and future token match',async()=>{
+    const {service,tx}=setup();
+    tx.socialAccount.findMany.mockResolvedValue([{id:'account-a',platform:'YOUTUBE',status:'connected',token:{expiresAt:new Date(Date.now()+60000),scopes:[]}}]);
+    const youtubeVariants=[{platform:'youtube',copy:'Public fixture',hashtags:[],callToAction:''}];
+    await expect(service.review(identity,'content-a',{expectedRevision:2,variants:youtubeVariants,socialAccountIds:['account-a']})).rejects.toThrow('Choose connected accounts');
+    expect(tx.contentItem.updateMany).not.toHaveBeenCalled();
   });
 });
 
