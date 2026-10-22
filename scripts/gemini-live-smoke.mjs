@@ -1,6 +1,11 @@
 // Explicit preview-only probe using public synthetic input. No key/output logging.
 import {createRequire} from 'node:module';
 if(process.env.VERCEL_ENV!=='preview'||!process.env.GEMINI_API_KEY){console.error('ORBIT_GEMINI_SMOKE setup FAIL');process.exit(1);}
+const originalFetch=globalThis.fetch;
+globalThis.fetch=async(...args)=>{
+ try{const response=await originalFetch(...args);console.log(`ORBIT_GEMINI_HTTP ${response.status}`);return response;}
+ catch(error){const code=error?.cause?.code;console.log(`ORBIT_GEMINI_NETWORK ${typeof code==='string'&&/^[A-Z_]{1,40}$/.test(code)?code:'fetch_failed'}`);throw error;}
+};
 const ai=createRequire(new URL('../apps/api/package.json',import.meta.url))('@sma/ai');
 const key=process.env.GEMINI_API_KEY,model=process.env.GEMINI_TEXT_MODEL??ai.DEFAULT_GEMINI_TEXT_MODEL;
 const tests=[
