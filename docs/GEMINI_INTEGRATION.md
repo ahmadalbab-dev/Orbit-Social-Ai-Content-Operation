@@ -55,8 +55,8 @@ by this patch; do not enable it expecting the text model's free allowance.
 2. Vercel API project: **orbit-ai-studio-api > Settings > Environment Variables**.
    Add the key as Secret `GEMINI_API_KEY` for **Preview**, scoped to branch
    `feat/gemini-editor-integration`. Never use `NEXT_PUBLIC_` or paste a key in chat.
-   Audit metadata showed this key name already exists for Production only;
-   its value, validity and Google project tier were not read or tested.
+   The user added the key to Production and Preview. Its value was not printed.
+   Real Preview inference is recorded below; production routing is unchanged.
 3. After reviewing Google's unpaid-data terms, use these server Config values
    for that same preview branch:
 
@@ -73,7 +73,10 @@ by this patch; do not enable it expecting the text model's free allowance.
 5. The preview web deployment must relay to the matching preview API and have
    working workspace authentication. Fix its `API_URL`/CORS pairing before live
    acceptance; the Google key belongs only in the API project. Redeploy preview
-   after environment changes. This branch depends on PR #12's current head.
+   after environment changes. The Gemini feature was fast-forwarded into PR #12's
+   configured `feat/cloudflare-image-editing` Preview to reuse its database/auth.
+   That shared Preview uses `GEMINI_ALLOW_PREVIEW_SHARING=true`; the independent
+   editor checkbox remains off by default.
 6. Production stays on the existing provider until the patch is released and
    production acceptance is authorized. Rollback is explicit provider selection
    back to `groq`, with its existing key/model. No runtime fallback hides failure.
@@ -89,8 +92,21 @@ For live acceptance use public/synthetic input: generate a Malay Studio caption,
 save/reload its revision, prepare/apply/undo Image and Video Editor changes, then
 test an explicitly shared reduced preview. Confirm request identity/model, output
 and usage without logging keys or prompt/media payloads. Verify no dispatch on
-quota denial or disabled consent. No live Google request or production release
-has been performed for this patch.
+quota denial or disabled consent.
+
+Real synthetic provider acceptance passed from Vercel Preview at commit
+`d9898cabac771c4931a4d11cbcac1bf198df07c9`: Studio, Image Editor with a synthetic
+reduced preview, and Video Editor planning each returned HTTP 200 and passed
+existing output validators using `gemini-3.5-flash-lite`. A separate real
+Cloudflare pixel-edit request returned a valid image. Deployment
+`dpl_2amhNTw8GrSQLtK9A9uQNdgqceE2` also returned database readiness
+`database=connected`. The opt-in build probe is disabled again.
+
+Earlier model probes returned 503 for `gemini-3.1-flash-lite` and 404 for
+`gemini-2.5-flash-lite` on this project. There is no hidden fallback. Provider
+inference acceptance does not establish signed-in Studio save/reload, visual
+correctness of generated pixels, live OAuth consent or publishing. No production
+release of this integration has been performed.
 
 ## Official sources
 

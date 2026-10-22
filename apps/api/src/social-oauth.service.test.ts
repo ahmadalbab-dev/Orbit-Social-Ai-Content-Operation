@@ -65,6 +65,42 @@ describe('social provider discovery and token storage',()=>{
  it('bounds discovery paging and ignores provider next URL destinations',async()=>{const {service,db}=fixture(),replies=providerResponses();replies[3]=response({data:[],paging:{next:'https://evil.example/steal',cursors:{after:'cursor'}}});for(let i=0;i<5;i++)replies.push(response({data:[],paging:{next:'https://evil.example',cursors:{after:'cursor'}}}));vi.mocked(fetch).mockImplementation(async()=>replies.shift()!);expect(await service.callback('meta',state,browser,'code',false)).toMatchObject({status:'failed'});expect(vi.mocked(fetch).mock.calls.every(call=>new URL(String(call[0])).hostname==='graph.facebook.com')).toBe(true);expect(fetch).toHaveBeenCalledTimes(8);expect(db.oAuthToken.upsert).not.toHaveBeenCalled();});
 });
 describe('status and public callback validation',()=>{
+ it('keeps a discovery-only Facebook connection connected while exposing missing publishing permission',async()=>{
+  const {service,db}=fixture();
+  db.socialAccount.findMany.mockResolvedValue([{id:'fb',platform:'FACEBOOK',displayName:'My Page',status:'connected',token:{expiresAt:new Date(Date.now()+60000),scopes:['pages_show_list','pages_read_engagement']}}] as any);
+  const result=await service.status(identity),facebook=result.providers.facebook;
+  expect(facebook).toMatchObject({connected:true,reconnectRequired:false,publishing:{implemented:false,canPublishText:false,canPublishImage:false,canPublishVideo:false}});
+  expect(facebook.accounts[0]).toMatchObject({connected:true,publishing:{missingScopes:['pages_manage_posts']}});
+  expect(facebook.accounts[0].publishing.reason).toContain('publishing permission has not been granted');
+  expect(result.livePublishing).toBe(false);expect(fetch).not.toHaveBeenCalled();
+ });
+ it.each([
+  {provider:'facebook',platform:'FACEBOOK',granted:['pages_show_list','pages_read_engagement','pages_manage_posts']},
+  {provider:'threads',platform:'THREADS',granted:['threads_basic','threads_content_publish']},
+  {provider:'instagram',platform:'INSTAGRAM',granted:['pages_show_list','pages_read_engagement','instagram_basic','instagram_content_publish']},
+  {provider:'tiktok',platform:'TIKTOK',granted:['user.info.basic','video.publish']},
+ ])('does not claim implemented publishing for $provider even when its permission is stored',async({provider,platform,granted})=>{
+  const {service,db}=fixture();
+  db.socialAccount.findMany.mockResolvedValue([{id:'a',platform,displayName:'Account',status:'connected',token:{expiresAt:new Date(Date.now()+60000),scopes:granted}}] as any);
+  const account=(await service.status(identity)).providers[provider].accounts[0];
+  expect(account).toMatchObject({connected:true,publishing:{implemented:false,canPublishText:false,canPublishImage:false,canPublishVideo:false,missingScopes:[]}});
+  expect(account.publishing.reason).toContain('permission is recorded');
+  expect(fetch).not.toHaveBeenCalled();
+ });
+ it('distinguishes expired account access from a missing publishing permission',async()=>{
+  const {service,db}=fixture();
+  db.socialAccount.findMany.mockResolvedValue([{id:'a',platform:'THREADS',displayName:'Account',status:'connected',token:{expiresAt:new Date(0),scopes:['threads_basic','threads_content_publish']}}] as any);
+  const threads=(await service.status(identity)).providers.threads;
+  expect(threads).toMatchObject({connected:false,reconnectRequired:true});
+  expect(threads.accounts[0].publishing).toMatchObject({canPublishText:false,missingScopes:[]});
+  expect(threads.accounts[0].publishing.reason).toContain('access needs reconnecting');
+ });
+ it.each(['facebook','instagram','threads','tiktok'])('does not request new publishing permission when connecting $provider',async provider=>{
+  vi.stubEnv('TIKTOK_CLIENT_KEY','client_key-fixture');vi.stubEnv('TIKTOK_CLIENT_SECRET','tiktok-client-secret');vi.stubEnv('TIKTOK_REDIRECT_URI','https://web.example/api/social-oauth/tiktok/callback');
+  const {service}=fixture(provider);
+  const url=new URL((await service.start(identity,provider as 'facebook'|'instagram'|'threads'|'tiktok',{},browser)).authorizationUrl);
+  expect(url.searchParams.get('scope')).not.toMatch(/pages_manage_posts|instagram_content_publish|threads_content_publish|video\.publish/);
+ });
  it('queries current workspace, treats expired/missing-scope tokens as reconnect and keeps live publishing disabled',async()=>{const {service,db}=fixture();db.socialAccount.findMany.mockResolvedValue([{id:'a',platform:'FACEBOOK',displayName:'Page',status:'connected',token:{expiresAt:new Date(0),scopes:['pages_show_list','pages_read_engagement']}},{id:'b',platform:'THREADS',displayName:'Profile',status:'connected',token:{expiresAt:new Date(Date.now()+60000),scopes:[]}}] as any);const result=await service.status(identity);expect(db.socialAccount.findMany.mock.calls[0][0].where).toEqual({workspaceId:'workspace-a'});expect(result.livePublishing).toBe(false);expect(result.providers.facebook).toMatchObject({connected:false,reconnectRequired:true});expect(result.providers.threads.connected).toBe(false);vi.stubEnv('TOKEN_ENCRYPTION_KEY','');expect((await service.status(identity)).providers.facebook.configured).toBe(false);expect(socialOAuthConfig('facebook')).toBeNull();});
  it('rejects unknown route, injected workspace, malformed provider errors; forwards browser binding',()=>{const callback=vi.fn(),controller=new SocialOAuthController({callback} as unknown as SocialOAuthService);expect(()=>controller.callback('unknown',{})).toThrow();expect(()=>controller.callback('meta',{state,browserNonce:browser,workspaceId:'evil'})).toThrow();expect(()=>controller.callback('meta',{state,browserNonce:browser,error:{message:'secret'}})).toThrow();controller.callback('meta',{state,browserNonce:browser,error:'access_denied'});expect(callback).toHaveBeenCalledWith('meta',state,browser,undefined,true);});
 });

@@ -13,6 +13,7 @@ import { boundedZoom, canvasPercent, draggedImageLayer, fittedImageViewport, ges
 import { SoundtrackControls } from "./soundtrack-controls";
 import { exportCanvasMovie, type LocalSoundtrack } from "./local-soundtrack";
 import {drawImageMotion,imageMotions,type ImageMotion} from "./image-motion";
+import {beforeAfterRecipe} from "./image-recipes";
 import "./image-editor.css";
 import { MobileEditorToolbar, EditorToolPanel, imageTools, type EditorTool } from "./mobile-editor-toolbar";
 
@@ -44,6 +45,24 @@ function SlideThumbnail({ state }: { state: ImageComposition }) {
  const ref = useRef<HTMLCanvasElement>(null);
  useEffect(() => { const target=ref.current, context=target?.getContext("2d"); if(!target||!context)return; const source=renderImageComposition(document.createElement("canvas"),state); target.width=64;target.height=80;const fit=Math.min(64/source.width,80/source.height);context.clearRect(0,0,64,80);context.drawImage(source,(64-source.width*fit)/2,(80-source.height*fit)/2,source.width*fit,source.height*fit); },[state]);
  return <canvas ref={ref} aria-hidden="true" style={{width:32,height:40,objectFit:"contain"}}/>;
+}
+
+function BeforeAfterRecipe({state,disabled,onApply,onChoosePhotos}:{state:ImageComposition;disabled:boolean;onApply:(next:ImageComposition)=>void;onChoosePhotos:()=>void}) {
+ const [afterId,setAfterId]=useState(''),[beforeLabel,setBeforeLabel]=useState('Before'),[afterLabel,setAfterLabel]=useState('After');
+ const target=useRef<HTMLCanvasElement>(null);
+ let proposed:ImageComposition|null=null,error='';
+ try{proposed=beforeAfterRecipe(state,afterId,beforeLabel,afterLabel);}catch(reason){error=reason instanceof Error?reason.message:'Choose your comparison photos.';}
+ useEffect(()=>{if(target.current&&proposed)renderImageComposition(target.current,proposed);},[state,afterId,beforeLabel,afterLabel]);
+ return <section aria-label="Before and after recipe">
+  <h4 className="editor-control-group-title">Before / after comparison</h4>
+  <p>Arrange two of your uploaded photos side by side. Edit the labels, preview the real result, then apply it to this slide.</p>
+  <p>Before photo: {state.image?'your current base image':'choose a base image first'}.</p>
+  <label className="field">After photo<select aria-label="Comparison after photo" disabled={disabled} value={afterId} onChange={event=>setAfterId(event.target.value)}><option value="">Choose an uploaded image layer</option>{state.overlays.map(layer=><option key={layer.id} value={layer.id}>{layer.name}</option>)}</select></label>
+  <div className="two-fields"><label className="field">Before label<input aria-label="Comparison before label" disabled={disabled} maxLength={60} value={beforeLabel} onChange={event=>setBeforeLabel(event.target.value)}/></label><label className="field">After label<input aria-label="Comparison after label" disabled={disabled} maxLength={60} value={afterLabel} onChange={event=>setAfterLabel(event.target.value)}/></label></div>
+  {proposed?<canvas ref={target} aria-label="Before and after recipe preview" style={{width:'100%',height:'auto',maxHeight:300,objectFit:'contain'}}/>:<p>{error}</p>}
+  <p className="revision-label">Applying replaces this slide's caption with your labels. Other layers stay in the project and are hidden for this comparison. Export uses the same composition shown here.</p>
+  <div className="review-actions"><Button disabled={disabled||!proposed} onClick={()=>{if(proposed)onApply(proposed);}}>Apply before / after recipe</Button><Button variant="outline" disabled={disabled} onClick={onChoosePhotos}>Choose comparison photos</Button></div>
+ </section>;
 }
 
 /** Local composition stays on this device. AI upload happens only on an explicit request. */
@@ -241,7 +260,7 @@ export function ImageEditor({ preview = false }: { preview?: boolean }) {
         <p className="image-device-note">Original templates by Orbit. Your files stay on this device unless you choose an AI upload. Keep this page open until exported.</p>
       </Card>
       <Card className="surface video-controls">
-<EditorToolPanel tool="layout" active={tool}><p className="editor-panel-intro">Start neutral, then choose a layout for your own photos. Templates never replace your uploaded media.</p><h4 className="editor-control-group-title">Arrange your photos</h4>    <div className="image-layout-gallery" aria-label="Uploaded photo layouts">{imageLayouts.map(layout => <button type="button" key={layout.id} disabled={busy} aria-label={layout.name} onClick={() => { try { const next = applyImageLayout(state, layout.id); snapshot(); patch(next); setNotice(`${layout.name} applied to your uploaded photos. Your text is unchanged.`); } catch (error) { setNotice(error instanceof Error ? error.message : "Choose the photos for this layout first."); } }}><ImageLayoutThumbnail state={state} layout={layout.id}/><span className="image-layout-copy"><strong>{layout.name}</strong><small>{layout.description}</small><em>{layout.photos}</em></span></button>)}</div>
+<EditorToolPanel tool="layout" active={tool}><p className="editor-panel-intro">Start neutral, then choose a layout for your own photos. Templates never replace your uploaded media.</p><BeforeAfterRecipe key={slides[active].id} state={state} disabled={busy} onChoosePhotos={()=>setTool(image?'layers':'media')} onApply={next=>{snapshot();patch(next);setMotionPreview(false);setSelectedLayer('');setNotice('Before / after comparison applied. Labels and layers remain editable; Undo last composition restores the previous slide.');}}/><h4 className="editor-control-group-title">Arrange your photos</h4>    <div className="image-layout-gallery" aria-label="Uploaded photo layouts">{imageLayouts.map(layout => <button type="button" key={layout.id} disabled={busy} aria-label={layout.name} onClick={() => { try { const next = applyImageLayout(state, layout.id); snapshot(); patch(next); setNotice(`${layout.name} applied to your uploaded photos. Your text is unchanged.`); } catch (error) { setNotice(error instanceof Error ? error.message : "Choose the photos for this layout first."); } }}><ImageLayoutThumbnail state={state} layout={layout.id}/><span className="image-layout-copy"><strong>{layout.name}</strong><small>{layout.description}</small><em>{layout.photos}</em></span></button>)}</div>
     <h4 className="editor-control-group-title">Social starter kits</h4><div className="image-creative-presets">{imageStylePresets.map(preset => <button type="button" key={preset.id} aria-pressed={state.template === preset.template && state.ratio === preset.ratio && state.background === preset.color} disabled={busy} onClick={() => { snapshot(); patch(applyImageStylePreset(state, preset.id)); }}><strong>{preset.name}</strong><small>{preset.description}</small></button>)}</div>
     <details className="image-explore-templates"><summary>Explore classic layouts and colour finishes</summary>
     <div className="image-template-strip" aria-label="Image templates">{imageTemplates.map(template => <button type="button" className={`image-template ${state.template === template.id ? "is-selected" : ""}`} key={template.id} disabled={busy} aria-pressed={state.template === template.id} onClick={() => { snapshot(); const next = applyImageTemplate(state, template.id); patch(next); }}><span className={`image-template-art template-${template.id}`} style={{ backgroundColor: template.color }}><i/><b>{template.id === "original" ? "+" : template.id === "quote" ? "“" : "Aa"}</b></span><strong>{template.name}</strong><small>{template.tag}</small></button>)}</div>

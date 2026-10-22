@@ -35,3 +35,22 @@ it.each([[403,'access_denied'],[429,'rate_limited'],[500,'upstream']])('does not
   expect(JSON.stringify(warn.mock.calls)).not.toMatch(/private-input|secret-provider-body|Bearer/);
  }finally{warn.mockRestore();}
 });
+it('uses registered catalogue access server-side without exposing its token or secret',async()=>{
+ vi.stubEnv('OPENVERSE_CLIENT_ID','registered-route-client');vi.stubEnv('OPENVERSE_CLIENT_SECRET','registered-route-secret');
+ try{
+  const fetcher=vi.fn().mockResolvedValueOnce(Response.json({access_token:'private-catalogue-token',token_type:'Bearer',expires_in:3600})).mockResolvedValueOnce(Response.json({results:[row]}));
+  const response=await searchMusic(request('q=registered-music'),fetcher),body=await response.json();
+  expect(body.mode).toBe('live');expect(fetcher).toHaveBeenCalledTimes(2);
+  const headers=new Headers(fetcher.mock.calls[1][1].headers);expect(headers.get('authorization')).toBe('Bearer private-catalogue-token');expect(headers.has('cookie')).toBe(false);
+  expect(JSON.stringify(body)).not.toMatch(/private-catalogue-token|registered-route-secret|registered-route-client/);
+ }finally{vi.unstubAllEnvs();}
+});
+it('fails partial registered credentials before provider dispatch without leaking values',async()=>{
+ vi.stubEnv('OPENVERSE_CLIENT_ID','private-client-only');vi.stubEnv('OPENVERSE_CLIENT_SECRET','');
+ const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+ try{
+  const fetcher=vi.fn(),response=await searchMusic(request('q=partial-auth-config'),fetcher),body=await response.json();
+  expect(body).toMatchObject({mode:'starter',reason:'auth_configuration'});expect(response.headers.get('cache-control')).toBe('no-store');expect(fetcher).not.toHaveBeenCalled();
+  expect(JSON.stringify([body,warn.mock.calls])).not.toContain('private-client-only');
+ }finally{warn.mockRestore();vi.unstubAllEnvs();}
+});

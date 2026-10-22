@@ -13,9 +13,19 @@
 - 27 focused Music/overlay/callback unit tests passed; six Node release/probe guard tests passed; five motion unit tests passed; existing OAuth service 60 tests passed during the read-only agent investigation. TypeScript web passed. The Gemini model-default tests are rerun with the final default.
 - Earlier PR13 CI quality, secret-scan, staging-images passed. Browser job timed out while installing Ubuntu packages, before app tests. Job allowance changed from 10 to 20 minutes; current-head CI remains a separate gate.
 
+## Current integrated provider evidence
+
+The configured feature Preview at `d9898cabac771c4931a4d11cbcac1bf198df07c9` passed all four actual provider probes: Gemini Studio, Gemini Image Editor with synthetic reduced preview, Gemini Video Editor planning, and Cloudflare pixel editing returning valid image bytes. Probe deployment: `dpl_2amhNTw8GrSQLtK9A9uQNdgqceE2`. The build probe has been switched off.
+
+The subsequent same-code API deployment `dpl_HhXXofjrPZgv7FN7jdwrrFXSFJAH` is ready and returned HTTP 200 from `/v1/ready` with database connected and livePublishing false. No signed-in browser acceptance is implied.
+
+Registered Openverse server-side authentication is now implemented with bounded token exchange, expiry cache, shared in-flight acquisition and rejected-token invalidation. No credentials were present and this mode has not passed a live request. See MUSIC_ACCESS_SETUP.md for exact owner steps.
+
+Current-head CI `39838261153`: quality, secret-scan and staging-images succeeded; web-preview was cancelled. Do not report all-CI success.
+
 ## Integration and work order
 
-Use the existing configured `feat/cloudflare-image-editing` Preview as the shared acceptance environment, integrating feature work with a fast-forward after checking its unchanged base. Reuse its database/auth/Cloudflare configuration. Keep production release separate from feature integration. Preview's server-only Gemini configuration uses the tested 3.5 model; preview image sharing remains disabled.
+Use the existing configured `feat/cloudflare-image-editing` Preview as the shared acceptance environment, integrating feature work with a fast-forward after checking its unchanged base. Reuse its database/auth/Cloudflare configuration. Keep production release separate from feature integration. Preview's server-only Gemini configuration uses the tested 3.5 model; the server permits reduced preview sharing, while each editor's independent checkbox remains off by default.
 
 1. Provider inference and API/database readiness, then signed-in Studio/image/video acceptance.
 2. Resolve Music provider access and Meta/Threads developer configuration with actual consent results.
@@ -33,10 +43,10 @@ Use the existing configured `feat/cloudflare-image-editing` Preview as the share
 | TikTok | App credentials/setup deferred by user; no new developer login attempted |
 | Music streaming catalogue | Openverse denies live search; no replacement commercial catalogue credentials supplied |
 | Studio and media assistant | Live Gemini provider paths passed; signed-in end-to-end workspace acceptance still required |
-| Image pixel editing | Cloudflare adapter and tests exist; no real pixel-edit inference performed in this checkpoint |
-| Green screen/stitch/multi-video timeline | Not implemented by these patches |
-| Dynamic/trending templates | Not implemented by these patches |
-| Social account selection/publishing | Current native Share and preview publishing do not fulfil actual social publishing |
+| Image pixel editing | Real Cloudflare synthetic request returned a valid image; visual instruction correctness not assessed |
+| Green screen/stitch/multi-video timeline | Local chroma-key implementation and unit boundaries pass; browser export acceptance pending. Sequential stitch not yet implemented |
+| Dynamic/trending templates | Before/After recipe uses two actual uploaded photos and editable labels, with shared preview/export state. Browser acceptance pending; no verified trending claim |
+| Social account selection/publishing | Current native Share and preview publishing do not fulfil actual social publishing; Channels now reports separate, truthful posting capability and missing scopes |
 | Design | Home source adaptation verified, full application parity incomplete |
 
 No new billing, production promotion, database migration or social post was performed.

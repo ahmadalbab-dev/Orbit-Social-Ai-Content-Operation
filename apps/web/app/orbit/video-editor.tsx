@@ -1,4 +1,6 @@
 "use client";
+import {VideoChromaControls} from "./video-chroma-controls";
+import {defaultVideoChromaKey, releaseVideoChromaKey, type VideoChromaKey} from "./video-chroma-key";
 import {prepareVideoOverlay} from "./video-overlay-image";
 
 import { useEffect, useRef, useState } from "react";
@@ -123,6 +125,16 @@ export function VideoEditor({
   const [flip, setFlip] = useState(false);
   const [playhead, setPlayhead] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [chromaKey, setChromaKey] = useState<VideoChromaKey | null>(null);
+  const [chromaDraft, setChromaDraft] = useState<VideoChromaKey>(defaultVideoChromaKey);
+  const [previewChroma, setPreviewChroma] = useState(false);
+  const [chromaUndo, setChromaUndo] = useState<{effect: VideoChromaKey | null} | null>(null);
+  const chosenChroma = previewChroma ? chromaDraft : chromaKey;
+  useEffect(() => {
+    if (chromaDraft.backgroundLayerId && !overlays.some(layer=>layer.id===chromaDraft.backgroundLayerId)) setChromaDraft(current=>({...current,backgroundLayerId:null}));
+    if (chromaKey?.backgroundLayerId && !overlays.some(layer=>layer.id===chromaKey.backgroundLayerId)) setChromaKey(current=>current?{...current,backgroundLayerId:null}:null);
+    if (chromaUndo?.effect?.backgroundLayerId && !overlays.some(layer=>layer.id===chromaUndo.effect!.backgroundLayerId)) setChromaUndo(null);
+  }, [overlays, chromaDraft.backgroundLayerId, chromaKey, chromaUndo]);
   const [lightning, setLightning] = useState<LightningEffect | null>(null);
   const [proposedLightning, setProposedLightning] = useState<LightningEffect | null>(null);
   const [previewLightning, setPreviewLightning] = useState(false);
@@ -329,6 +341,7 @@ export function VideoEditor({
     overlays,
     soundtrack,
     lightning: chosenLightning,
+    chromaKey: chosenChroma,
     ...(template === "product" ||
     template === "cinematic" ||
     template === "captions"
@@ -362,6 +375,7 @@ export function VideoEditor({
   useEffect(() => {
     if (!source || !active) return;
     let frame = 0;
+    const output = canvasRef.current;
     const draw = () => {
       const video = videoRef.current,
         canvas = canvasRef.current;
@@ -370,19 +384,15 @@ export function VideoEditor({
         if (canvas.width !== current.width) canvas.width = current.width;
         if (canvas.height !== current.height) canvas.height = current.height;
         const context = canvas.getContext("2d");
-        if (context)
-          drawEditedFrame(
-            context,
-            video,
-            current,
-            Math.max(0, video.currentTime - current.start),
-            overlayImages.current,
-          );
+        if (context) {
+          try { drawEditedFrame(context,video,current,Math.max(0,video.currentTime-current.start),overlayImages.current); }
+          catch (error) { video.pause();setPreviewChroma(false);setChromaKey(null);setNotice(readableError(error)); }
+        }
       }
       frame = requestAnimationFrame(draw);
     };
     frame = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(frame);
+    return () => { cancelAnimationFrame(frame);releaseVideoChromaKey(output?.getContext("2d") ?? null); };
   }, [source, active]);
   async function addOverlays(files: FileList | null) {
     if (!files || busy || overlayLoading.current) return;
@@ -527,6 +537,8 @@ export function VideoEditor({
     !soundtrack &&
     !lightning &&
     !previewLightning &&
+    !chromaKey &&
+    !previewChroma &&
     !overlays.length &&
     brightness === 1 &&
     contrast === 1 &&
@@ -553,6 +565,7 @@ export function VideoEditor({
       return;
     }
     setAiUndo(null);
+    setChromaKey(null);setChromaDraft(defaultVideoChromaKey);setPreviewChroma(false);setChromaUndo(null);
     setTemplate(neutralVideoSettings.template); setNews(neutralVideoSettings.news); setTitle(neutralVideoSettings.title);
     setBrightness(1); setContrast(1); setSaturation(1); setOriginalFrame(true); setViewZoom(1);
     sourceGeneration.current += 1;
@@ -930,7 +943,7 @@ export function VideoEditor({
           </Button>
 </EditorToolPanel><EditorToolPanel tool="ai" active={tool}>
           <EditorAiPanel
-            assetIdentity={JSON.stringify([source, overlays.map(layer => layer.id)])}
+            assetIdentity={JSON.stringify([source, overlays.map(layer => layer.id), chosenChroma])}
             key={source}
             onPrepareLightning={prepareLightning}
             kind="video"
@@ -949,13 +962,13 @@ export function VideoEditor({
               const ctx = canvas.getContext("2d");
               if (!ctx) return null;
               ctx.scale(scale, scale);
-              drawEditedFrame(
+              try { drawEditedFrame(
                 ctx,
                 video,
                 current,
                 Math.max(0, video.currentTime - current.start),
                 overlayImages.current,
-              );
+              ); } finally { releaseVideoChromaKey(ctx); }
               return canvas;
             }}
             current={aiCurrent}
@@ -1065,6 +1078,16 @@ export function VideoEditor({
             ))}
           </details>
 </EditorToolPanel><EditorToolPanel tool="layers" active={tool}>
+          <VideoChromaControls
+            draft={chromaDraft} onChange={setChromaDraft} disabled={busy || !source || !validRange}
+            active={!!chromaKey} previewing={previewChroma} canUndo={!!chromaUndo}
+            backgrounds={overlays.map((layer,index)=>({id:layer.id,label:`Image layer ${index+1}`}))}
+            onPreview={()=>{setPreviewChroma(true);setNotice("Review green screen in the video preview, then Apply to include it in export.");}}
+            onStopPreview={()=>setPreviewChroma(false)}
+            onApply={()=>{setChromaUndo({effect:chromaKey});setChromaKey({...chromaDraft});setPreviewChroma(false);setNotice("Green screen applied to local preview and export.");}}
+            onRemove={()=>{setChromaUndo({effect:chromaKey});setChromaKey(null);setPreviewChroma(false);}}
+            onUndo={()=>{if(chromaUndo){setChromaKey(chromaUndo.effect);setChromaUndo(null);setPreviewChroma(false);}}}
+          />
           <details className="small-details" open={tool === "layers" || undefined}>
             <summary>Image overlays · {overlays.length}/6</summary>
             <p className="review-help">
@@ -1442,6 +1465,7 @@ export function VideoEditor({
               !validMusic ||
               !validLightning ||
               previewLightning ||
+              previewChroma ||
               (news && (!cleanText(title) || !dateLabel))
             }
             onClick={() =>
@@ -1468,6 +1492,7 @@ export function VideoEditor({
                       overlays,
                       soundtrack,
                       lightning,
+                      chromaKey,
                       titleCard: edit.titleCard,
                       brightness,
                       contrast,

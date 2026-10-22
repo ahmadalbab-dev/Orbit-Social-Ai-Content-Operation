@@ -1,5 +1,6 @@
 import { drawLightning, scheduleThunder, validateLightning, type LightningEffect } from "./local-video-effects";
 import { validateRecordedMovie } from "./recorded-movie";
+import { keyedVideoFrame, releaseVideoChromaKey, validateVideoChromaKey, type VideoChromaKey } from "./video-chroma-key";
 import {
   prepareSoundtrack,
   startSoundtrack,
@@ -32,6 +33,7 @@ export interface LocalVideoEdit {
   overlays?: VideoImageOverlay[];
   soundtrack?: LocalSoundtrack | null;
   lightning?: LightningEffect | null;
+  chromaKey?: VideoChromaKey | null;
   titleCard?: {
     text: string;
     kicker: string;
@@ -53,6 +55,10 @@ export function recorderMime(
   ].find(supported);
 }
 export function validateVideoEdit(edit: LocalVideoEdit) {
+  if (edit.chromaKey) {
+    validateVideoChromaKey(edit.chromaKey);
+    if (edit.chromaKey.backgroundLayerId && !edit.overlays?.some(layer => layer.id === edit.chromaKey!.backgroundLayerId)) throw Error("Choose an existing image layer for the green-screen background.");
+  }
   if (edit.soundtrack) validateSoundtrack(edit.soundtrack);
   if (edit.lightning) validateLightning(edit.lightning, edit.duration / edit.speed);
   if (
@@ -163,8 +169,18 @@ export function drawEditedFrame(
   images: ReadonlyMap<string, HTMLImageElement> = new Map(),
 ) {
   const { width: w, height: h } = edit;
-  ctx.fillStyle = "#000";
+  ctx.fillStyle = edit.chromaKey?.background ?? "#000";
   ctx.fillRect(0, 0, w, h);
+  const background = edit.chromaKey?.backgroundLayerId ? edit.overlays?.find(layer => layer.id === edit.chromaKey!.backgroundLayerId) : undefined;
+  const backgroundImage = background && elapsed >= background.start && elapsed < background.end ? images.get(background.id) : undefined;
+  if (backgroundImage) {
+    const scale = Math.max(w / backgroundImage.naturalWidth, h / backgroundImage.naturalHeight);
+    const bw = backgroundImage.naturalWidth * scale, bh = backgroundImage.naturalHeight * scale;
+    ctx.save(); ctx.globalAlpha = background!.opacity;
+    ctx.drawImage(backgroundImage, (w - bw) / 2, (h - bh) / 2, bw, bh); ctx.restore();
+  }
+  const source = edit.chromaKey ? keyedVideoFrame(ctx, video, edit.chromaKey) : video;
+  if (!edit.chromaKey) releaseVideoChromaKey(ctx);
   const fitted = fitVideo(
     video.videoWidth,
     video.videoHeight,
@@ -178,7 +194,7 @@ export function drawEditedFrame(
   ctx.scale(edit.flip ? -1 : 1, 1);
   ctx.rotate((edit.rotation * Math.PI) / 180);
   ctx.drawImage(
-    video,
+    source,
     -fitted.width / 2,
     -fitted.height / 2,
     fitted.width,
@@ -187,6 +203,7 @@ export function drawEditedFrame(
   ctx.restore();
   ctx.filter = "none";
   for (const overlay of edit.overlays ?? []) {
+    if (overlay.id === background?.id) continue;
     const image = images.get(overlay.id);
     if (!image || elapsed < overlay.start || elapsed >= overlay.end) continue;
     const width = overlay.width * w;
@@ -437,7 +454,8 @@ export async function exportLocalVideo(
       };
       const draw = () => {
         const elapsed = Math.max(0, video.currentTime - edit.start);
-        drawEditedFrame(ctx, video, edit, elapsed, images);
+        try { drawEditedFrame(ctx, video, edit, elapsed, images); }
+        catch { error = new Error("Video effects were interrupted. Keep this tab open and try exporting again."); stop(); return; }
         progress(Math.min(99, (elapsed / edit.duration) * 100));
         if (elapsed >= edit.duration - 0.025 || video.ended) {
           complete = true;
@@ -469,6 +487,7 @@ export async function exportLocalVideo(
     progress(100);
     return blob;
   } finally {
+    releaseVideoChromaKey(ctx);
     cleanupRecording();
     stopMusic();
     stopThunder();

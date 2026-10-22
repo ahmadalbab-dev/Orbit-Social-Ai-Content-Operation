@@ -1,4 +1,6 @@
 import { librarySounds } from '../../../orbit/sound-library-api';
+import { createOpenverseAuth, OpenverseAuthError } from './openverse-auth';
+const catalogueToken = createOpenverseAuth();
 const ENDPOINT = 'https://api.openverse.org/v1/audio/';
 const MAX_JSON = 512 * 1024;
 const cache = new Map<string, { expires: number; body: unknown }>();
@@ -31,13 +33,14 @@ export async function searchMusic(request: Request, fetcher: typeof fetch = fetc
   active++;
   try {
     const url = new URL(ENDPOINT); url.search = new URLSearchParams({ q: term, license: 'cc0', source: 'freesound', page_size: '40' }).toString();
-    const response = await fetcher(url.href, { method: 'GET', credentials: 'omit', redirect: 'error', cache: 'no-store', signal, headers: { Accept: 'application/json' } });
-    if (!response.ok) { upstreamStatus = response.status; reason = response.status === 429 ? 'rate_limited' : response.status === 401 || response.status === 403 ? 'access_denied' : 'upstream'; await response.body?.cancel(); throw Error('Catalogue unavailable'); }
+    const token = await catalogueToken({clientId: process.env.OPENVERSE_CLIENT_ID, clientSecret: process.env.OPENVERSE_CLIENT_SECRET}, fetcher, signal);
+    const response = await fetcher(url.href, { method: 'GET', credentials: 'omit', redirect: 'error', cache: 'no-store', signal, headers: { Accept: 'application/json', ...(token ? {Authorization: `Bearer ${token}`} : {}) } });
+    if (!response.ok) { if (response.status === 401 && token) catalogueToken.invalidate(token); upstreamStatus = response.status; reason = response.status === 429 ? 'rate_limited' : response.status === 401 || response.status === 403 ? 'access_denied' : 'upstream'; await response.body?.cancel(); throw Error('Catalogue unavailable'); }
     reason = 'invalid_response';
     const tracks = librarySounds(await json(response));
     const body = { mode: 'live', results: tracks.map(track => ({ id: track.id, title: track.title, creator: track.creator, url: track.url, foreign_landing_url: track.source, license: 'cc0', license_url: track.license, source: 'freesound', mature: false })) };
     if (cache.size >= 32) cache.delete(cache.keys().next().value!);
     cache.set(term, { expires: Date.now() + 60000, body }); return reply(body);
-  } catch { return degraded(signal.aborted ? 'timeout' : reason, upstreamStatus); }
+  } catch (error) { return degraded(signal.aborted ? 'timeout' : error instanceof OpenverseAuthError ? error.reason : reason, upstreamStatus); }
   finally { active--; }
 }
