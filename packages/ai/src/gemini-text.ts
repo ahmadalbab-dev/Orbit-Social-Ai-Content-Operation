@@ -1,6 +1,6 @@
 import { AiProviderError, readBoundedAiJson } from './huggingface.js';
 
-export const DEFAULT_GEMINI_TEXT_MODEL = 'gemini-3.1-flash-lite';
+export const DEFAULT_GEMINI_TEXT_MODEL = 'gemini-3.5-flash-lite';
 // Reviewed against Google's API pricing on 2026-10-23. Not a guarantee of
 // project quota or zero charges on a billing-enabled Google Cloud project.
 export const GEMINI_FREE_TEXT_MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.5-flash-lite'] as const;

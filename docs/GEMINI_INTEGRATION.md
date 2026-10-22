@@ -13,7 +13,7 @@ Gemini is useful as an optional provider for all three existing planning paths:
 | Image Editor assistant | Validated layout, text, colours, crop settings, existing layer changes; optional reduced preview understanding | Generated pixels, automatic subject cutout |
 | Video Editor assistant | Validated editable settings and brief-based scene/caption suggestions; optional current-frame understanding | Watching full footage, speech transcription, generated video/audio, multi-clip timeline |
 
-Default: `gemini-3.1-flash-lite`, listed with free input/output in Google's API
+Default: `gemini-3.5-flash-lite`, listed with free input/output in Google's API
 pricing. A small explicit allowlist accepts reviewed free-tier text models;
 image, music/video generation, arbitrary endpoints and `latest` aliases are
 rejected by the text adapter. Quota still depends on the actual Google project.
@@ -62,7 +62,7 @@ by this patch; do not enable it expecting the text model's free allowance.
 
    ```dotenv
    AI_TEXT_PROVIDER=gemini
-   GEMINI_TEXT_MODEL=gemini-3.1-flash-lite
+   GEMINI_TEXT_MODEL=gemini-3.5-flash-lite
    GEMINI_ALLOW_UNPAID_DATA_USE=true
    GEMINI_ALLOW_PREVIEW_SHARING=false
    ```

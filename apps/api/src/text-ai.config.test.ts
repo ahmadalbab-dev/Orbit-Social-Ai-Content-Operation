@@ -7,7 +7,7 @@ describe("explicit text provider configuration",()=>{
   it('requires an explicit Gemini selection, key and unpaid-data acknowledgement',()=>{
     const env={AI_TEXT_PROVIDER:'gemini',GEMINI_API_KEY:'fixture'};
     expect(textAiConfig(env).configured).toBe(false);
-    expect(textAiConfig({...env,GEMINI_ALLOW_UNPAID_DATA_USE:'true'})).toMatchObject({provider:'gemini',configured:true,model:'gemini-3.1-flash-lite'});
+    expect(textAiConfig({...env,GEMINI_ALLOW_UNPAID_DATA_USE:'true'})).toMatchObject({provider:'gemini',configured:true,model:'gemini-3.5-flash-lite'});
     expect(textAiConfig({...env,GEMINI_ALLOW_UNPAID_DATA_USE:'true',GEMINI_TEXT_MODEL:'gemini-3.1-flash-image'}).configured).toBe(false);
     expect(textAiConfig({...env,GEMINI_ALLOW_UNPAID_DATA_USE:'true',GEMINI_API_KEY:''}).configured).toBe(false);
     expect(textAiConfig({GEMINI_API_KEY:'fixture'}).provider).not.toBe('gemini');

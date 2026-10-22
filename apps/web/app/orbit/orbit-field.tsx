@@ -32,7 +32,7 @@ export function OrbitField({ paused, centered = false }: { paused: boolean; cent
 
     function palette() {
       dark = document.documentElement.dataset.theme !== "light";
-      const stops = dark ? [[148,240,228],[199,175,255],[255,181,223]] : [[17,87,92],[65,33,139],[126,26,86]];
+      const stops = dark ? [[127,227,245],[180,156,255],[255,159,216]] : [[17,87,92],[65,33,139],[126,26,86]];
       colours = Array.from({length:24},(_,index)=>{
         const point=index/23*2, segment=Math.min(1,Math.floor(point)), fraction=point-segment;
         const values=stops[segment].map((value,channel)=>Math.round(value+(stops[segment+1][channel]-value)*fraction));
@@ -113,7 +113,7 @@ export function OrbitField({ paused, centered = false }: { paused: boolean; cent
       orbit!.font=`800 ${size}px JetBrains Mono, monospace`;
       const total=logo+gap+orbit!.measureText("Orbit").width;
       const left=centered||width<700?(width-total)/2:width-total-width*.055;
-      const cy=centered?height*.4:width<700?130:height*.34;
+      const cy=centered?height*.4:width<700?130:height*.22;
       orbit!.fillStyle="#fff";orbit!.textBaseline="middle";
       orbit!.fillText("Orbit",left+logo+gap,cy);
       orbit!.save();orbit!.translate(left+logo/2,cy);orbit!.strokeStyle="#fff";orbit!.lineWidth=logo*.065;
@@ -128,9 +128,9 @@ export function OrbitField({ paused, centered = false }: { paused: boolean; cent
       const studioPixels=studio!.getImageData(0,0,studioMask.width,studioMask.height).data;
       // Match the background font, column pitch, baseline and flow exactly.
       // Size the grid to keep coverage caches bounded on 4K screens.
-      glyphSize=Math.max(width<700?7.5:9,Math.sqrt(width*height/16000));
+      glyphSize=Math.max(width<700?11:13,Math.sqrt(width*height/16000));
       context!.font=`600 ${glyphSize}px JetBrains Mono, monospace`;
-      step=context!.measureText("M").width;rowStep=glyphSize*1.12;
+      step=context!.measureText("M").width;rowStep=Math.round(glyphSize*1.32);
       const columns=Math.ceil(width/step)+1,rowCount=Math.ceil(height/rowStep);
       const coverageA=new Float32Array(columns*rowCount),coverageB=new Float32Array(columns*rowCount);
       for(let row=0;row<rowCount;row++)for(let column=0;column<columns;column++){

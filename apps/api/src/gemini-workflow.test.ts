@@ -6,7 +6,7 @@ import { VideoAiService } from "./video-ai.service";
 import { ImageAiService } from "./image-ai.service";
 import type { DatabaseService } from "./database.service";
 import type { BillingService } from "./billing.service";
-const GEMINI_ENDPOINT="https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent";
+const GEMINI_ENDPOINT="https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent";
 const identity={sub:"subject",userId:"user",workspaceId:"workspace",role:"OWNER"};
 const variants=[{platform:"facebook",copy:"Test caption",hashtags:[],callToAction:"Your idea?"}];
 function setup(count=1){
