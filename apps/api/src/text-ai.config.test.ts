@@ -4,6 +4,14 @@ import { AppController } from "./app.controller";
 import { afterEach, vi } from "vitest";
 describe("explicit text provider configuration",()=>{
   afterEach(()=>vi.unstubAllEnvs());
+  it('requires an explicit Gemini selection, key and unpaid-data acknowledgement',()=>{
+    const env={AI_TEXT_PROVIDER:'gemini',GEMINI_API_KEY:'fixture'};
+    expect(textAiConfig(env).configured).toBe(false);
+    expect(textAiConfig({...env,GEMINI_ALLOW_UNPAID_DATA_USE:'true'})).toMatchObject({provider:'gemini',configured:true,model:'gemini-3.1-flash-lite'});
+    expect(textAiConfig({...env,GEMINI_ALLOW_UNPAID_DATA_USE:'true',GEMINI_TEXT_MODEL:'gemini-3.1-flash-image'}).configured).toBe(false);
+    expect(textAiConfig({...env,GEMINI_ALLOW_UNPAID_DATA_USE:'true',GEMINI_API_KEY:''}).configured).toBe(false);
+    expect(textAiConfig({GEMINI_API_KEY:'fixture'}).provider).not.toBe('gemini');
+  });
   it.each(["llama-3.3-70b-versatile","openai/gpt-oss-120b"])("accepts Groq model %s without affecting the retained image provider",model=>{
     expect(textAiConfig({AI_TEXT_PROVIDER:"groq",GROQ_API_KEY:"gsk_fixture",GROQ_MODEL:model,HF_TOKEN:"hf_fixture"})).toMatchObject({provider:"groq",configured:true,model});
   });

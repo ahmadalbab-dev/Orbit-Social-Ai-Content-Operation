@@ -1,3 +1,4 @@
+import { DEFAULT_GEMINI_TEXT_MODEL, geminiCompletionFetch } from './gemini-text.js';
 import { z } from "zod";
 import { AiProviderError, aiProviderResponseError, DEFAULT_HF_MODEL, DEFAULT_GROQ_MODEL, GROQ_CHAT_ENDPOINT, HF_CHAT_ENDPOINT, readBoundedAiJson, isValidTextModel } from "./huggingface.js";
 const inputSchema = z.object({ brief: z.string().trim().min(1).max(3000), duration: z.number().finite().positive().max(600) }).strict();
@@ -18,7 +19,7 @@ export function parseVideoPlan(text: string, duration: number): VideoPlan {
 }
 export class HuggingFaceVideoPlanner {
   private readonly model: string;
-  constructor(private readonly token: string, model = DEFAULT_HF_MODEL, private readonly fetcher: typeof fetch = fetch, private readonly provider: "huggingface" | "groq" = "huggingface") {
+  constructor(private readonly token: string, model = DEFAULT_HF_MODEL, private readonly fetcher: typeof fetch = fetch, private readonly provider: "huggingface" | "groq" | "gemini" = "huggingface") {
     if (!isValidTextModel(model, provider)) throw new AiProviderError("unconfigured");
     this.model = model;
   }
@@ -27,7 +28,7 @@ export class HuggingFaceVideoPlanner {
     if (!this.token) throw new AiProviderError("unconfigured");
     const signal = AbortSignal.timeout(45000);
     try {
-      const response = await this.fetcher(this.provider === "groq" ? GROQ_CHAT_ENDPOINT : HF_CHAT_ENDPOINT, {
+      const response = await (this.provider === "gemini" ? geminiCompletionFetch(this.fetcher) : this.fetcher)(this.provider === "groq" ? GROQ_CHAT_ENDPOINT : HF_CHAT_ENDPOINT, {
         method: "POST", signal, redirect: "error", credentials: "omit",
         headers: { Authorization: `Bearer ${this.token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ model: this.model, ...(this.provider === "groq" ? {max_completion_tokens:2000,...(/^openai\/gpt-oss-(?:20|120)b$/.test(this.model)?{include_reasoning:false,reasoning_effort:"low"}:{})} : {max_tokens:2000}), temperature: 0.5, stream: false, response_format: { type: "json_object" }, messages: [
@@ -51,4 +52,10 @@ export class GroqVideoPlanner extends HuggingFaceVideoPlanner {
   constructor(token: string, model = DEFAULT_GROQ_MODEL, fetcher: typeof fetch = fetch) {
     super(token, model, fetcher, "groq");
   }
+}
+
+export class GeminiVideoPlanner extends HuggingFaceVideoPlanner {
+ constructor(token: string, model = DEFAULT_GEMINI_TEXT_MODEL, fetcher: typeof fetch = fetch) {
+  super(token, model, fetcher, "gemini");
+ }
 }

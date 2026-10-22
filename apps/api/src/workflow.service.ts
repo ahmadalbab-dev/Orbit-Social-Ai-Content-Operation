@@ -3,7 +3,7 @@ import { aiServiceFailure } from "./ai-errors";
 import { textAiConfig } from "./text-ai.config";
 import { createHash } from "node:crypto";
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
-import { GroqContentProvider, HuggingFaceContentProvider, OpenAiContentProvider, validateAiGenerationInput, socialDraftLimitViolation, type UsageRecord, type UsageStore } from "@sma/ai";
+import { GeminiContentProvider, GroqContentProvider, HuggingFaceContentProvider, OpenAiContentProvider, validateAiGenerationInput, socialDraftLimitViolation, type UsageRecord, type UsageStore } from "@sma/ai";
 import { Prisma, type ContentItem, type Platform } from "@sma/database";
 import { socialPlatforms, type ContentVariant, type SocialPlatform } from "@sma/types";
 import { z } from "zod";
@@ -77,7 +77,7 @@ export class WorkflowService {
       };
       const workspace = await this.db.workspace.findUniqueOrThrow({where:{id:identity.workspaceId}});
       const options={monthlyBudgetUsd:Number(workspace.monthlyAiBudgetUsd)};
-      const provider = config.provider === "groq" ? new GroqContentProvider(store,{...options,apiKey:config.apiKey!,model:config.model}) : config.provider === "huggingface" ? new HuggingFaceContentProvider(store,{...options,apiKey:config.apiKey!,model:config.model}) : new OpenAiContentProvider(store,{...options,apiKey:config.apiKey!,model:config.model});
+      const provider = config.provider === "gemini" ? new GeminiContentProvider(store,{...options,apiKey:config.apiKey!,model:config.model}) : config.provider === "groq" ? new GroqContentProvider(store,{...options,apiKey:config.apiKey!,model:config.model}) : config.provider === "huggingface" ? new HuggingFaceContentProvider(store,{...options,apiKey:config.apiKey!,model:config.model}) : new OpenAiContentProvider(store,{...options,apiKey:config.apiKey!,model:config.model});
       const result=await provider.generateVariants(generationInput);
       const variants=parse(variantsSchema,result.variants);
       const item=await this.db.contentItem.create({data:{workspaceId:identity.workspaceId,brandId:brand.id,title:body.topic,body:variants[0].copy,platform:variants[0].platform.toUpperCase() as Platform,metadata:json({variants,generationMode:"ai"}),revisions:{create:{revision:1,variants:json(variants),actorId:identity.userId}}}});
