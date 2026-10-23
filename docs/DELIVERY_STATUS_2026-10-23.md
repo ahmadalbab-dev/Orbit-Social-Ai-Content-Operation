@@ -58,3 +58,21 @@ Use the existing configured `feat/cloudflare-image-editing` Preview as the share
 | Design | Home source adaptation verified, full application parity incomplete |
 
 No new billing, production promotion, database migration or social post was performed.
+
+## Settings WebKit follow-up
+
+CI on feature commit `f6945c3` passed Chromium browser acceptance (76 passed,
+1 intentional skip). WebKit had 47 passed, 4 intentional skips and one failed
+immediate Settings checkbox interaction. Its recorded trace showed document
+scroll moving 18 pixels between the computed click point and click delivery;
+the checkbox never changed state. Settings now disables root smooth scrolling
+while visible, and native preference checkboxes have appropriate padding and
+44px label targets. The original failing assertion remains unchanged.
+
+DESKTOP-ALBAB WebKit validation after the source fix: 16 passed, 1 intentional
+Chromium-recording skip across Home, appearance/navigation and device settings.
+The new regression covers pointer, keyboard, label activation and reload
+persistence. Linux CI is a separate remaining gate. The previous failed run was
+cancelled after its quality job stalled on unconditional codec installation;
+CI now reuses an existing ffmpeg executable and bounds installation time without
+removing any worker or export checks.
