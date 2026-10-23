@@ -20,7 +20,7 @@ a { color:inherit; }
 .orbit-shell button:not(.icon-button):not(.orbit-nav button) { gap:8px; }
 .app-header { position:absolute;top:max(20px,env(safe-area-inset-top));left:max(28px,env(safe-area-inset-left));right:max(28px,env(safe-area-inset-right));display:flex;align-items:center;gap:16px;z-index:10; }
 .brand-word { display:flex;align-items:center;gap:9px!important;background:none;border:0;font:800 25px var(--mono);letter-spacing:-1.5px;padding:0; }
-.orbit-mark { width:48px;height:48px;color:var(--primary); }
+.orbit-mark { width:48px;height:48px;color:var(--primary);display:inline-block;flex-shrink:0;vertical-align:middle; }
 .orbit-mark.small { width:28px;height:28px; }
 .word-dot { color:var(--accent); }
 .mode-chip { margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--soft); }

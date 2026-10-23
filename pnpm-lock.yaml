@@ -151,6 +151,9 @@ importers:
       react-dom:
         specifier: ^19.1.0
         version: 19.2.8(react@19.2.8)
+      thinking-orbs:
+        specifier: 0.3.2
+        version: 0.3.2(react@19.2.8)
     devDependencies:
       '@playwright/test':
         specifier: ^1.54.1
@@ -2822,6 +2825,11 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
+  thinking-orbs@0.3.2:
+    resolution: {integrity: sha512-QZFeBaPEzqhjiZoXy961EvDgaXk2WgXacF3Rbz+Sj5IfzDzBvTC86vdREUHniBffYibJFKSwbfllxLUdI/Xv6g==}
+    peerDependencies:
+      react: '>=18.0.0'
+
   tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
 
@@ -5407,6 +5415,10 @@ snapshots:
       acorn: 8.17.0
       commander: 2.20.3
       source-map-support: 0.5.21
+
+  thinking-orbs@0.3.2(react@19.2.8):
+    dependencies:
+      react: 19.2.8
 
   tinybench@2.9.0: {}
 

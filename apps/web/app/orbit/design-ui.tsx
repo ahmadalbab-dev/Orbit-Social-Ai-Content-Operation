@@ -1,9 +1,7 @@
 import type { ReactNode, ButtonHTMLAttributes } from "react";
 import { ArrowUpRight, Check, Clock3, FilePenLine, CircleCheck, Radio } from "lucide-react";
 export type OrbitChannel = "facebook" | "instagram" | "threads" | "tiktok";
-export function OrbitMark({ small=false }: { small?:boolean }) {
-  return <svg className={small?"orbit-mark small":"orbit-mark"} viewBox="0 0 48 48" fill="none" aria-hidden="true"><circle cx="24" cy="24" r="15" stroke="currentColor" strokeWidth="3"/><ellipse cx="24" cy="24" rx="22" ry="9" transform="rotate(-35 24 24)" stroke="currentColor" strokeWidth="2"/><circle cx="24" cy="24" r="4" fill="currentColor"/><circle cx="41" cy="12" r="4" fill="var(--accent)"/></svg>;
-}
+export { OrbitMark } from "./orbit-mark";
 export function PlatformIcon({ platform, size=22 }: { platform:string; size?:number }) {
   const supported=["facebook","instagram","threads","tiktok"].includes(platform);
   if(!supported)return <span aria-hidden="true" style={{width:size,height:size,display:"inline-grid",placeItems:"center"}}>?</span>;

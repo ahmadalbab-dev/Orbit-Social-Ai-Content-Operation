@@ -66,7 +66,7 @@ function BeforeAfterRecipe({state,disabled,onApply,onChoosePhotos}:{state:ImageC
 }
 
 /** Local composition stays on this device. AI upload happens only on an explicit request. */
-export function ImageEditor({ preview = false }: { preview?: boolean }) {
+export function ImageEditor({ preview = false, initialFile = null }: { preview?: boolean; initialFile?: File|null }) {
   const [tool, setTool] = useState<EditorTool>("media");
   const canvas = useRef<HTMLCanvasElement>(null);
   const stage = useRef<HTMLDivElement>(null);
@@ -183,6 +183,7 @@ export function ImageEditor({ preview = false }: { preview?: boolean }) {
     } catch (error) { if (request === generation.current) setNotice(error instanceof Error ? error.message : "This image could not be opened."); return false; }
     finally { if (request === generation.current) setLoading(false); }
   }
+  useEffect(()=>{if(initialFile)void select(initialFile);},[initialFile]);
   function updateLayer(changes: Partial<Overlay>) { if (layer) patch({ overlays: state.overlays.map(item => item.id === layer.id ? { ...item, ...changes } : item) }); }
   function reorderLayer(direction: number) { if (!layer) return; const next = [...state.overlays], index = next.findIndex(item => item.id === layer.id), target = index + direction; if (target < 0 || target >= next.length) return; snapshot(); [next[index], next[target]] = [next[target], next[index]]; patch({ overlays: next }); }
   function addSlide(duplicate = false) { if (slides.length >= 10) return; const next = createSlide(`Slide ${slides.length + 1}`); if (duplicate) next.state = { ...state, overlays: state.overlays.map(item => ({ ...item, id: crypto.randomUUID() })) }; if (duplicate && state.backgroundLayerId) next.state.backgroundLayerId = next.state.overlays[state.overlays.findIndex(item => item.id === state.backgroundLayerId)]?.id ?? null; setSlides(items => [...items, next]); setActive(slides.length); setSelectedLayer(""); setUndo(null); }

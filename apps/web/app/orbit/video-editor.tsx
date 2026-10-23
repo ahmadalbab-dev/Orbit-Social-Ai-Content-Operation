@@ -84,9 +84,11 @@ const failures: Record<string, string> = {
 export function VideoEditor({
   active = true,
   preview = false,
+  initialFile = null,
 }: {
   active?: boolean;
   preview?: boolean;
+  initialFile?: File|null;
 }) {
   const [tool, setTool] = useState<EditorTool>("media");
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -636,6 +638,7 @@ export function VideoEditor({
     setPlayhead(0);
     setNotice("");
   }
+  useEffect(()=>{if(initialFile)choose(initialFile);},[initialFile]);
   async function download(job: RenderJob, signal: AbortSignal) {
     const blob = await renderDownload(job.id, signal);
     if (signal.aborted) return;
