@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { join } from "node:path";
+import { readFile } from "node:fs/promises";
 
 async function create(page:Page){await page.goto('/preview/projects');await page.getByLabel('New project name').fill('Launch collection');await page.getByRole('button',{name:'Create project',exact:true}).click();await expect(page.getByRole('heading',{name:'Launch collection',exact:true})).toBeVisible();}
 async function imageFile(page:Page){return {name:'original.png',mimeType:'image/png',buffer:Buffer.from(await page.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=120;canvas.height=80;const ctx=canvas.getContext('2d')!;ctx.fillStyle='#246842';ctx.fillRect(0,0,120,80);return canvas.toDataURL().split(',')[1];}),'base64')};}
@@ -18,7 +19,12 @@ test('project originals survive reload, deduplicate, open in the image editor an
   await page.reload();await expect.poll(()=>canvas.evaluate(node=>(node as HTMLCanvasElement).width)).toBe(120);
 });
 test('project video source restores with metadata or an explicit unsupported-codec message',async({page})=>{
-  await create(page);const supported=await page.evaluate(()=>document.createElement('video').canPlayType('video/mp4; codecs="avc1.64000b,mp4a.40.2"')!=='');
+  await create(page);
+  // canPlayType reports support on Windows WebKit even when its decoder fails.
+  // Decode the untouched fixture independently, before testing the project path.
+  const bytes=await readFile(join(__dirname,'fixtures','clip.mp4'));
+  await page.route('**/codec-control.mp4',route=>route.fulfill({contentType:'video/mp4',body:bytes}));
+  const supported=await page.evaluate(()=>new Promise<boolean>(resolve=>{const v=document.createElement('video');v.preload='auto';let done=false;const finish=(value:boolean)=>{if(done)return;done=true;clearTimeout(timer);v.removeAttribute('src');v.load();resolve(value);};const timer=setTimeout(()=>finish(false),4000);v.onloadedmetadata=()=>finish(v.videoWidth>0);v.onerror=()=>finish(false);v.src='/codec-control.mp4';v.load();}));
   await page.locator('input[type=file]').setInputFiles(join(__dirname,'fixtures','clip.mp4'));await expect(page.getByRole('status')).toContainText('Original saved');await page.getByRole('link',{name:'Open video editor'}).click();
   if(supported)await expect.poll(()=>page.locator('video').first().evaluate(node=>(node as HTMLVideoElement).videoWidth)).toBeGreaterThan(0);
   else{await expect(page.getByText('This browser cannot preview this file. Try an MP4 with H.264 video.',{exact:true})).toBeVisible();await expect(page.getByText(/clip\.mp4.*On your device/)).toBeVisible();}
