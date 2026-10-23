@@ -1,5 +1,26 @@
 # Orbit delivery checkpoint, 23 October 2026
 
+## Current checkpoint after owner design approval
+
+The historical sections below retain their original evidence scope. This section supersedes their older CI/design status.
+
+- Owner approved the hero, light-mode contrast and bottom-to-top motion at feature commit `fda47799967bb985a53e560267af08f9adef0141`. Code is pushed to `feat/cloudflare-image-editing`; PR12 remains open. Production promotion is separate.
+- CI `39962216261` passed all four jobs: quality, secret-scan, web-preview and staging-images. Chromium: 81 passed / 1 skipped; WebKit: 53 passed / 4 skipped; web unit suite: 231 passed. Real compiled worker/private download and production dependency audit passed. Web deployment `dpl_En1pyo4zAXpgpRfqTT5K8jnxAsR3` is READY; `/preview` returned HTTP 200.
+- Current read-only Orbit database recheck: one FACEBOOK account with status connected. No Instagram, Threads or TikTok account row was returned. This does not establish whether consent succeeded elsewhere or in another environment; callback persistence into this workspace still needs real acceptance.
+- Web Vercel environment metadata recheck: no OPENVERSE_CLIENT_ID or OPENVERSE_CLIENT_SECRET entry. No values were decrypted. Music registered-access acceptance remains blocked on setup.
+- The available cloud browser reached Vercel's login page for the configured feature Preview. Local Chrome control is not exposed in this session. A local Chrome login does not authenticate this separate browser. Signed-in Studio/media acceptance has not passed; no session extraction or protection changes were attempted.
+- AI Gateway remains owner-deferred. Direct Gemini/Cloudflare and probe-off configuration remain the accepted route.
+
+## Next work in dependency order
+
+1. Authenticated feature Preview acceptance: Studio generate/save/reload/destinations, then image plan/Apply/Undo and Cloudflare output, then video plan/apply/export. Preserve the approved design. Stop at an actual failed boundary and fix that boundary before claiming success.
+2. Actual Instagram/Threads consent and callback persistence in the same Orbit workspace. TikTok developer setup remains owner-deferred.
+3. Music registration/configuration, then real search, playback, selection and audible export. Starter fallback does not pass live catalogue acceptance.
+4. Media Share needs durable exported assets and server-validated destinations bound to a draft revision, followed by immutable publishing jobs and provider dispatch/reconciliation. Current MediaShare only uses the native file-share menu; Studio saves selected accounts but does not post.
+5. Expand editable templates and advanced composition after these creation/export/share foundations pass. No verified trending-template or AI-segmentation claim is established.
+
+No new production release, database mutation, provider inference or social post was performed during this follow-up review.
+
 ## Changes and acceptance evidence
 
 - Gemini **real provider inference** passed from Vercel Preview build with synthetic public input for Studio draft generation, Image Editor changes and Video Editor brief planning. Model: `gemini-3.5-flash-lite`; each returned HTTP 200 and passed existing domain validators. Deployment `dpl_5L7D4HxhBN6Gbap7svJgzp2EsiHK`, commit `2479959`. This is provider integration acceptance, not a signed-in user workflow test.

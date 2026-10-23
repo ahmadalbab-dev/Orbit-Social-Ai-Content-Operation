@@ -1,5 +1,9 @@
 # Orbit hero reference contract
 
+## Owner approval
+
+Albab approved this hero, light-mode contrast and motion on 23 October 2026 after reviewing the feature Preview at `fda47799967bb985a53e560267af08f9adef0141`. Preserve this approved visual baseline while completing product functionality. Its hero implementation is `a5e3428`; the subsequent commit changes CI codec setup only. Approval covers this design, not production promotion or completion of AI, Music, OAuth and publishing.
+
 ## Evidence and scope
 
 Reference: https://ponytail.dev/, fresh homepage capture on 2026-10-23, plus the user's `20261023-0857-09.6855396.mp4` (36.03 seconds). The actual screenshot pixels and timed video frames were inspected. The original local extract is `C:\Users\User\Documents\Codex\2026-10-17\this-is-the-dedicated-ai-office\outputs\ponytail-copy` and is preserved unchanged.
