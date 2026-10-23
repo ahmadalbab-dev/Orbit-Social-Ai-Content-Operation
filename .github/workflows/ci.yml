@@ -93,7 +93,7 @@ jobs:
       - name: Verify phone preview, navigation and local image export
         run: pnpm --filter @sma/web test:e2e --output=test-results/chromium
       - name: Verify WebKit mobile tools and session restoration
-        run: pnpm --filter @sma/web exec playwright test --browser=webkit --output=test-results/webkit tests/mobile-editor-tools.spec.ts tests/preview.spec.ts tests/session-persistence.spec.ts tests/auth.spec.ts tests/home-presentation.spec.ts tests/media-entry-presentation.spec.ts tests/editor-neutral-media.spec.ts tests/sound-library.spec.ts tests/uploaded-image-background.spec.ts tests/image-motion.spec.ts tests/editor-ai.spec.ts tests/video-lightning.spec.ts tests/connections.spec.ts
+        run: pnpm --filter @sma/web exec playwright test --browser=webkit --output=test-results/webkit tests/mobile-editor-tools.spec.ts tests/preview.spec.ts tests/session-persistence.spec.ts tests/auth.spec.ts tests/home-presentation.spec.ts tests/media-entry-presentation.spec.ts tests/editor-neutral-media.spec.ts tests/sound-library.spec.ts tests/uploaded-image-background.spec.ts tests/image-motion.spec.ts tests/editor-ai.spec.ts tests/video-lightning.spec.ts tests/connections.spec.ts tests/project-library.spec.ts
       - name: Save editor and navigation visual acceptance artifacts
         if: always()
         uses: actions/upload-artifact@v4
