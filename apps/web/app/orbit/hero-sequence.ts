@@ -1,30 +1,29 @@
 export const HERO_SCENE_MS = 9000;
-export const HERO_DISSOLVE_MS = 2400;
+// Original renderer: 1.3 s switching window plus .45 s character settling.
+export const HERO_TRANSITION_MS = 1750;
 export const AI_STUDIO_SCALE = 0.6;
-const smooth = (value: number) => {
-  const x = Math.max(0, Math.min(1, value));
-  // Zero velocity and acceleration at both ends prevent a visible switch.
-  return x * x * x * (x * (x * 6 - 15) + 10);
-};
-/** Shared title position, readable holds, and an unbroken dissolve in both directions. */
-export function heroSequence(elapsed: number, reduced = false) {
-  if (reduced) return { orbit: 1, studio: 0 };
-  const time = Math.max(0, elapsed) % (HERO_SCENE_MS * 2);
-  const second = time >= HERO_SCENE_MS;
-  const blend = smooth(((time % HERO_SCENE_MS) - (HERO_SCENE_MS - HERO_DISSOLVE_MS)) / HERO_DISSOLVE_MS);
-  return second ? { orbit: blend, studio: 1 - blend } : { orbit: 1 - blend, studio: blend };
+const clamp = (value:number) => Math.max(0,Math.min(1,value));
+const smooth = (value:number) => { const x=clamp(value);return x*x*(3-2*x); };
+/** Nine readable seconds, then a directional character transition; never a blank scene. */
+export function heroSequence(elapsed:number,reduced=false) {
+  if(reduced)return {orbit:1,studio:0,progress:0,toStudio:true};
+  const duration=HERO_SCENE_MS+HERO_TRANSITION_MS;
+  const time=Math.max(0,elapsed)%(duration*2),toStudio=time<duration;
+  const progress=clamp(((time%duration)-HERO_SCENE_MS)/HERO_TRANSITION_MS);
+  return {orbit:toStudio?1-progress:progress,studio:toStudio?progress:1-progress,progress,toStudio};
 }
-/** Hash once when building the lattice, never on each animation frame. */
-export function codeCellStagger(column: number, row: number) {
-  const seed = Math.sin(column * 127.1 + row * 311.7) * 43758.5453;
-  return (seed - Math.floor(seed)) * 0.22;
+/** A lower row changes before every higher row; tiny column jitter keeps the code texture alive. */
+export function heroCellBlend(progress:number,rowPosition:number,column=0) {
+  if(progress<=0)return 0;if(progress>=1)return 1;
+  const hash=Math.sin(column*127.1+31.7)*43758.5453;
+  const start=(1-clamp(rowPosition))*.72+(hash-Math.floor(hash))*.025;
+  return smooth((progress-start)/.255);
 }
-export function codeCellBlend(weight: number, stagger: number) {
-  if (weight <= 0) return 0;
-  if (weight >= 1) return 1;
-  return smooth((weight - stagger) / 0.78);
+/** Increasing source-row offsets move code upwards through fixed screen rows. */
+export function heroCodeRow(elapsed:number,reduced=false) {
+  return reduced?0:Math.floor(Math.max(0,elapsed)/1000*1.1);
 }
-/** A stable per-cell stagger. Shared cells stay visible instead of double drawing two words. */
-export function codeCellOpacity(weight: number, column: number, row: number) {
-  return codeCellBlend(weight, codeCellStagger(column, row));
+/** Shared occupied cells never disappear while their surrounding silhouette changes. */
+export function heroCellCoverage(previous:number,next:number,blend:number) {
+  return previous+(next-previous)*clamp(blend);
 }
