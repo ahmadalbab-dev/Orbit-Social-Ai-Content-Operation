@@ -24,7 +24,7 @@ async function canvasHasArtwork(canvas: Locator) {
   })).toBeGreaterThan(.005);
 }
 
-for (const width of [320, 390, 1440, 3840]) {
+for (const width of [320, 390, 1024, 1440, 1920, 3840]) {
   test(`Home presents a full-bleed responsive hero and example posts at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: width < 768 ? 844 : 1080 });
     await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });

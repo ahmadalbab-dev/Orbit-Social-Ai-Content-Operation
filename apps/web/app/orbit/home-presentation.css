@@ -19,3 +19,5 @@
 .orbit-shell .overview-view .hero-intro .eyebrow{font:400 12px/1.6 var(--mono);letter-spacing:.22em;color:var(--soft);margin-bottom:18px}
 .orbit-shell .overview-view .hero-intro h1 em{font-size:.86em;font-weight:400;letter-spacing:-.03em;background:none;color:var(--soft)}
 .orbit-shell .overview-view .hero-caption{max-width:52ch;margin-top:22px;font-size:1.08rem;line-height:1.6}
+/* Orbit is a longer silhouette than Ponytail's single numeral: keep the reading column clear. */
+@media(min-width:901px){.orbit-shell .overview-view .hero-intro{max-width:min(820px,calc(50vw - max(28px,calc((100vw - 1180px)/2 + 28px)) - 28px))}}

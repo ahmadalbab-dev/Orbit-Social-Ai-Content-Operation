@@ -130,7 +130,7 @@ export function OrbitField({paused,centered=false}:{paused:boolean;centered?:boo
     context!.fillRect(cell.x*columnWidth,cell.y*lineHeight+3,columnWidth+.5,lineHeight+.5);
     context!.globalAlpha=opacity;context!.fillStyle=rgb(dark?mix(colour,[255,255,255],.08):colour);
     // A small character glow, never a filled word underlay. Bound work at 4K and 30 fps.
-    context!.shadowColor=rgb(colour,dark?.65:.18);context!.shadowBlur=dark?4:1;
+    context!.shadowColor=rgb(colour,dark?.65:.18);context!.shadowBlur=dark?(width<700?2:4):1;
     context!.fillText(character,cell.x*columnWidth,(cell.y+1)*lineHeight);context!.shadowBlur=0;
    }
    context!.globalAlpha=1;
@@ -167,12 +167,14 @@ export function OrbitField({paused,centered=false}:{paused:boolean;centered?:boo
    cancelAnimationFrame(frame);frame=0;lastTick=0;lastPaint=0;if(!width||!height)return;
    const ratio=Math.min(window.devicePixelRatio||1,2,Math.sqrt(6_000_000/(width*height)));
    for(const surface of [element!,ambient]){surface.width=Math.max(1,Math.round(width*ratio));surface.height=Math.max(1,Math.round(height*ratio));surface.getContext('2d')!.setTransform(ratio,0,0,ratio,0,0);}
-   fontSize=Math.max(width<700?11:13,Math.sqrt(width*height/24000));lineHeight=Math.round(fontSize*1.32);
+   // Small silhouettes need a denser code grid: a 75px letter must not collapse
+   // to four coarse rows. Keep at least seven to eight rows of actual glyphs.
+   fontSize=width<700?Math.max(6.5,Math.min(8,width/55)):Math.max(13,Math.sqrt(width*height/24000));lineHeight=Math.round(fontSize*1.32);
    context!.font=font(400);columnWidth=context!.measureText('M').width;columns=Math.ceil(width/columnWidth);rows=Math.ceil(height/lineHeight);
    const mobile=!centered&&width<=900;
    const available=width*(centered?.90:mobile?.91:.49);
    context!.font=font(800,100);const widthPerSize=.84+context!.measureText('Orbit').width/100;
-   const size=Math.min(300,width*.19,available/widthPerSize),total=size*widthPerSize;
+   const size=Math.min(300,width*(width<700?.23:.19),available/widthPerSize),total=size*widthPerSize;
    const left=centered||mobile?(width-total)/2:width*.75-total/2;
    const cy=centered?height*.42:mobile?Math.min(150,height*.30):height*.42;
    orbit=makeMask('orbit',size,left,total,cy);studio=makeMask('studio',size,left,total,cy);
