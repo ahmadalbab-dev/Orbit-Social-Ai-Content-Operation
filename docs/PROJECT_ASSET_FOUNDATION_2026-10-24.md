@@ -58,3 +58,16 @@ A controlled Windows WebKit probe returned `UnknownError: Error preparing Blob/F
 - The new test is included in the existing WebKit CI selection. GitHub CI and Vercel deployment of the pushed head remain separate checks.
 
 Browser artifacts are in the isolated DESKTOP-ALBAB checkout under apps/web/test-results/projects-accepted and projects-codec-accepted. Earlier Home artifacts are under projects-chromium and projects-webkit. Owner's existing checkout and its untracked recovery configuration were preserved.
+
+## Follow-up release checks
+
+Runtime audit identified GHSA-mrhx-c7xc-m3w5 (Zod) and GHSA-27r3-jxmh-p828 (body-parser). Pin Zod 4.6.6 across runtime paths and body-parser 2.4.0 on the Express 2.x dependency path. OpenAI SDK 6.0.0 declares Zod 4 compatibility; its actual SDK response decoding, structured-request shape, workspace cache and invalid-output rejection now have transport-isolated regression coverage. No live provider calls are needed for these checks.
+
+After installing the frozen lockfile on DESKTOP-ALBAB, production dependency audit reported no known vulnerabilities; all 10 package typechecks and backend builds passed. AI tests: 141 passed. API tests: 250 passed; eight opt-in database cases remain for disposable-database CI. The workspace animation test now checks changing canvas pixels, then stable pixels after the device motion toggle and profile navigation; both Chromium and WebKit passed.
+
+The Import control meets 4.5:1 text contrast in light and dark modes on the narrow phone viewport. The lightning export acceptance samples the bounded two-pulse interval at 30fps against corresponding source frames, instead of assuming one MediaRecorder timestamp lands exactly on a pulse peak; it retains the brightness threshold and separate thunder, soundtrack, duration, undo and no-provider-request assertions.
+
+Upstream advisory references:
+
+- https://github.com/advisories/GHSA-mrhx-c7xc-m3w5
+- https://github.com/expressjs/body-parser/security/advisories/GHSA-27r3-jxmh-p828
