@@ -47,3 +47,14 @@ Next ordered phase: account-scoped project documents plus private storage and co
 ## WebKit storage compatibility
 
 A controlled Windows WebKit probe returned `UnknownError: Error preparing Blob/File data to be stored in object store` for both Blob and File, while ArrayBuffer saved successfully. Sources are therefore stored as ArrayBuffer plus MIME metadata, preserving exact bytes. Reads still accept legacy Blob records. Browser tests keep the original persistence/export assertions; none are skipped to hide this failure.
+
+## Recorded acceptance
+
+- Web unit suite: 238 passed across 35 files. Web TypeScript passed. Production Next.js build passed.
+- DESKTOP-ALBAB Chromium Home suite: 14 passed, including six viewport sizes, theme/ink contrast, reduced motion and the complete hero handoff.
+- DESKTOP-ALBAB WebKit Home suite: 13 passed, one intentional Chromium-only recording skip.
+- Six project-library cases are accepted in Chromium and WebKit after the byte-record fix (12 browser/case combinations). The final focused video control test passed in both engines; the preceding run passed the other combinations.
+- Chromium decoded the untouched H.264/AAC fixture through HTTP, File URL and ArrayBuffer reconstruction (160x90, 2 seconds). Windows WebKit returned media error code 4 on all three untouched controls despite canPlayType reporting support. Its project-video case therefore verifies the explicit unsupported-codec message; it is not a successful WebKit H.264 playback/export claim. Image source pixels, image export download, source persistence/deletion and concurrency are actually checked in both browsers.
+- The new test is included in the existing WebKit CI selection. GitHub CI and Vercel deployment of the pushed head remain separate checks.
+
+Browser artifacts are in the isolated DESKTOP-ALBAB checkout under apps/web/test-results/projects-accepted and projects-codec-accepted. Earlier Home artifacts are under projects-chromium and projects-webkit. Owner's existing checkout and its untracked recovery configuration were preserved.
