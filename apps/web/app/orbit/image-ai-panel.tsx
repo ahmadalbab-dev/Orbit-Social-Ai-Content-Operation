@@ -33,7 +33,7 @@ export function ImageAiPanel({
     if (!preview)
       void api<{ configured: boolean; provider?: string; model?: string }>("/media/image-edit/status")
         .then((status) => {
-          if (active) { setConfigured(status.configured); setPreviewLimit(status.provider === "cloudflare" ? 511 : 1024); setImageProvider(status.provider === "cloudflare" ? "Cloudflare Workers AI (FLUX.2 Klein 4B)" : status.provider === "gemini" ? "Google Gemini (Nano Banana 2.1)" : status.provider === "fal-ai" ? "Hugging Face / fal-ai" : "the configured image provider"); }
+          if (active) { setConfigured(status.configured); setPreviewLimit(status.provider === "cloudflare" ? 511 : 1024); setImageProvider(status.provider === "cloudflare" ? "Cloudflare Workers AI (FLUX.2 Klein 4B)" : status.provider === "gateway" ? "Vercel AI Gateway (Gemini image editing)" : status.provider === "gemini" ? "Google Gemini (Nano Banana 2.1)" : status.provider === "fal-ai" ? "Hugging Face / fal-ai" : "the configured image provider"); }
         })
         .catch(() => {});
     return () => {

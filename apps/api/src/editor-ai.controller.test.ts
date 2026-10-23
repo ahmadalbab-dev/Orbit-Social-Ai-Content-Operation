@@ -12,3 +12,10 @@ describe('editor AI membership-scoped quota',()=>{
   await expect(new EditorAiController({reserveAttempt} as unknown as ImageAiService).plan(request,{kind:'image',instruction:'Make a poster',current:{}})).rejects.toThrow('quota reached');expect(reserveAttempt).toHaveBeenCalledWith(request.identity,true);expect(fetcher).not.toHaveBeenCalled();
  });
 });
+
+it('rejects Gateway preview sharing without server opt-in before quota or dispatch',async()=>{
+ vi.stubEnv('AI_TEXT_PROVIDER','gateway');vi.stubEnv('AI_GATEWAY_API_KEY','fixture');vi.stubEnv('AI_GATEWAY_ALLOW_PREVIEW_SHARING','false');
+ const reserveAttempt=vi.fn(),f=vi.fn();vi.stubGlobal('fetch',f);
+ await expect(new EditorAiController({reserveAttempt} as unknown as ImageAiService).plan(request,{kind:'image',instruction:'x',current:{},previewDataUrl:'data:image/png;base64,aAAA'})).rejects.toThrow('not configured');
+ expect(reserveAttempt).not.toHaveBeenCalled();expect(f).not.toHaveBeenCalled();
+});

@@ -1,3 +1,4 @@
+import { DEFAULT_GATEWAY_MODEL, isGatewayModel, gatewayCompletionFetch, gatewaySocialSchema } from './gateway.js';
 import { DEFAULT_GEMINI_TEXT_MODEL, isGeminiTextModel, geminiCompletionFetch } from './gemini-text.js';
 import { createHash } from "node:crypto";
 import { z } from "zod";
@@ -9,7 +10,8 @@ export const DEFAULT_HF_MODEL = "Qwen/Qwen3-235B-A22B-Instruct-2507";
 export const GROQ_CHAT_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 export const DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b";
 /** Validate identifiers only; provider endpoints remain fixed independently. */
-export function isValidTextModel(model: string, provider: "groq" | "huggingface" | "openai" | "gemini") {
+export function isValidTextModel(model: string, provider: "groq" | "huggingface" | "openai" | "gemini" | "gateway") {
+  if (provider === "gateway") return isGatewayModel(model);
   if (provider === "gemini") return isGeminiTextModel(model);
   if (!model || /\s/.test(model)) return false;
   if (provider === "huggingface") return /^[\w.-]+\/[\w.-]+(?::[\w-]+)?$/.test(model);
@@ -109,9 +111,9 @@ const completionSchema = z.object({
 export class HuggingFaceContentProvider {
   private readonly model: string;
   private readonly maxOutputTokens: number;
-  constructor(private readonly store: UsageStore, private readonly options: {apiKey:string;model?:string;monthlyBudgetUsd?:number;maxOutputTokens?:number;fetch?:typeof fetch;provider?:"groq"|"gemini"}) {
+  constructor(private readonly store: UsageStore, private readonly options: {apiKey:string;model?:string;monthlyBudgetUsd?:number;maxOutputTokens?:number;fetch?:typeof fetch;provider?:"groq"|"gemini"|"gateway"}) {
     if (!options.apiKey.trim() || /[\r\n]/.test(options.apiKey)) throw new AiProviderError("unconfigured");
-    this.model = options.model ?? (options.provider === "gemini" ? DEFAULT_GEMINI_TEXT_MODEL : options.provider === "groq" ? DEFAULT_GROQ_MODEL : DEFAULT_HF_MODEL);
+    this.model = options.model ?? (options.provider === "gateway" ? DEFAULT_GATEWAY_MODEL : options.provider === "gemini" ? DEFAULT_GEMINI_TEXT_MODEL : options.provider === "groq" ? DEFAULT_GROQ_MODEL : DEFAULT_HF_MODEL);
     if (!isValidTextModel(this.model, options.provider ?? "huggingface")) throw new AiProviderError("unconfigured");
     this.maxOutputTokens = options.maxOutputTokens ?? 3000;
     if (!Number.isSafeInteger(this.maxOutputTokens) || this.maxOutputTokens < 128 || this.maxOutputTokens > 6000 || (options.monthlyBudgetUsd !== undefined && (!Number.isFinite(options.monthlyBudgetUsd) || options.monthlyBudgetUsd < 0))) throw new AiProviderError("unconfigured");
@@ -126,7 +128,7 @@ export class HuggingFaceContentProvider {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 45000);
     try {
-      const response = await (this.options.provider === "gemini" ? geminiCompletionFetch(this.options.fetch ?? fetch) : (this.options.fetch ?? fetch))(this.options.provider === "groq" ? GROQ_CHAT_ENDPOINT : HF_CHAT_ENDPOINT, {
+      const response = await (this.options.provider === "gateway" ? gatewayCompletionFetch(this.options.fetch ?? fetch, gatewaySocialSchema) : this.options.provider === "gemini" ? geminiCompletionFetch(this.options.fetch ?? fetch) : (this.options.fetch ?? fetch))(this.options.provider === "groq" ? GROQ_CHAT_ENDPOINT : HF_CHAT_ENDPOINT, {
         method:"POST",redirect:"error",signal:controller.signal,
         headers:{Authorization:`Bearer ${this.options.apiKey.trim()}`,"Content-Type":"application/json"},
         body:JSON.stringify({model:this.model,messages:socialMessages(input),response_format:{type:"json_object"},...(this.options.provider === "groq" ? {max_completion_tokens:this.maxOutputTokens,...(/^openai\/gpt-oss-(?:20|120)b$/.test(this.model)?{include_reasoning:false,reasoning_effort:"low"}:{})} : {max_tokens:this.maxOutputTokens}),temperature:0.6,stream:false})
@@ -162,5 +164,11 @@ export class GroqContentProvider extends HuggingFaceContentProvider {
 export class GeminiContentProvider extends HuggingFaceContentProvider {
  constructor(store: UsageStore, options: {apiKey:string;model?:string;monthlyBudgetUsd?:number;maxOutputTokens?:number;fetch?:typeof fetch}) {
   super(store, {...options, provider: "gemini"});
+ }
+}
+
+export class GatewayContentProvider extends HuggingFaceContentProvider {
+ constructor(store: UsageStore, options: {apiKey:string;model?:string;monthlyBudgetUsd?:number;maxOutputTokens?:number;fetch?:typeof fetch}) {
+  super(store,{...options,provider:'gateway'});
  }
 }

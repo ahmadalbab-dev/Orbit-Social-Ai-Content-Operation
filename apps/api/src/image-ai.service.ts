@@ -7,6 +7,8 @@ import {
 import {
   CLOUDFLARE_IMAGE_MODEL,
   CloudflareImageEditor,
+  GATEWAY_IMAGE_MODEL,
+  GatewayImageEditor,
   GEMINI_IMAGE_MODEL,
   GeminiImageEditor,
   HF_IMAGE_MODEL,
@@ -14,6 +16,7 @@ import {
   validateImageEdit,
   validateCloudflareImageEdit,
 } from "@sma/ai";
+import { gatewayCredential } from "./text-ai.config";
 import { DatabaseService } from "./database.service";
 import { BillingService } from "./billing.service";
 import { requireRole } from "./workflow.service";
@@ -29,13 +32,14 @@ export class ImageAiService {
   private imageConfig() {
     const selected = process.env.AI_IMAGE_PROVIDER ?? "huggingface";
     const provider =
+      selected === "gateway" ||
       selected === "gemini" ||
       selected === "huggingface" ||
       selected === "cloudflare"
         ? selected
         : null;
     const apiKey =
-      provider === "gemini"
+      provider === "gateway" ? gatewayCredential() : provider === "gemini"
         ? process.env.GEMINI_API_KEY
         : provider === "huggingface"
           ? process.env.HF_TOKEN
@@ -65,7 +69,7 @@ export class ImageAiService {
       configured: config.configured,
       verified: false,
       model:
-        config.provider === "gemini"
+        config.provider === "gateway" ? GATEWAY_IMAGE_MODEL : config.provider === "gemini"
           ? GEMINI_IMAGE_MODEL
           : config.provider === "huggingface"
             ? HF_IMAGE_MODEL
@@ -103,6 +107,7 @@ export class ImageAiService {
       );
     await this.reserveAttempt(identity, config.configured);
     try {
+      if (config.provider === "gateway") return await new GatewayImageEditor(config.apiKey!).edit(body);
       if (config.provider === "cloudflare")
         return await new CloudflareImageEditor(
           config.apiKey!,

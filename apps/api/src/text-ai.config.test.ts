@@ -4,6 +4,15 @@ import { AppController } from "./app.controller";
 import { afterEach, vi } from "vitest";
 describe("explicit text provider configuration",()=>{
   afterEach(()=>vi.unstubAllEnvs());
+  it('requires explicit Gateway routing, reviewed model and Gateway credentials',()=>{
+    const base={AI_TEXT_PROVIDER:'gateway',VERCEL_OIDC_TOKEN:'fixture'};
+    expect(textAiConfig(base)).toMatchObject({configured:true,provider:'gateway',model:'google/gemini-3.5-flash-lite',apiKey:'fixture'});
+    expect(textAiConfig({...base,AI_GATEWAY_API_KEY:'key'}).apiKey).toBe('key');
+    expect(textAiConfig({AI_TEXT_PROVIDER:'gateway',GEMINI_API_KEY:'direct',HF_TOKEN:'direct'}).configured).toBe(false);
+    expect(textAiConfig({...base,AI_GATEWAY_MODEL:'https://private.test'}).configured).toBe(false);
+    expect(textAiConfig({...base,AI_GATEWAY_API_KEY:'bad\n'}).configured).toBe(false);
+    expect(textAiConfig({AI_GATEWAY_API_KEY:'key'}).provider).not.toBe('gateway');
+  });
   it('requires an explicit Gemini selection, key and unpaid-data acknowledgement',()=>{
     const env={AI_TEXT_PROVIDER:'gemini',GEMINI_API_KEY:'fixture'};
     expect(textAiConfig(env).configured).toBe(false);

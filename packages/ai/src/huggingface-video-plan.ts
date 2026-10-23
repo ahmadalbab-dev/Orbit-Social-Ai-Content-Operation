@@ -1,3 +1,4 @@
+import { DEFAULT_GATEWAY_MODEL, gatewayCompletionFetch, gatewayVideoSchema } from './gateway.js';
 import { DEFAULT_GEMINI_TEXT_MODEL, geminiCompletionFetch } from './gemini-text.js';
 import { z } from "zod";
 import { AiProviderError, aiProviderResponseError, DEFAULT_HF_MODEL, DEFAULT_GROQ_MODEL, GROQ_CHAT_ENDPOINT, HF_CHAT_ENDPOINT, readBoundedAiJson, isValidTextModel } from "./huggingface.js";
@@ -19,7 +20,7 @@ export function parseVideoPlan(text: string, duration: number): VideoPlan {
 }
 export class HuggingFaceVideoPlanner {
   private readonly model: string;
-  constructor(private readonly token: string, model = DEFAULT_HF_MODEL, private readonly fetcher: typeof fetch = fetch, private readonly provider: "huggingface" | "groq" | "gemini" = "huggingface") {
+  constructor(private readonly token: string, model = DEFAULT_HF_MODEL, private readonly fetcher: typeof fetch = fetch, private readonly provider: "huggingface" | "groq" | "gemini" | "gateway" = "huggingface") {
     if (!isValidTextModel(model, provider)) throw new AiProviderError("unconfigured");
     this.model = model;
   }
@@ -28,7 +29,7 @@ export class HuggingFaceVideoPlanner {
     if (!this.token) throw new AiProviderError("unconfigured");
     const signal = AbortSignal.timeout(45000);
     try {
-      const response = await (this.provider === "gemini" ? geminiCompletionFetch(this.fetcher) : this.fetcher)(this.provider === "groq" ? GROQ_CHAT_ENDPOINT : HF_CHAT_ENDPOINT, {
+      const response = await (this.provider === "gateway" ? gatewayCompletionFetch(this.fetcher,gatewayVideoSchema) : this.provider === "gemini" ? geminiCompletionFetch(this.fetcher) : this.fetcher)(this.provider === "groq" ? GROQ_CHAT_ENDPOINT : HF_CHAT_ENDPOINT, {
         method: "POST", signal, redirect: "error", credentials: "omit",
         headers: { Authorization: `Bearer ${this.token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ model: this.model, ...(this.provider === "groq" ? {max_completion_tokens:2000,...(/^openai\/gpt-oss-(?:20|120)b$/.test(this.model)?{include_reasoning:false,reasoning_effort:"low"}:{})} : {max_tokens:2000}), temperature: 0.5, stream: false, response_format: { type: "json_object" }, messages: [
@@ -40,9 +41,9 @@ export class HuggingFaceVideoPlanner {
         await response.body?.cancel();
         throw aiProviderResponseError(response.status);
       }
-      const value = await readBoundedAiJson(response, 24000) as { choices?: { message?: { content?: unknown } }[] };
+      const value = await readBoundedAiJson(response, 24000) as { choices?: { finish_reason?:string; message?: { content?: unknown } }[] };
       const content = value?.choices?.[0]?.message?.content;
-      if (typeof content !== "string") throw new AiProviderError("invalid_response");
+      if ((this.provider === "gateway" && value.choices?.[0]?.finish_reason !== "stop") || typeof content !== "string") throw new AiProviderError("invalid_response");
       return parseVideoPlan(content, brief.duration);
     } catch (error) { if (error instanceof AiProviderError) throw error; throw new AiProviderError(signal.aborted ? "timeout" : "unavailable"); }
   }
@@ -58,4 +59,8 @@ export class GeminiVideoPlanner extends HuggingFaceVideoPlanner {
  constructor(token: string, model = DEFAULT_GEMINI_TEXT_MODEL, fetcher: typeof fetch = fetch) {
   super(token, model, fetcher, "gemini");
  }
+}
+
+export class GatewayVideoPlanner extends HuggingFaceVideoPlanner {
+ constructor(token:string,model=DEFAULT_GATEWAY_MODEL,fetcher:typeof fetch=fetch){super(token,model,fetcher,'gateway');}
 }

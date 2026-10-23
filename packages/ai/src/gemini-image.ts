@@ -20,10 +20,12 @@ export function parseGeminiImageResponse(value: unknown): { bytes: Uint8Array; c
   }
   // The adapter requests a single image. Ambiguous/multiple results never silently replace the editor.
   if (images.length !== 1) throw new AiProviderError('invalid_response');
-  const image = images[0], data = image.data;
+  return parseInlineImage(images[0].data, images[0].mime_type);
+}
+export function parseInlineImage(data: unknown, mimeType: unknown): {bytes: Uint8Array; contentType: string} {
   if (typeof data !== 'string' || !data.length || data.length > Math.ceil(MAX_OUTPUT / 3) * 4 || data.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(data)) throw new AiProviderError('invalid_response');
   const bytes = Buffer.from(data, 'base64'), contentType = imageMime(bytes);
-  if (bytes.length > MAX_OUTPUT || bytes.toString('base64') !== data || !contentType || contentType !== image.mime_type) throw new AiProviderError('invalid_response');
+  if (bytes.length > MAX_OUTPUT || bytes.toString('base64') !== data || !contentType || contentType !== mimeType) throw new AiProviderError('invalid_response');
   return { bytes, contentType };
 }
 export class GeminiImageEditor {

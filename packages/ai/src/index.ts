@@ -57,7 +57,7 @@ export function estimateCost(model: string, inputTokens: number, outputTokens: n
   return (inputTokens * rate.input + outputTokens * rate.output) / 1_000_000;
 }
 
-export { GeminiContentProvider, GroqContentProvider, HuggingFaceContentProvider, AiProviderError, GROQ_CHAT_ENDPOINT, DEFAULT_GROQ_MODEL, HF_CHAT_ENDPOINT, DEFAULT_HF_MODEL, aiModes, parseSocialDrafts, socialMessages, readBoundedAiJson, validateAiGenerationInput, socialDraftLimitViolation, isValidTextModel } from "./huggingface.js";
+export { GatewayContentProvider, GeminiContentProvider, GroqContentProvider, HuggingFaceContentProvider, AiProviderError, GROQ_CHAT_ENDPOINT, DEFAULT_GROQ_MODEL, HF_CHAT_ENDPOINT, DEFAULT_HF_MODEL, aiModes, parseSocialDrafts, socialMessages, readBoundedAiJson, validateAiGenerationInput, socialDraftLimitViolation, isValidTextModel } from "./huggingface.js";
 export type { AiGenerationInput, AiProviderFailure } from "./huggingface.js";
 export { HuggingFaceImageEditor, ImageEditError, validateImageEdit, HF_IMAGE_MODEL, HF_IMAGE_ENDPOINT } from "./huggingface-image.js";
 export { GeminiVideoPlanner, GroqVideoPlanner, HuggingFaceVideoPlanner, parseVideoPlan, validateVideoPlanInput } from "./huggingface-video-plan.js";
@@ -67,3 +67,8 @@ export { GeminiImageEditor, GEMINI_IMAGE_MODEL, GEMINI_IMAGE_ENDPOINT, parseGemi
 export { CloudflareImageEditor, CLOUDFLARE_IMAGE_MODEL, parseCloudflareImageResponse, validateCloudflareImageEdit } from './cloudflare-image.js';
 
 export { DEFAULT_GEMINI_TEXT_MODEL, GEMINI_FREE_TEXT_MODELS } from './gemini-text.js';
+
+export {GatewayVideoPlanner} from './huggingface-video-plan.js';
+export {DEFAULT_GATEWAY_MODEL} from './gateway.js';
+
+export {GatewayImageEditor,GATEWAY_IMAGE_MODEL} from './gateway-image.js';
