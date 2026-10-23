@@ -157,6 +157,27 @@ for (const preference of ['system', 'workspace'] as const) {
   });
 }
 
+test('motion preference responds to checkbox, keyboard and label clicks and survives reload', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/preview');
+  await page.getByRole('button', { name: 'Workspace Settings', exact: true }).click();
+  const reduce = page.getByRole('checkbox', { name: 'Reduce decorative animation', exact: true });
+  // Exercise the same immediate, below-the-fold interaction as the hero test.
+  await reduce.check();
+  await expect(reduce).toBeChecked();
+  await expect(page.locator('html')).toHaveAttribute('data-motion', 'paused');
+  await reduce.focus();
+  await page.keyboard.press('Space');
+  await expect(reduce).not.toBeChecked();
+  await expect(page.locator('html')).toHaveAttribute('data-motion', 'on');
+  await page.getByText('Reduce decorative animation', { exact: true }).click();
+  await expect(reduce).toBeChecked();
+  await page.reload();
+  await expect(reduce).toBeChecked();
+  await expect(page.locator('html')).toHaveAttribute('data-motion', 'paused');
+});
+
 
 test('hero records a complete live Orbit to ai studio and back handoff', async ({ browser, browserName }, testInfo) => {
   test.skip(browserName !== 'chromium', 'One Chromium recording complements cross-browser layout and reduced-motion checks.');
