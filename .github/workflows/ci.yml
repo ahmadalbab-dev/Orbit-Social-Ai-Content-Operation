@@ -40,13 +40,8 @@ jobs:
       - name: Verify compiled backend modules without require ESM interop
         run: node scripts/check-runtime-modules.mjs
       - name: Install codec for trusted fixture acceptance
-        timeout-minutes: 3
-        run: |
-          if ! command -v ffmpeg >/dev/null 2>&1; then
-            sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 update
-            sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 install -y --no-install-recommends ffmpeg
-          fi
-          ffmpeg -version
+        timeout-minutes: 8
+        run: bash scripts/ci-install-codecs.sh
       - name: Compiled HTTP upload, restart, real worker and private download
         run: node scripts/staging-smoke.mjs
         env:
