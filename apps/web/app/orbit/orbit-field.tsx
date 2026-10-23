@@ -59,7 +59,7 @@ export function OrbitField({paused,centered=false}:{paused:boolean;centered?:boo
   const ambient=document.createElement('canvas'),background=ambient.getContext('2d');
   if(!background)return;
   const reduced=window.matchMedia('(prefers-reduced-motion: reduce)');
-  let disposed=false,onScreen=true,frame=0,width=0,height=0,elapsed=savedElapsed.current,lastTick=0,lastPaint=0;
+  let fontsReady=false,disposed=false,onScreen=true,frame=0,width=0,height=0,elapsed=savedElapsed.current,lastTick=0,lastPaint=0;
   let fontSize=13,columnWidth=8,lineHeight=17,columns=0,rows=0,cachedRow=-1;
   let orbit:Mask,studio:Mask,cells:Cell[]=[],union:Box={left:0,top:0,right:0,bottom:0};
   let dark=true,colours:number[][]=[];
@@ -162,10 +162,10 @@ export function OrbitField({paused,centered=false}:{paused:boolean;centered?:boo
    return {set,box};
   }
   function resize(){
-   if(disposed)return;
+   if(disposed||!fontsReady)return;
    const rect=element!.getBoundingClientRect();width=rect.width;height=rect.height;
    cancelAnimationFrame(frame);frame=0;lastTick=0;lastPaint=0;if(!width||!height)return;
-   const ratio=Math.min(window.devicePixelRatio||1,2,Math.sqrt(6_000_000/(width*height)));
+   const ratio=Math.min(Math.max(window.devicePixelRatio||1,width<700?2:1),2,Math.sqrt(6_000_000/(width*height)));
    for(const surface of [element!,ambient]){surface.width=Math.max(1,Math.round(width*ratio));surface.height=Math.max(1,Math.round(height*ratio));surface.getContext('2d')!.setTransform(ratio,0,0,ratio,0,0);}
    // Small silhouettes need a denser code grid: a 75px letter must not collapse
    // to four coarse rows. Keep at least seven to eight rows of actual glyphs.
@@ -194,7 +194,10 @@ export function OrbitField({paused,centered=false}:{paused:boolean;centered?:boo
   },{threshold:0});intersection.observe(element);
   const visibility=()=>{cancelAnimationFrame(frame);frame=0;lastTick=0;lastPaint=0;if(!document.hidden&&onScreen)refresh();else element.dataset.motion=frozen()?'paused':'suspended';};
   window.addEventListener('orbit-appearance',refresh);reduced.addEventListener('change',refresh);document.addEventListener('visibilitychange',visibility);
-  void document.fonts.ready.then(()=>{if(!disposed)resize();});resize();
+  // Build masks only after both canvas font weights load. A paused first frame must
+  // not change again when WebKit swaps its fallback font a few frames later.
+  const ready = () => { if (!disposed) { fontsReady=true; resize(); } };
+  void Promise.all([document.fonts.load('400 13px "JetBrains Mono"'),document.fonts.load('800 13px "JetBrains Mono"'),document.fonts.ready]).then(ready,ready);
   return()=>{disposed=true;cancelAnimationFrame(frame);observer.disconnect();intersection.disconnect();themeObserver.disconnect();window.removeEventListener('orbit-appearance',refresh);reduced.removeEventListener('change',refresh);document.removeEventListener('visibilitychange',visibility);};
  },[paused,centered]);
  return <div className={`orbit-artwork ${centered?'orbit-artwork-centered':''}`} data-paused={paused}><canvas className="orbit-field" ref={canvas} aria-hidden="true"/></div>;
