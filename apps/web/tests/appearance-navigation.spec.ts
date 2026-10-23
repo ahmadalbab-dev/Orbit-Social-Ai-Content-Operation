@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+test.use({ trace: "retain-on-failure" });
+
 test("light default keeps the auth form compact while widening only the hero", async ({
   page,
 }) => {

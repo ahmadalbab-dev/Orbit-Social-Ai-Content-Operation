@@ -19,7 +19,7 @@ Its original `assets/v5/site.js` SHA256 `97f97389cf95ba0f20efd85b35ac08ab3684f03
 
 ## Orbit adaptations
 
-Retain Orbit / ai studio wording at the same position, with ai studio .6 of the Orbit font size as previously requested. Keep navigation, auth controls, media tools and social workflows functional. Mobile reserves a free band above the copy rather than overlapping text and canvas. Its word silhouette uses a denser 6.5–8px code grid so the short letters retain enough rows to be legible. On desktop the reading column ends before the longer Orbit word silhouette; the source’s left alignment and headline sizing remain unchanged.
+Retain Orbit / ai studio wording at the same position, with ai studio .6 of the Orbit font size as previously requested. Keep navigation, auth controls, media tools and social workflows functional. Mobile reserves a free band above the copy rather than overlapping text and canvas. Its word silhouette uses a denser 4–7px code grid so the short letters retain enough rows to be legible. On desktop the reading column ends before the longer Orbit word silhouette; the source’s left alignment and headline sizing remain unchanged.
 
 The supplied video is dark-mode evidence. The richer light palette is explicitly user-requested: cream background#faf8f3, foreground#241e29, secondary text#55495b, primary#503099, accent#802b70, dark cyan/violet/magenta hero ink. It is not presented as an extracted Ponytail light theme. Confirm actual screenshots, readable text contrast, both theme transitions and motion phases.
 

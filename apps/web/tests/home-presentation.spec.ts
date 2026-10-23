@@ -249,3 +249,18 @@ test('light mode uses deeper readable UI colours and saturated hero ink',async({
   return(Math.max(fg,bg)+.05)/(Math.min(fg,bg)+.05);
  });expect(contrast).toBeGreaterThanOrEqual(4.5);
 });
+
+
+test('mobile ai studio remains formed in both themes during its full hold',async({page},testInfo)=>{
+ await page.setViewportSize({width:390,height:844});await page.emulateMedia({colorScheme:'light',reducedMotion:'no-preference'});
+ await page.goto('/preview');const canvas=page.locator('.overview-view canvas.orbit-field');
+ await expect(canvas).toHaveAttribute('data-scene','ai-studio',{timeout:18000});
+ await expect.poll(()=>canvas.getAttribute('data-transition')).toBe('0.000');
+ await canvasHasArtwork(canvas);
+ for(const mode of ['Light','Dark']){
+  await page.getByRole('button',{name:`${mode} mode`,exact:true}).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme',mode.toLowerCase());
+  await expect(canvas).toHaveAttribute('data-scene','ai-studio');
+  await page.screenshot({path:testInfo.outputPath(`mobile-ai-studio-${mode.toLowerCase()}.png`)});
+ }
+});

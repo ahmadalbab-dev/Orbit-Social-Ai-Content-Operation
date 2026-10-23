@@ -169,7 +169,7 @@ export function OrbitField({paused,centered=false}:{paused:boolean;centered?:boo
    for(const surface of [element!,ambient]){surface.width=Math.max(1,Math.round(width*ratio));surface.height=Math.max(1,Math.round(height*ratio));surface.getContext('2d')!.setTransform(ratio,0,0,ratio,0,0);}
    // Small silhouettes need a denser code grid: a 75px letter must not collapse
    // to four coarse rows. Keep at least seven to eight rows of actual glyphs.
-   fontSize=width<700?Math.max(6.5,Math.min(8,width/55)):Math.max(13,Math.sqrt(width*height/24000));lineHeight=Math.round(fontSize*1.32);
+   fontSize=width<700?Math.max(4,Math.min(7,width/85)):Math.max(13,Math.sqrt(width*height/24000));lineHeight=Math.round(fontSize*1.32);
    context!.font=font(400);columnWidth=context!.measureText('M').width;columns=Math.ceil(width/columnWidth);rows=Math.ceil(height/lineHeight);
    const mobile=!centered&&width<=900;
    const available=width*(centered?.90:mobile?.91:.49);

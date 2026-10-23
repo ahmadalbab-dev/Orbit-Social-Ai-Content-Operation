@@ -19,13 +19,27 @@ export function WorkspaceNavigation({ items, activeId, onSelect }: { items: read
   useEffect(() => {
     const element = sentinel.current;
     if (!element) return;
-    const observer = new IntersectionObserver(([entry]) => {
-      const belowHeader = !entry.isIntersecting && entry.boundingClientRect.top < 0;
+    let frame = 0;
+    const sync = () => {
+      frame = 0;
+      // Read current geometry: an observer entry can predate hydration or font layout.
+      const rect = element.getBoundingClientRect();
+      const belowHeader = rect.height > 0 && rect.bottom <= 0;
       setFloating(belowHeader);
       if (!belowHeader) setExpanded(false);
-    });
+    };
+    const schedule = () => { if (!frame) frame = requestAnimationFrame(sync); };
+    const observer = new IntersectionObserver(schedule);
+    const layout = new ResizeObserver(schedule);
     observer.observe(element);
-    return () => observer.disconnect();
+    if (element.parentElement) layout.observe(element.parentElement);
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    schedule();
+    return () => {
+      cancelAnimationFrame(frame); observer.disconnect(); layout.disconnect();
+      window.removeEventListener("scroll", schedule); window.removeEventListener("resize", schedule);
+    };
   }, []);
 
   useEffect(() => {
