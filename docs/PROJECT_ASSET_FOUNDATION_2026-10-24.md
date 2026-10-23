@@ -2,13 +2,13 @@
 
 ## Scope
 
-Owner requested the project/asset stage first and supplied Transitions.dev and Libraries.dev as UI/motion sources. This implementation adds a working device library at `/projects` and `/preview/projects`: create a project, import original image/video/audio files, reopen after refresh, preview, filter, deduplicate, open image/video sources in existing editors, and delete the project with its source blobs. Studio and Media link to the library.
+Owner requested the project/asset stage first and supplied Transitions.dev and Libraries.dev as UI/motion sources. This implementation adds a working device library at `/projects` and `/preview/projects`: create a project, import original image/video/audio files, reopen after refresh, preview, filter, deduplicate, open image/video sources in existing editors, and delete the project with its source records. Studio and Media link to the library.
 
 This is deliberately device storage, labelled in the product. It is not Supabase project persistence, an account workspace, full composition autosave, storyboard orchestration or cloud publishing. Server ContentItem/ContentRevision/MediaAsset IDs remain separate. Editor edits still need export; refreshing the editor reloads the original source. Clearing browser site data removes the library.
 
 ## Data contract
 
-`project-document.ts`: schemaVersion 1, project UUID, title, revision and timestamps, plus asset UUID/name/kind/MIME/byte count/SHA-256. Runtime object URLs and secrets are not stored. IndexedDB stores source Blobs separately under `[projectId, assetId]`. Manifest and Blob changes commit atomically. Read-modify-write in one transaction rejects a stale revision from another tab. Duplicate source bytes do not advance revision. Project deletion removes associated blobs in the same transaction.
+`project-document.ts`: schemaVersion 1, project UUID, title, revision and timestamps, plus asset UUID/name/kind/MIME/byte count/SHA-256. Runtime object URLs and secrets are not stored. IndexedDB stores source byte records separately under `[projectId, assetId]`. Manifest and byte-record changes commit atomically. Read-modify-write in one transaction rejects a stale revision from another tab. Duplicate source bytes do not advance revision. Project deletion removes associated blobs in the same transaction.
 
 Bounds: 100 projects, 100 assets/project, 512 MiB/project, 256 MiB/file and 8 MiB/image. SVG/HTML are excluded. These are device-library limits, not server upload permissions. Existing editors still perform their own decode/pixel/duration validation. Storage failure must not be presented as successful saving.
 
@@ -43,3 +43,7 @@ References:
 Local TypeScript and production build passed during implementation; manifest and hero sequencing tests passed (11 tests). New browser cases cover source persistence/deduplication, image pixels/export, decoded video source, stale concurrent imports, deletion of blobs, mobile keyboard filters/themes and reduced-motion branding. Browser results are recorded separately after execution; this file does not claim those cases passed before they ran.
 
 Next ordered phase: account-scoped project documents plus private storage and composition save/reload adapters; then Studio scenes and provider jobs. Preserve source UUID/provenance and draft-revision validation while adding those adapters. Existing provider acceptance and OAuth/Openverse blockers are unchanged by this delivery.
+
+## WebKit storage compatibility
+
+A controlled Windows WebKit probe returned `UnknownError: Error preparing Blob/File data to be stored in object store` for both Blob and File, while ArrayBuffer saved successfully. Sources are therefore stored as ArrayBuffer plus MIME metadata, preserving exact bytes. Reads still accept legacy Blob records. Browser tests keep the original persistence/export assertions; none are skipped to hide this failure.
