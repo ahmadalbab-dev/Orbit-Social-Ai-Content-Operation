@@ -27,23 +27,33 @@ for(const speed of [1,2])test(`local lightning + thunder survive actual export a
  await expect(page.getByText('Lightning + synthesized thunder active.',{exact:true})).toBeVisible();
  await selectEditorTool(page,'Video','Export');const pending=page.waitForEvent('download');await page.getByRole('button',{name:'Export edited video locally',exact:true}).click();
  const bytes=await readFile((await (await pending).path())!);
- const result=await page.evaluate(async({base64,speed})=>{
+ const result=await page.evaluate(async({base64,original,speed})=>{
   const bytes=Uint8Array.from(atob(base64),c=>c.charCodeAt(0)),blob=new Blob([bytes],{type:bytes[4]===102?'video/mp4':'video/webm'}),url=URL.createObjectURL(blob);
   const video=document.createElement('video');video.muted=true;video.playsInline=true;video.src=url;video.preload='auto';document.body.append(video);
+  const originalUrl=URL.createObjectURL(new Blob([Uint8Array.from(atob(original),c=>c.charCodeAt(0))],{type:'video/mp4'}));
+  const control=document.createElement('video');control.muted=true;control.playsInline=true;control.src=originalUrl;control.preload='auto';document.body.append(control);
   const audio=new AudioContext();try{
    await new Promise<void>((resolve,reject)=>{video.onloadedmetadata=()=>resolve();video.onerror=()=>reject(new Error('Export cannot decode'));});
+   if(control.readyState<1)await new Promise<void>((resolve,reject)=>{control.onloadedmetadata=()=>resolve();control.onerror=()=>reject(new Error('Control cannot decode'));});
    const context=document.createElement('canvas');context.width=160;context.height=90;const ctx=context.getContext('2d')!;
-   async function brightness(time:number){video.currentTime=time;await new Promise<void>(resolve=>video.onseeked=()=>resolve());ctx.drawImage(video,0,0,160,90);const pixels=ctx.getImageData(0,0,160,90).data;let sum=0;for(let i=0;i<pixels.length;i+=4)sum+=(pixels[i]+pixels[i+1]+pixels[i+2])/3;return sum/(pixels.length/4);}
-   const outputDuration=2/speed,at=Math.min(1,outputDuration*.25),before=await brightness(.05),flash=await brightness(at+.045);
+   async function brightness(target:HTMLVideoElement,time:number){const seeked=new Promise<void>(resolve=>target.onseeked=()=>resolve());target.currentTime=time;await seeked;ctx.drawImage(target,0,0,160,90);const pixels=ctx.getImageData(0,0,160,90).data;let sum=0;for(let i=0;i<pixels.length;i+=4)sum+=(pixels[i]+pixels[i+1]+pixels[i+2])/3;return sum/(pixels.length/4);}
+   const outputDuration=2/speed,at=Math.min(1,outputDuration*.25),samples:{time:number;gain:number}[]=[];
+   // MediaRecorder chooses encoded frame timestamps asynchronously. Check the
+   // bounded two-pulse window at 30fps, rather than one assumed peak frame.
+   // Compare against the source so ordinary scene brightness cannot pass.
+   for(let frame=0;frame<=10;frame++){
+    const time=at+frame/30;
+    samples.push({time,gain:await brightness(video,time)-await brightness(control,time*speed)});
+   }
    const sound=await audio.decodeAudioData(bytes.buffer.slice(0)),values=sound.getChannelData(0);
    const rms=(from:number,to:number)=>{const start=Math.floor(from*sound.sampleRate),end=Math.min(values.length,Math.floor(to*sound.sampleRate));let energy=0;for(let i=start;i<end;i++)energy+=values[i]*values[i];return Math.sqrt(energy/Math.max(1,end-start));};
    const band=(from:number,to:number)=>{const start=Math.floor(from*sound.sampleRate),end=Math.min(values.length,Math.floor(to*sound.sampleRate)),count=end-start;let sine=0,cosine=0;
     for(let i=start;i<end;i++){const angle=2*Math.PI*880*i/sound.sampleRate;sine+=values[i]*Math.sin(angle);cosine+=values[i]*Math.cos(angle);}
     const amplitude=2*Math.hypot(sine,cosine)/count;return{amplitude,residual:Math.sqrt(Math.max(0,rms(from,to)**2-amplitude**2/2))};};
-   return{before,flash,early:rms(0,.1),thunder:rms(at+.14,Math.min(outputDuration,at+.45)),musicBefore:band(.04,.2),musicDuring:band(at+.14,Math.min(outputDuration,at+.45)),duration:video.duration};
-  }finally{video.remove();URL.revokeObjectURL(url);await audio.close();}
- },{base64:bytes.toString('base64'),speed});
- expect(result.flash).toBeGreaterThan(result.before+8);expect(result.thunder).toBeGreaterThan(.005);if(speed===1)expect(result.thunder).toBeGreaterThan(result.early*2);else{expect(result.musicBefore.amplitude).toBeGreaterThan(.05);expect(result.musicDuring.amplitude).toBeGreaterThan(.05);expect(result.musicDuring.residual).toBeGreaterThan(result.musicBefore.residual+.003);}expect(result.duration).toBeGreaterThan(2/speed-.3);
+   return{samples,early:rms(0,.1),thunder:rms(at+.14,Math.min(outputDuration,at+.45)),musicBefore:band(.04,.2),musicDuring:band(at+.14,Math.min(outputDuration,at+.45)),duration:video.duration};
+  }finally{video.remove();control.remove();URL.revokeObjectURL(url);URL.revokeObjectURL(originalUrl);await audio.close();}
+ },{base64:bytes.toString('base64'),original:(await readFile(join(__dirname,'fixtures','clip.mp4'))).toString('base64'),speed});
+ expect(Math.max(...result.samples.map(sample=>sample.gain)),JSON.stringify(result.samples)).toBeGreaterThan(8);expect(result.thunder).toBeGreaterThan(.005);if(speed===1)expect(result.thunder).toBeGreaterThan(result.early*2);else{expect(result.musicBefore.amplitude).toBeGreaterThan(.05);expect(result.musicDuring.amplitude).toBeGreaterThan(.05);expect(result.musicDuring.residual).toBeGreaterThan(result.musicBefore.residual+.003);}expect(result.duration).toBeGreaterThan(2/speed-.3);
  await selectEditorTool(page,'Video','AI editor');await page.getByRole('button',{name:'Undo lightning edit',exact:true}).click();await expect(page.getByText('Lightning + synthesized thunder active.',{exact:true})).toHaveCount(0);expect(posts).toEqual([]);
 });
 
