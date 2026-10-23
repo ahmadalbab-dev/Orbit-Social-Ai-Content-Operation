@@ -1,5 +1,7 @@
 # Orbit AI Gateway routing
 
+**Owner decision, 2026-10-23: deferred.** Keep the current direct Gemini/Cloudflare routes and all paid smoke probes off. Do not retry Gateway activation or request card verification unless the owner reopens this work. The adapter below remains available as inactive code.
+
 Implemented 2026-10-23. All model traffic can use the fixed server-only Gateway Chat Completions endpoint (`https://ai-gateway.vercel.sh/v1/chat/completions`). Direct providers remain selectable for explicit rollback; failures never switch providers or models automatically.
 
 | Flow | Server selection | Reviewed Gateway model |
