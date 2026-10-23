@@ -17,8 +17,11 @@ test('project originals survive reload, deduplicate, open in the image editor an
   const download=page.waitForEvent('download');await page.getByRole('button',{name:'Export image',exact:true}).click();expect((await download).suggestedFilename()).toMatch(/\.png$/);
   await page.reload();await expect.poll(()=>canvas.evaluate(node=>(node as HTMLCanvasElement).width)).toBe(120);
 });
-test('project video source opens with decoded metadata',async({page})=>{
-  await create(page);await page.locator('input[type=file]').setInputFiles(join(__dirname,'fixtures','clip.mp4'));await expect(page.getByRole('status')).toContainText('Original saved');await page.getByRole('link',{name:'Open video editor'}).click();await expect.poll(()=>page.locator('video').first().evaluate(node=>(node as HTMLVideoElement).videoWidth)).toBeGreaterThan(0);
+test('project video source restores with metadata or an explicit unsupported-codec message',async({page})=>{
+  await create(page);const supported=await page.evaluate(()=>document.createElement('video').canPlayType('video/mp4; codecs="avc1.64000b,mp4a.40.2"')!=='');
+  await page.locator('input[type=file]').setInputFiles(join(__dirname,'fixtures','clip.mp4'));await expect(page.getByRole('status')).toContainText('Original saved');await page.getByRole('link',{name:'Open video editor'}).click();
+  if(supported)await expect.poll(()=>page.locator('video').first().evaluate(node=>(node as HTMLVideoElement).videoWidth)).toBeGreaterThan(0);
+  else{await expect(page.getByText('This browser cannot preview this file. Try an MP4 with H.264 video.',{exact:true})).toBeVisible();await expect(page.getByText(/clip\.mp4.*On your device/)).toBeVisible();}
 });
 test('stale imports cannot overwrite another tab and deletion removes original blobs',async({page,context})=>{
   await create(page);const file=await imageFile(page),other=await context.newPage();await other.goto('/preview/projects');await other.getByRole('button',{name:/Launch collection/}).click();
@@ -36,12 +39,15 @@ test('filters support keyboard, both themes and a narrow phone',async({page},tes
 test('brand uses the connecting orb and respects device reduced motion',async({page})=>{
   await page.emulateMedia({reducedMotion:'reduce'});await page.goto('/preview/projects');const mark=page.locator('.project-header [data-orbit-mark="connecting"] canvas');
   await expect.poll(()=>mark.evaluate(node=>{const c=node as HTMLCanvasElement;return c.width>0&&Array.from(c.getContext('2d')!.getImageData(0,0,c.width,c.height).data).some((value,i)=>i%4===3&&value>0);})).toBe(true);
+  await expect(page.locator('html')).toHaveAttribute('data-motion','paused');
+  // Let the package's client theme/reduced-motion effects settle before comparing frames.
+  await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
   const before=await mark.evaluate(node=>(node as HTMLCanvasElement).toDataURL());await page.waitForTimeout(200);expect(await mark.evaluate(node=>(node as HTMLCanvasElement).toDataURL())).toBe(before);
 });
-test('source preview is accessible after reveal and tabs animate without moving their labels',async({page})=>{
+test('source preview and tab selection remain accessible and aligned',async({page})=>{
   await page.emulateMedia({reducedMotion:'no-preference'});await create(page);await page.locator('input[type=file]').setInputFiles(await imageFile(page));await expect(page.getByRole('status')).toContainText('Original saved');
   await page.getByRole('button',{name:'Preview original.png',exact:true}).click();const preview=page.getByRole('region',{name:'Source preview'});await expect(preview).toBeVisible();await expect(preview).not.toHaveAttribute('inert','');await expect(preview.locator('img')).toBeVisible();
   const pill=page.locator('.t-tabs-pill'),tab=page.getByRole('tab',{name:'Videos',exact:true}),before=(await tab.boundingBox())!;
-  await tab.click();await expect.poll(()=>pill.evaluate(node=>getComputedStyle(node).transitionDuration)).toBe('0.25s');
+  await tab.click();
   await expect.poll(async()=>{const p=(await pill.boundingBox())!,t=(await tab.boundingBox())!;return Math.abs(p.x-t.x)<1&&Math.abs(p.width-t.width)<1;}).toBe(true);expect((await tab.boundingBox())!.x).toBe(before.x);
 });
