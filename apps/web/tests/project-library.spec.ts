@@ -3,11 +3,12 @@ import { join } from "node:path";
 
 async function create(page:Page){await page.goto('/preview/projects');await page.getByLabel('New project name').fill('Launch collection');await page.getByRole('button',{name:'Create project',exact:true}).click();await expect(page.getByRole('heading',{name:'Launch collection',exact:true})).toBeVisible();}
 async function imageFile(page:Page){return {name:'original.png',mimeType:'image/png',buffer:Buffer.from(await page.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=120;canvas.height=80;const ctx=canvas.getContext('2d')!;ctx.fillStyle='#246842';ctx.fillRect(0,0,120,80);return canvas.toDataURL().split(',')[1];}),'base64')};}
-test('project originals survive reload, deduplicate, open in the image editor and export real pixels',async({page})=>{
+test('project originals survive reload, deduplicate, open in the image editor and export real pixels',async({page},testInfo)=>{
   await create(page);const file=await imageFile(page);await page.locator('input[type=file]').setInputFiles(file);
   await expect(page.getByRole('status')).toContainText('Original saved');
   await page.locator('input[type=file]').setInputFiles(file);await expect(page.getByRole('status')).toContainText('already in');
   await expect(page.locator('.source-card')).toHaveCount(1);
+  await page.screenshot({path:testInfo.outputPath('projects-desktop.png'),fullPage:true});
   await page.reload();await page.getByRole('button',{name:/Launch collection.*revision 2/}).click();await expect(page.locator('.source-card')).toHaveCount(1);
   await page.getByRole('link',{name:'Open image editor'}).click();
   const canvas=page.getByLabel('Edited image preview',{exact:true});
@@ -36,4 +37,11 @@ test('brand uses the connecting orb and respects device reduced motion',async({p
   await page.emulateMedia({reducedMotion:'reduce'});await page.goto('/preview/projects');const mark=page.locator('.project-header [data-orbit-mark="connecting"] canvas');
   await expect.poll(()=>mark.evaluate(node=>{const c=node as HTMLCanvasElement;return c.width>0&&Array.from(c.getContext('2d')!.getImageData(0,0,c.width,c.height).data).some((value,i)=>i%4===3&&value>0);})).toBe(true);
   const before=await mark.evaluate(node=>(node as HTMLCanvasElement).toDataURL());await page.waitForTimeout(200);expect(await mark.evaluate(node=>(node as HTMLCanvasElement).toDataURL())).toBe(before);
+});
+test('source preview is accessible after reveal and tabs animate without moving their labels',async({page})=>{
+  await page.emulateMedia({reducedMotion:'no-preference'});await create(page);await page.locator('input[type=file]').setInputFiles(await imageFile(page));await expect(page.getByRole('status')).toContainText('Original saved');
+  await page.getByRole('button',{name:'Preview original.png',exact:true}).click();const preview=page.getByRole('region',{name:'Source preview'});await expect(preview).toBeVisible();await expect(preview).not.toHaveAttribute('inert','');await expect(preview.locator('img')).toBeVisible();
+  const pill=page.locator('.t-tabs-pill'),tab=page.getByRole('tab',{name:'Videos',exact:true}),before=(await tab.boundingBox())!;
+  await tab.click();await expect.poll(()=>pill.evaluate(node=>getComputedStyle(node).transitionDuration)).toBe('0.25s');
+  await expect.poll(async()=>{const p=(await pill.boundingBox())!,t=(await tab.boundingBox())!;return Math.abs(p.x-t.x)<1&&Math.abs(p.width-t.width)<1;}).toBe(true);expect((await tab.boundingBox())!.x).toBe(before.x);
 });

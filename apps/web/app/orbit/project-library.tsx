@@ -8,19 +8,25 @@ import { createProject, deleteProject, importProjectFile, listProjects, projectS
 import type { AssetKind, MediaProject, ProjectAsset } from "./project-document";
 import "./project-motion.css";
 import "./project-library.css";
+import "./workspace-settings.css";
 
 const filters=["all","image","video","audio"] as const;
 const labels={all:"All media",image:"Images",video:"Videos",audio:"Audio"};
 const icons={image:Image,video:Film,audio:Music2};
 function MediaTabs({value,onChange}:{value:typeof filters[number];onChange:(value:typeof filters[number])=>void}) {
-  const bar=useRef<HTMLDivElement>(null),pill=useRef<HTMLSpanElement>(null),initial=useRef(true);
-  useLayoutEffect(()=>{
+  const bar=useRef<HTMLDivElement>(null),pill=useRef<HTMLSpanElement>(null);
+  function measure(snap:boolean){
     const root=bar.current,indicator=pill.current;if(!root||!indicator)return;
-    const measure=(snap:boolean)=>{const tab=root.querySelector<HTMLButtonElement>('[aria-selected="true"]');if(!tab)return;if(snap)indicator.style.transition="none";indicator.style.width=`${tab.offsetWidth}px`;indicator.style.transform=`translateX(${tab.offsetLeft}px)`;if(snap){void indicator.offsetWidth;indicator.style.transition="";}};
-    measure(initial.current);initial.current=false;
-    const observer=new ResizeObserver(()=>measure(true));observer.observe(root);return()=>observer.disconnect();
-  },[value]);
+    const tab=root.querySelector<HTMLButtonElement>('[aria-selected="true"]');if(!tab)return;if(snap)indicator.style.transition="none";indicator.style.width=`${tab.offsetWidth}px`;indicator.style.transform=`translateX(${tab.offsetLeft}px)`;if(snap){void indicator.offsetWidth;indicator.style.transition="";}
+  }
+  useLayoutEffect(()=>{measure(true);const root=bar.current;if(!root)return;const observer=new ResizeObserver(()=>measure(true));observer.observe(root);return()=>observer.disconnect();},[]);
+  useLayoutEffect(()=>measure(false),[value]);
   return <div ref={bar} className="t-tabs" role="tablist" aria-label="Media type"><span ref={pill} className="t-tabs-pill" aria-hidden="true"/>{filters.map((filter,index)=><button key={filter} type="button" role="tab" className="t-tab" id={`project-tab-${filter}`} aria-controls="project-assets" aria-selected={value===filter} tabIndex={value===filter?0:-1} onClick={()=>onChange(filter)} onKeyDown={event=>{let next=index;if(event.key==="ArrowRight")next=(index+1)%filters.length;else if(event.key==="ArrowLeft")next=(index+filters.length-1)%filters.length;else if(event.key==="Home")next=0;else if(event.key==="End")next=filters.length-1;else return;event.preventDefault();onChange(filters[next]);bar.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next].focus();}}>{labels[filter]}</button>)}</div>;
+}
+function SourcePreview({project,asset,onClose}:{project:MediaProject;asset:ProjectAsset;onClose:()=>void}) {
+  const [open,setOpen]=useState(false);
+  useEffect(()=>{let second=0;if(matchMedia('(prefers-reduced-motion: reduce)').matches||document.documentElement.dataset.motion==='paused'){setOpen(true);return;}const first=requestAnimationFrame(()=>{second=requestAnimationFrame(()=>setOpen(true));});return()=>{cancelAnimationFrame(first);cancelAnimationFrame(second);};},[]);
+  return <section className="project-preview t-panel-slide" data-open={open} aria-hidden={!open} inert={!open} aria-label="Source preview"><div><h3>{asset.name}</h3><button className="text-action" onClick={onClose}>Close preview</button></div><AssetPreview project={project} asset={asset}/></section>;
 }
 function AssetPreview({project,asset}:{project:MediaProject;asset:ProjectAsset}) {
   const [url,setUrl]=useState(""),[error,setError]=useState("");
@@ -51,7 +57,7 @@ export function ProjectLibrary({preview=false}:{preview?:boolean}) {
       {project?<><div className="project-main-heading"><div><p className="eyebrow">SOURCE MEDIA</p><h2>{project.title}</h2></div><button className="orbit-button orbit-button-default" disabled={busy} onClick={()=>input.current?.click()}><Upload size={17}/>Import media</button><input ref={input} type="file" hidden accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime,audio/mpeg,audio/wav,audio/ogg,audio/mp4" onChange={event=>{const file=event.target.files?.[0];event.target.value="";if(file)void action(async()=>{const next=await importProjectFile(project.id,project.revision,file);await refresh();setNotice(next.revision===project.revision?"This original is already in the project.":"Original saved on this device. No file was uploaded.");});}}/></div>
       <div className="project-filters"><MediaTabs value={filter} onChange={setFilter}/><label><span className="sr-only">Find source media</span><input type="search" placeholder="Find a file…" value={query} onChange={e=>setQuery(e.target.value)} aria-label="Find source media"/></label></div>
       <div id="project-assets" role="tabpanel" aria-labelledby={`project-tab-${filter}`} tabIndex={0} className="project-assets">{visible.length?visible.map(item=>{const Icon=icons[item.kind];return <article key={item.id} className="source-card"><button className="source-preview-button" aria-label={`Preview ${item.name}`} onClick={()=>setAssetId(item.id)}><Icon size={36}/><span>{item.kind}</span></button><h3 title={item.name}>{item.name}</h3><p>{(item.bytes/1024/1024).toFixed(2)} MB · Original</p>{item.kind!=="audio"?<a className="project-editor-link" href={`${editor}/${item.kind}?project=${project.id}&asset=${item.id}`}>Open {item.kind} editor<ArrowUpRight size={15}/></a>:<button className="project-editor-link" onClick={()=>setAssetId(item.id)}>Listen<Music2 size={15}/></button>}</article>;}):<div className="project-empty"><Upload size={32}/><h3>{project.assets.length?"No matching files":"Start with your own media"}</h3><p>{project.assets.length?"Try another filter or file name.":"Import an image, video or audio file. Your original is kept unchanged."}</p></div>}</div>
-      {asset?<section className="project-preview t-panel-slide" data-open="true" aria-label="Source preview"><div><h3>{asset.name}</h3><button className="text-action" onClick={()=>setAssetId("")}>Close preview</button></div><AssetPreview key={asset.id} project={project} asset={asset}/></section>:null}
+      {asset?<SourcePreview key={asset.id} project={project} asset={asset} onClose={()=>setAssetId("")}/>:null}
       <div className="project-footer"><span>Saved on this device · {project.assets.length}/100 files</span><button className="text-action" disabled={busy} onClick={()=>{if(window.confirm(`Delete “${project.title}” and its source files from this device?`))void action(async()=>{await deleteProject(project);await refresh();setSelected("");setAssetId("");setNotice("Device project deleted.");});}}><Trash2 size={15}/>Delete project</button></div>
       </>:<div className="project-welcome"><div className="project-welcome-art"><OrbitMark/></div><h2>Make room for something good.</h2><p>Create a project or open one from your library.</p><div className="project-kind-cards">{(["image","video","audio"] as AssetKind[]).map(kind=>{const Icon=icons[kind];return <div key={kind}><Icon size={24}/><strong>{labels[kind]}</strong><span>Your originals. One project.</span></div>;})}</div></div>}
     </section></div><p role="status" className="project-notice">{notice}</p>
