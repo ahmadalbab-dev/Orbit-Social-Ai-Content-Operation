@@ -31,7 +31,7 @@ it.each([[403,'access_denied'],[429,'rate_limited'],[500,'upstream']])('does not
   const response=await searchMusic(request(`q=private-input-${status}`),vi.fn().mockResolvedValue(new Response('secret-provider-body',{status:Number(status)})));
   expect(response.headers.get('cache-control')).toBe('no-store');
   expect(await response.json()).toMatchObject({mode:'starter',reason,requestId:expect.any(String)});
-  expect(warn).toHaveBeenCalledWith('orbit.music.search',{reason,upstreamStatus:status,requestId:expect.any(String)});
+  expect(warn).toHaveBeenCalledWith('orbit.music.search',{reason,phase:'catalogue',upstreamStatus:status,requestId:expect.any(String)});
   expect(JSON.stringify(warn.mock.calls)).not.toMatch(/private-input|secret-provider-body|Bearer/);
  }finally{warn.mockRestore();}
 });
@@ -53,6 +53,21 @@ it('fails partial registered credentials before provider dispatch without leakin
   expect(body).toMatchObject({mode:'starter',reason:'auth_configuration'});expect(response.headers.get('cache-control')).toBe('no-store');expect(fetcher).not.toHaveBeenCalled();
   expect(JSON.stringify([body,warn.mock.calls])).not.toContain('private-client-only');
  }finally{warn.mockRestore();vi.unstubAllEnvs();}
+});
+it('distinguishes a stalled token exchange from a failed catalogue request in private diagnostics',async()=>{
+ vi.stubEnv('OPENVERSE_CLIENT_ID','diagnostic-client');vi.stubEnv('OPENVERSE_CLIENT_SECRET','diagnostic-secret');
+ const signal=AbortSignal.abort(new DOMException('Timed out','TimeoutError'));
+ const deadline=vi.spyOn(AbortSignal,'timeout').mockReturnValue(signal),warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+ try{
+  const fetcher=vi.fn().mockRejectedValue(new DOMException('Timed out','TimeoutError'));
+  const body=await(await searchMusic(request('q=token-deadline-diagnostic'),fetcher)).json();
+  expect(body).toMatchObject({mode:'starter',reason:'timeout'});
+  expect(deadline).toHaveBeenCalledWith(12000);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(warn).toHaveBeenCalledWith('orbit.music.search',{requestId:expect.any(String),reason:'timeout',phase:'authentication'});
+  expect(body).not.toHaveProperty('phase');
+  expect(JSON.stringify([body,warn.mock.calls])).not.toMatch(/diagnostic-client|diagnostic-secret|token-deadline-diagnostic/);
+ }finally{deadline.mockRestore();warn.mockRestore();vi.unstubAllEnvs();}
 });
 it('does not replay a rejected bearer search and refreshes on the next explicit search',async()=>{
  vi.stubEnv('OPENVERSE_CLIENT_ID','recovery-client');vi.stubEnv('OPENVERSE_CLIENT_SECRET','recovery-secret');

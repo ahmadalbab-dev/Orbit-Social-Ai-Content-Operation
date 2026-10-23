@@ -23,17 +23,22 @@ export async function searchMusic(request: Request, fetcher: typeof fetch = fetc
   if (saved && saved.expires > Date.now()) return reply(saved.body);
   const unavailable = { results: [], mode: 'starter', notice: 'Live music search is temporarily unavailable. The included CC0 starter tracks below are ready to preview and use.' };
   const requestId = crypto.randomUUID();
+  let phase: 'admission' | 'authentication' | 'catalogue' = 'admission';
   const degraded = (reason: string, upstreamStatus?: number) => {
-    console.warn('orbit.music.search', {requestId, reason, ...(upstreamStatus === undefined ? {} : {upstreamStatus})});
+    console.warn('orbit.music.search', {requestId, reason, phase, ...(upstreamStatus === undefined ? {} : {upstreamStatus})});
     return reply({...unavailable, reason, requestId}, 200, false);
   };
   if (active >= 4) return degraded('capacity');
   let reason = 'network', upstreamStatus: number | undefined;
-  const signal = AbortSignal.timeout(8000);
+  // Token acquisition and catalogue search share one deadline, with headroom
+  // below the route's 15-second function limit for response serialization.
+  const signal = AbortSignal.timeout(12000);
   active++;
   try {
     const url = new URL(ENDPOINT); url.search = new URLSearchParams({ q: term, license: 'cc0', source: 'freesound', page_size: '40' }).toString();
+    phase = 'authentication';
     const token = await catalogueToken({clientId: process.env.OPENVERSE_CLIENT_ID, clientSecret: process.env.OPENVERSE_CLIENT_SECRET}, fetcher, signal);
+    phase = 'catalogue';
     const response = await fetcher(url.href, { method: 'GET', credentials: 'omit', redirect: 'error', cache: 'no-store', signal, headers: { Accept: 'application/json', ...(token ? {Authorization: `Bearer ${token}`} : {}) } });
     if (!response.ok) { if (response.status === 401 && token) catalogueToken.invalidate(token); upstreamStatus = response.status; reason = response.status === 429 ? 'rate_limited' : response.status === 401 || response.status === 403 ? 'access_denied' : 'upstream'; await response.body?.cancel(); throw Error('Catalogue unavailable'); }
     reason = 'invalid_response';
