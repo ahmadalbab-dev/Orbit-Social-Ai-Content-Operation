@@ -46,7 +46,7 @@ export function ProjectLibrary({preview=false}:{preview?:boolean}) {
   useEffect(()=>{let active=true;void listProjects().then(next=>{if(active)setProjects(next);}).catch(()=>{if(active)setNotice("Device storage is unavailable. Your existing server drafts are unaffected.");}).finally(()=>{if(active)setReady(true);});return()=>{active=false;};},[]);
   async function action(task:()=>Promise<void>){if(busy)return;setBusy(true);setNotice("");try{await task();}catch(error){setNotice(error instanceof Error?error.message:"The project could not be saved.");await refresh().catch(()=>{});}finally{setBusy(false);}}
   const visible=project?.assets.filter(item=>(filter==="all"||item.kind===filter)&&item.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()))??[];
-  return <main className="project-library">
+  return <main className="orbit-shell project-library">
     <header className="project-header"><a className="brand-word" href={home} aria-label="Orbit home"><OrbitMark small/><span>orbit<span className="word-dot">.</span></span></a><span className="project-device-badge">Device library</span><AppearanceToggle/></header>
     <section className="project-intro"><a href={`${home}?view=studio`} className="project-back"><ArrowLeft size={16}/>Back to Studio</a><p className="eyebrow">YOUR CREATIVE WORKSPACE</p><h1>A place for<br/><em>your next idea.</em></h1><p>Bring your images, video and sound together. Open a source in the editor when you are ready.</p></section>
     <div className="project-workspace"><aside className="project-sidebar"><div className="project-section-label"><Folder size={18}/><h2>Projects</h2><span>{projects.length}</span></div>
