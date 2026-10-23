@@ -37,3 +37,5 @@ overrides:
   multer: 2.4.0
   source-map-js: 1.2.2
   proxy-addr: 2.0.8
+  body-parser@^2.0.0: 2.4.0
+  zod: 4.6.6
