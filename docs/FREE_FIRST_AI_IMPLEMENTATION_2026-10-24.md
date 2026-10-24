@@ -217,3 +217,11 @@ Trusted Source. Configuration has **not** been changed by this patch:
 
 Do not disable Deployment Protection or distribute a long-lived bypass secret.
 Reference: https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/trusted-sources
+
+OIDC repair validation:24 relay tests passed, including new fresh-token,
+user-header isolation, non-Vercel destination, missing-token and pre-auth/size
+cases. A frozen offline install on DESKTOP-ALBAB, web TypeScript and production
+Next build passed with the declared dependency. The earlier15-relay-test total
+is superseded by24 (108 API/provider +24 relay =132 focused unit tests); the14
+browser cases remain the UI acceptance scope. Trusted Sources membership and a
+real signed-in inference request remain separate deployed acceptance conditions.
