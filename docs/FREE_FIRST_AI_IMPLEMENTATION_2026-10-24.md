@@ -248,3 +248,27 @@ upload, database write, provider fallback or output/key logging. It requires bot
 selected providers and the Gemini data-policy opt-in before loading providers.
 Eleven release/probe guard tests passed. The switch must be restored to its
 original `false` immediately after this bounded acceptance run.
+
+## Completed live provider acceptance
+
+Feature commit `be02edb56297293baf14b91fe4113ea2a2082f6b` was tested by the
+explicit focused scope in API Preview deployment
+`dpl_5QpBjxikinFRg6GeKfCuckMFoVA5`:
+
+- `ORBIT_GEMINI_SMOKE studio PASS`: a real Gemini response passed the existing
+  Studio variant/domain validation with public synthetic copy.
+- `ORBIT_GEMINI_SMOKE image-generation PASS`: a real Cloudflare prompt-only
+  response passed the bounded image parser; JPEG,493,408 bytes, zero reference
+  images. No personal file was uploaded.
+- Both provider requests returned HTTP200. There was no provider fallback,
+  automatic repeat, database draft/quota write or actual publishing in this probe.
+- The branch-scoped `ORBIT_GEMINI_SMOKE_ON_BUILD` setting was restored to `false`
+  immediately afterward and the readback verified it. Keep it disabled; do not
+  repeat successful inference just to refresh this report.
+
+This supersedes the earlier pending direct-provider acceptance. The web→API
+transport repair and provider inference are now verified separately. Complete
+signed-in browser save/reload, image export and plan entitlement acceptance are
+not asserted by this synthetic run. Existing UI behavior was verified by the14
+intercepted browser cases recorded above. Production was not promoted, keys were
+not changed, and account billing/free-tier status was not inferred from HTTP200.
