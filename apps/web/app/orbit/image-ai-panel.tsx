@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Sparkles, X } from "lucide-react";
 import { api, apiResponse } from "./session-api";
+import {AiChat,useAiConversation} from "./ai-chat";
 import { Button } from "./ui";
 
 type Props = {
@@ -23,6 +24,7 @@ export function ImageAiPanel({
   onResult,
   onBusyChange,
 }: Props) {
+  const conversation=useAiConversation();
   const [prompt, setPrompt] = useState("");
   const [createNew, setCreateNew] = useState(false);
   const [canGenerate, setCanGenerate] = useState(false);
@@ -66,6 +68,7 @@ export function ImageAiPanel({
     setBusy(true);
     onBusyChange?.(true);
     setNotice("");
+    conversation.record("user",prompt.trim());
     try {
       let payload: {prompt:string;imageDataUrl?:string} = {prompt:prompt.trim()};
       if (canvas) {
@@ -100,10 +103,12 @@ export function ImageAiPanel({
         throw Error("AI returned an image that is too large.");
       if (controller.signal.aborted || pending.current !== controller) return;
       await onResult(blob);
+      conversation.record("assistant",createNew?"Your image is ready on the canvas. Review it, edit it or restore the previous composition with Undo.":"Your edited image is ready on the canvas. Review it before exporting.");
       setNotice(
         createNew ? "AI image generated. Review and edit it before exporting. Undo restores your previous composition." : "AI edit loaded. Review it before exporting. Your original file is unchanged.",
       );
     } catch (error) {
+      if(pending.current===controller)conversation.record("notice",controller.signal.aborted?"Image request cancelled. A dispatched attempt may still count toward quota.":error instanceof Error?error.message:"AI imaging did not complete.");
       if (pending.current === controller)
         setNotice(
           controller.signal.aborted
@@ -121,7 +126,8 @@ export function ImageAiPanel({
     }
   }
   return (
-    <section className="image-ai-panel" aria-label="AI image editing">
+    <section className="image-ai-panel orbit-chat-surface" aria-label="AI image editing">
+      <AiChat title={createNew?"Imagine your next image.":"A new look for your image."} description="Describe your idea, review the result on your canvas, then refine and export." context="Media · Image generation" conversation={conversation} busy={busy}>
       {canGenerate?<div role="group" aria-label="AI image task"><Button variant="outline" disabled={busy} aria-pressed={!createNew} onClick={()=>{setCreateNew(false);setNotice("");}}>Edit current image</Button><Button variant="outline" disabled={busy} aria-pressed={createNew} onClick={()=>{setCreateNew(true);setNotice("");}}>Create from text</Button></div>:null}
       <h3>
         <Sparkles size={18} aria-hidden="true" /> {createNew?"Create with AI":"Edit with AI"}
@@ -166,6 +172,7 @@ export function ImageAiPanel({
       ) : !configured ? (
         <p>AI image connection is not available yet. Local editing is ready.</p>
       ) : null}
+      </AiChat>
       {notice ? (
         <p role="status" className="action-notice">
           {notice}

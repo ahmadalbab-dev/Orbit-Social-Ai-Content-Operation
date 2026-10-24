@@ -29,6 +29,9 @@ test('Studio stages the active draft for AI rewrite without sending it until Gen
  await expect(connection).toContainText('Google may use your brief');
  await expect(connection).toContainText('Configuration check only');
  await expect(page.getByRole('button',{name:'Generate AI content'})).toBeEnabled();
+ await page.getByRole('button',{name:'Find content ideas',exact:true}).click();
+ await expect(page.getByRole('combobox',{name:'AI content task'})).toHaveValue('ideas');
+ expect(writes).toBe(0);expect(generations).toHaveLength(0);
  await page.getByRole('combobox',{name:'Open saved draft'}).selectOption('draft-one');
  await page.getByRole('button',{name:'Use this draft for AI rewrite'}).click();
  const brief=page.getByRole('textbox',{name:'Your idea or text'});
@@ -59,6 +62,14 @@ test('Studio stages the active draft for AI rewrite without sending it until Gen
  await expect(page.getByRole('textbox',{name:'facebook copy',exact:true})).toHaveValue('AI rewritten public fixture');
  expect(generations).toEqual([{brandId:'brand-one',topic:original,platforms:['facebook'],mode:'rewrite',language:'Bahasa Melayu'}]);
  expect(brands).toBe(1);expect(writes).toBe(2);
+ const chat=page.getByRole('region',{name:'What would you like to create? chat',exact:true});
+ const messages=chat.getByRole('log');
+ await expect(messages.getByRole('listitem')).toHaveCount(2);
+ await expect(messages).toContainText('AI rewritten public fixture');
+ await chat.getByRole('button',{name:'Clear messages',exact:true}).click();
+ await expect(chat.getByRole('log')).toHaveCount(0);
+ await expect(page.getByRole('textbox',{name:'facebook copy',exact:true})).toHaveValue('AI rewritten public fixture');
+ expect(generations).toHaveLength(1);expect(writes).toBe(2);
  statusAvailable=false;
  await page.getByRole('button',{name:'Check setup'}).click();
  await expect(connection).toContainText('AI status unavailable');

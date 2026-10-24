@@ -180,6 +180,11 @@ test('Cloudflare creates from text without an upload, restores with Undo and pre
  expect(prompts).toEqual([{prompt:'A green ceramic cup on a cream background'}]);
  const canvas=page.getByLabel('Edited image preview',{exact:true});
  await expect(canvas).toBeVisible();
+ const chat=page.getByRole('region',{name:'Imagine your next image. chat',exact:true});
+ await expect(chat.getByRole('log').getByRole('listitem')).toHaveCount(2);
+ await chat.getByRole('button',{name:'Clear messages',exact:true}).click();
+ await expect(chat.getByRole('log')).toHaveCount(0);
+ expect(prompts).toHaveLength(1);
  // Browser colour management may round a decoded RGB channel by one unit.
  await expect.poll(()=>canvas.evaluate(n=>{const pixel=Array.from((n as HTMLCanvasElement).getContext('2d')!.getImageData(50,50,1,1).data);return Math.max(...pixel.map((value,index)=>Math.abs(value-[0,255,0,255][index])));})).toBeLessThanOrEqual(1);
  await selectEditorTool(page,'Image','Export');
