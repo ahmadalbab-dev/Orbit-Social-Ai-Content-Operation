@@ -10,6 +10,28 @@ export function textAiConfig(env: NodeJS.ProcessEnv = process.env) {
   const configured = validProvider && (provider !== "gemini" || env.GEMINI_ALLOW_UNPAID_DATA_USE === "true") && Boolean(apiKey?.trim()) && !/[\r\n]/.test(apiKey ?? "") && (model === undefined || isValidTextModel(model, provider));
   return { provider: validProvider ? provider : null, configured, apiKey, model };
 }
+/** Configuration metadata only: never probe inference or read workspace usage. */
+export function textAiStatus(env: NodeJS.ProcessEnv = process.env) {
+  const { configured, provider, model } = textAiConfig(env);
+  const unpaidDataUse = provider === "gemini";
+  return {
+    configured,
+    provider,
+    verified: false,
+    // A missing optional model means the existing provider uses its own default.
+    // Never echo an invalid or unconfigured environment value to a client.
+    model: configured ? model ?? null : null,
+    privacy: {
+      unpaidDataUse,
+      unpaidDataUseAcknowledged: unpaidDataUse && env.GEMINI_ALLOW_UNPAID_DATA_USE === "true",
+      previewSharingAllowed: configured && (
+        (provider === "gemini" && env.GEMINI_ALLOW_PREVIEW_SHARING === "true") ||
+        (provider === "gateway" && env.AI_GATEWAY_ALLOW_PREVIEW_SHARING === "true") ||
+        provider === "groq"
+      ),
+    },
+  };
+}
 /** Read the current Vercel request context on every call; never cache OIDC tokens. */
 export function gatewayCredential(env: NodeJS.ProcessEnv = process.env) {
   let gatewayToken = env.AI_GATEWAY_API_KEY;

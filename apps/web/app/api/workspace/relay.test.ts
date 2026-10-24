@@ -67,3 +67,17 @@ it('isolates TikTok browser binding and keeps the same-origin start requirement'
  expect((await relayWorkspace(request(segments.join('/'),{method:'POST',body:'{}'}),segments,fetcher)).status).toBe(403);expect(fetcher).not.toHaveBeenCalled();
  const response=await relayWorkspace(request(segments.join('/'),{method:'POST',headers:{Origin:origin},body:'{}'}),segments,fetcher);expect(response.status).toBe(200);expect(response.headers.get('set-cookie')).toMatch(/orbit_oauth_tiktok=[A-Za-z0-9_-]{43};/);expect(response.headers.get('set-cookie')).toContain('HttpOnly; SameSite=Lax; Max-Age=600; Secure');
 });
+
+it('relays only the exact authenticated image generation POST and keeps output private',async()=>{
+ vi.stubEnv('NEXT_PUBLIC_API_URL','https://api.orbit.test');
+ const fetcher=vi.fn(async(..._args:Parameters<typeof fetch>)=>new Response(new Uint8Array([137,80,78,71]),{headers:{'content-type':'image/png'}}));
+ const body=JSON.stringify({prompt:'A public test cup'});
+ const response=await relayWorkspace(request('media/image-edit/generate',{method:'POST',body}),['media','image-edit','generate'],fetcher);
+ expect(response.status).toBe(200);expect(response.headers.get('content-type')).toBe('image/png');expect(response.headers.get('cache-control')).toBe('private, no-store');
+ expect(fetcher).toHaveBeenCalledWith('https://api.orbit.test/v1/media/image-edit/generate',expect.objectContaining({method:'POST'}));
+ expect(new TextDecoder().decode(fetcher.mock.calls[0][1]?.body as Uint8Array)).toBe(body);
+ const denied=vi.fn();
+ expect((await relayWorkspace(request('media/image-edit/generate'),['media','image-edit','generate'],denied)).status).toBe(404);
+ expect((await relayWorkspace(request('media/image-edit/generate/other',{method:'POST',body}),['media','image-edit','generate','other'],denied)).status).toBe(404);
+ expect(denied).not.toHaveBeenCalled();
+});

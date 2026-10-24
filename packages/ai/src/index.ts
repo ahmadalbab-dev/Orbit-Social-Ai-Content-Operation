@@ -64,7 +64,7 @@ export { GeminiVideoPlanner, GroqVideoPlanner, HuggingFaceVideoPlanner, parseVid
 export type { VideoPlan } from "./huggingface-video-plan.js";
 export {EditorPlanner,validateEditorInput,parseEditorPlan} from './editor-planner.js';
 export { GeminiImageEditor, GEMINI_IMAGE_MODEL, GEMINI_IMAGE_ENDPOINT, parseGeminiImageResponse } from './gemini-image.js';
-export { CloudflareImageEditor, CLOUDFLARE_IMAGE_MODEL, parseCloudflareImageResponse, validateCloudflareImageEdit } from './cloudflare-image.js';
+export { CloudflareImageEditor, CLOUDFLARE_IMAGE_MODEL, parseCloudflareImageResponse, validateCloudflareImageEdit, validateCloudflareImageGeneration } from './cloudflare-image.js';
 
 export { DEFAULT_GEMINI_TEXT_MODEL, GEMINI_FREE_TEXT_MODELS } from './gemini-text.js';
 

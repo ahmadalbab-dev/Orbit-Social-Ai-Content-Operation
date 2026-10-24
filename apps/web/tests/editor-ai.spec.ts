@@ -148,3 +148,46 @@ test('replacing same-aspect media rejects a pending preview-guided AI proposal w
   await selectEditorTool(page, 'Image', 'Adjust & text');
   await expect(page.getByLabel('Image caption', { exact: true })).toHaveValue('');
 });
+
+test('Cloudflare creates from text without an upload, restores with Undo and preserves the editor on quota failure',async({page})=>{
+ const prompts:unknown[]=[];let refuse=false;let output:Buffer;
+ await page.route('**/api/auth/session',route=>route.fulfill({json:{access_token:'fixture-editor-token',expires_in:3600,refreshable:true}}));
+ await page.route('https://auth.orbit.test/auth/v1/user',route=>route.fulfill({json:{email_confirmed_at:'2026-10-17T00:00:00Z'}}));
+ await page.route('**/api/workspace/**',route=>{
+  const path=new URL(route.request().url()).pathname;
+  if(path.endsWith('/media/image-edit/generate')){
+   prompts.push(route.request().postDataJSON());
+   return refuse?route.fulfill({status:429,json:{message:'AI provider quota reached. Try again after it resets.'}}):route.fulfill({status:200,contentType:'image/png',body:output});
+  }
+  const body=path.endsWith('/workspaces')?[{id:'fixture-workspace',name:'Editor test',role:'OWNER'}]
+   :path.endsWith('/media/image-edit/status')?{configured:true,provider:'cloudflare',canGenerate:true,verified:false}
+   :path.endsWith('/media/status')?{configured:false,limits:{uploadBytes:25000000,maxDuration:120}}
+   :path.endsWith('/integrations/status')?{providers:{}}:[];
+  return route.fulfill({json:body});
+ });
+ await page.goto('/editor/image');
+ output=Buffer.from(await page.evaluate(()=>{const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d')!;x.fillStyle='#00ff00';x.fillRect(0,0,128,128);return c.toDataURL().split(',')[1];}),'base64');
+ await selectEditorTool(page,'Image','AI editor');
+ await page.getByText('Generate a new background or visual with AI',{exact:true}).click();
+ await page.getByRole('button',{name:'Create from text',exact:true}).click();
+ const prompt=page.getByRole('textbox',{name:'AI image generation prompt',exact:true});
+ await expect(prompt).toHaveAttribute('maxlength','1500');
+ await prompt.fill('A green ceramic cup on a cream background');
+ await expect(page.getByText(/no current image or original file is uploaded/)).toBeVisible();
+ expect(prompts).toEqual([]);
+ await page.getByRole('button',{name:'Generate image with AI',exact:true}).click();
+ await expect(page.getByText('AI image generated. Review and edit it before exporting. Undo restores your previous composition.',{exact:true})).toBeVisible();
+ expect(prompts).toEqual([{prompt:'A green ceramic cup on a cream background'}]);
+ const canvas=page.getByLabel('Edited image preview',{exact:true});
+ await expect(canvas).toBeVisible();
+ await expect.poll(()=>canvas.evaluate(n=>Array.from((n as HTMLCanvasElement).getContext('2d')!.getImageData(50,50,1,1).data))).toEqual([0,255,0,255]);
+ await selectEditorTool(page,'Image','Export');
+ await page.getByRole('button',{name:'Undo last composition',exact:true}).click();
+ await expect(canvas).toBeHidden();
+ await selectEditorTool(page,'Image','AI editor');
+ refuse=true;
+ await page.getByRole('button',{name:'Generate image with AI',exact:true}).click();
+ await expect(page.getByText('AI provider quota reached. Try again after it resets.',{exact:true})).toBeVisible();
+ await expect(canvas).toBeHidden();
+ expect(prompts).toHaveLength(2);
+});

@@ -36,6 +36,74 @@ afterEach(() => {
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
+
+describe("Cloudflare text-to-image generation", () => {
+  const prompt = {prompt: "A ceramic cup on a blue table"};
+  function configure() {
+    vi.stubEnv("AI_IMAGE_PROVIDER", "cloudflare");
+    vi.stubEnv("CLOUDFLARE_API_TOKEN", "cloudflare_fixture");
+    vi.stubEnv("CLOUDFLARE_ACCOUNT_ID", "a".repeat(32));
+  }
+  it("advertises generation only for configured, explicitly selected Cloudflare", () => {
+    configure();
+    expect(setup().service.status().canGenerate).toBe(true);
+    vi.stubEnv("CLOUDFLARE_API_TOKEN", "");
+    expect(setup().service.status().canGenerate).toBe(false);
+    vi.stubEnv("AI_IMAGE_PROVIDER", "gemini"); vi.stubEnv("GEMINI_API_KEY", "retained-key");
+    expect(setup().service.status()).toMatchObject({configured: true, canGenerate: false});
+  });
+  it("checks role and strict input before billing, quota and generation", async () => {
+    configure();
+    const ctx = setup(), cf = vi.spyOn(CloudflareImageEditor.prototype, "generate");
+    await expect(ctx.service.generate({...identity, role: "VIEWER"}, prompt)).rejects.toThrow("Role");
+    for (const value of [{}, {prompt: " "}, {prompt: "x".repeat(1501)}, {...prompt, url: "https://private.test/image"}, {...prompt, imageDataUrl: input.imageDataUrl}])
+      await expect(ctx.service.generate(identity, value)).rejects.toThrow("only a prompt");
+    expect(ctx.requirePaidAccess).not.toHaveBeenCalled();
+    expect(ctx.upsert).not.toHaveBeenCalled(); expect(ctx.updateMany).not.toHaveBeenCalled();
+    expect(cf).not.toHaveBeenCalled();
+  });
+  it("reserves one shared attempt before dispatching a trimmed prompt without an image", async () => {
+    configure();
+    const ctx = setup(), output = {bytes: new Uint8Array([1]), contentType: "image/png"};
+    const cf = vi.spyOn(CloudflareImageEditor.prototype, "generate").mockResolvedValue(output);
+    const edit = vi.spyOn(CloudflareImageEditor.prototype, "edit");
+    expect(await ctx.service.generate(identity, {prompt: `  ${prompt.prompt}  `})).toBe(output);
+    expect(ctx.requirePaidAccess).toHaveBeenCalledExactlyOnceWith("ws");
+    expect(ctx.updateMany).toHaveBeenCalledOnce();
+    expect(ctx.updateMany).toHaveBeenCalledWith(expect.objectContaining({where: expect.objectContaining({workspaceId: "ws", used: {lt: 100}}), data: {used: {increment: 1}}}));
+    expect(ctx.updateMany.mock.invocationCallOrder[0]).toBeLessThan(cf.mock.invocationCallOrder[0]);
+    expect(cf).toHaveBeenCalledExactlyOnceWith(prompt);
+    expect(edit).not.toHaveBeenCalled();
+  });
+  it("rejects unavailable configuration and other selected providers without reserving quota or falling back", async () => {
+    configure();
+    const ctx = setup(), cf = vi.spyOn(CloudflareImageEditor.prototype, "generate");
+    const hf = vi.spyOn(HuggingFaceImageEditor.prototype, "edit"), gemini = vi.spyOn(GeminiImageEditor.prototype, "edit");
+    vi.stubEnv("CLOUDFLARE_API_TOKEN", "");
+    await expect(ctx.service.generate(identity, prompt)).rejects.toThrow("not configured");
+    vi.stubEnv("CLOUDFLARE_API_TOKEN", "retained-token"); vi.stubEnv("AI_IMAGE_PROVIDER", "gemini"); vi.stubEnv("GEMINI_API_KEY", "retained-key");
+    await expect(ctx.service.generate(identity, prompt)).rejects.toThrow("not configured");
+    expect(ctx.requirePaidAccess).not.toHaveBeenCalled(); expect(ctx.updateMany).not.toHaveBeenCalled();
+    expect(cf).not.toHaveBeenCalled(); expect(hf).not.toHaveBeenCalled(); expect(gemini).not.toHaveBeenCalled();
+  });
+  it("does not dispatch after billing denial or exhausted quota", async () => {
+    configure();
+    const cf = vi.spyOn(CloudflareImageEditor.prototype, "generate");
+    const quota = setup(0);
+    await expect(quota.service.generate(identity, prompt)).rejects.toThrow("quota reached");
+    const billing = setup(); billing.requirePaidAccess.mockRejectedValue(Error("billing denied"));
+    await expect(billing.service.generate(identity, prompt)).rejects.toThrow("billing denied");
+    expect(billing.updateMany).not.toHaveBeenCalled(); expect(cf).not.toHaveBeenCalled();
+  });
+  it("keeps a failed dispatch metered once and preserves safe errors without fallback", async () => {
+    configure();
+    const ctx = setup(), cf = vi.spyOn(CloudflareImageEditor.prototype, "generate").mockRejectedValue(new AiProviderError("rate_limited"));
+    const hf = vi.spyOn(HuggingFaceImageEditor.prototype, "edit"), gemini = vi.spyOn(GeminiImageEditor.prototype, "edit");
+    await expect(ctx.service.generate(identity, prompt)).rejects.toMatchObject({response: expect.objectContaining({code: "AI_RATE_LIMITED"})});
+    expect(ctx.updateMany).toHaveBeenCalledOnce(); expect(cf).toHaveBeenCalledOnce();
+    expect(hf).not.toHaveBeenCalled(); expect(gemini).not.toHaveBeenCalled();
+  });
+});
 describe("Image AI metering", () => {
   it("returns truthful configuration without claiming provider verification", () => {
     vi.stubEnv("HF_TOKEN", "");

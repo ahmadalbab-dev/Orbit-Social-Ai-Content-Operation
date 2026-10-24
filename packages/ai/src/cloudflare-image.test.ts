@@ -4,6 +4,7 @@ import {
   CloudflareImageEditor,
   parseCloudflareImageResponse,
   validateCloudflareImageEdit,
+  validateCloudflareImageGeneration,
 } from "./cloudflare-image";
 
 const png = Buffer.from(
@@ -19,6 +20,57 @@ const result = (image: unknown = png.toString("base64")) => ({
   success: true,
   errors: [],
   result: { image },
+});
+
+describe("Cloudflare prompt-only generation", () => {
+  it("uses the fixed model once with prompt and fixed size, without an image or URL fetch", async () => {
+    const fetcher = vi.fn().mockResolvedValue(Response.json(result()));
+    const output = await new CloudflareImageEditor("token_fixture", accountId, fetcher).generate({ prompt: "  A ceramic cup on a blue table  " });
+    expect(Buffer.from(output.bytes)).toEqual(png);
+    expect(fetcher).toHaveBeenCalledOnce();
+    const [url, request] = fetcher.mock.calls[0];
+    expect(url).toBe(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${CLOUDFLARE_IMAGE_MODEL}`);
+    const body = request.body as FormData;
+    expect([...body.keys()]).toEqual(["prompt", "width", "height"]);
+    expect(body.get("prompt")).toBe("A ceramic cup on a blue table");
+    expect(body.get("width")).toBe("1024");
+    expect(body.get("height")).toBe("1024");
+    expect(request).toMatchObject({ method: "POST", redirect: "error", credentials: "omit", headers: { Authorization: "Bearer token_fixture" } });
+    expect(request.signal).toBeInstanceOf(AbortSignal);
+    expect(request.headers).not.toHaveProperty("Content-Type");
+  });
+
+  it.each([null, [], {}, "a prompt", {prompt: " "}, {prompt: 2}, {prompt: "x".repeat(1501)},
+    {prompt: "A cup", imageDataUrl: input.imageDataUrl}, {prompt: "A cup", url: "https://private.test/asset"},
+    {prompt: "A cup", width: 1920}, {prompt: "A cup", model: "another-model"}])(
+    "rejects invalid generation input before dispatch: %j", async value => {
+      const fetcher = vi.fn();
+      expect(() => validateCloudflareImageGeneration(value)).toThrow();
+      await expect(new CloudflareImageEditor("token_fixture", accountId, fetcher).generate(value)).rejects.toThrow();
+      expect(fetcher).not.toHaveBeenCalled();
+    },
+  );
+
+  it("uses the same bounded response reader for generation and never returns remote URLs", async () => {
+    const cancel = vi.fn(), chunk = new Uint8Array(1024 * 1024);
+    const body = new ReadableStream({start(controller) { for (let i = 0; i < 7; i++) controller.enqueue(chunk); }, cancel});
+    const fetcher = vi.fn().mockResolvedValue(new Response(body, {headers: {"content-type": "application/json"}}));
+    await expect(new CloudflareImageEditor("token_fixture", accountId, fetcher).generate({prompt: "A cup"})).rejects.toMatchObject({code: "invalid_response"});
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(fetcher).toHaveBeenCalledOnce();
+    const remote = vi.fn().mockResolvedValue(Response.json(result("https://private.test/image")));
+    await expect(new CloudflareImageEditor("token_fixture", accountId, remote).generate({prompt: "A cup"})).rejects.toMatchObject({code: "invalid_response"});
+    expect(remote).toHaveBeenCalledOnce();
+  });
+
+  it("classifies provider failure without retrying or exposing its body", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response("secret upstream response", {status: 429}));
+    await expect(new CloudflareImageEditor("token_fixture", accountId, fetcher).generate({prompt: "A cup"})).rejects.toMatchObject({code: "rate_limited"});
+    expect(fetcher).toHaveBeenCalledOnce();
+    const invalid = vi.fn();
+    await expect(new CloudflareImageEditor("", accountId, invalid).generate({prompt: "A cup"})).rejects.toMatchObject({code: "unconfigured"});
+    expect(invalid).not.toHaveBeenCalled();
+  });
 });
 
 describe("Cloudflare Klein image REST adapter", () => {

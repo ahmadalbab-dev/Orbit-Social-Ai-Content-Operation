@@ -17,6 +17,14 @@ const MAX_RESPONSE = MAX_ENCODED_OUTPUT + 65536;
 const object = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
 
+/** Prompt-only generation accepts no source image, URL, model or size override. */
+export function validateCloudflareImageGeneration(value: unknown) {
+  if (!object(value) || Object.keys(value).some(key => key !== "prompt") ||
+      typeof value.prompt !== "string" || value.prompt.length > 1500 || !value.prompt.trim())
+    throw new ImageEditError("input");
+  return { prompt: value.prompt.trim() };
+}
+
 /** Inspect bounded PNG/JPEG headers without decoding untrusted pixel data. */
 export function validateCloudflareImageEdit(value: unknown) {
   const input = validateImageEdit(value);
@@ -146,6 +154,28 @@ export class CloudflareImageEditor {
     value: unknown,
   ): Promise<{ bytes: Uint8Array; contentType: string }> {
     const input = validateCloudflareImageEdit(value);
+    const [, mimeType, data] = /^data:(image\/(?:png|jpeg));base64,(.+)$/.exec(
+      input.imageDataUrl,
+    )!;
+    const body = new FormData();
+    body.append("prompt", input.prompt);
+    body.append(
+      "input_image_0",
+      new Blob([Buffer.from(data, "base64")], { type: mimeType }),
+      mimeType === "image/png" ? "reference.png" : "reference.jpg",
+    );
+    return this.dispatch(body);
+  }
+  /** Official REST schema makes all input_image_* fields optional:
+   * https://developers.cloudflare.com/changelog/post/2026-01-15-flux-2-klein-4b-workers-ai/
+   */
+  async generate(value: unknown): Promise<{ bytes: Uint8Array; contentType: string }> {
+    const input = validateCloudflareImageGeneration(value);
+    const body = new FormData();
+    body.append("prompt", input.prompt);
+    return this.dispatch(body);
+  }
+  private async dispatch(body: FormData): Promise<{ bytes: Uint8Array; contentType: string }> {
     const token = this.apiToken.trim(),
       accountId = this.accountId.trim();
     if (
@@ -157,16 +187,6 @@ export class CloudflareImageEditor {
       !/^[a-f0-9]{32}$/i.test(accountId)
     )
       throw new AiProviderError("unconfigured");
-    const [, mimeType, data] = /^data:(image\/(?:png|jpeg));base64,(.+)$/.exec(
-      input.imageDataUrl,
-    )!;
-    const body = new FormData();
-    body.append("prompt", input.prompt);
-    body.append(
-      "input_image_0",
-      new Blob([Buffer.from(data, "base64")], { type: mimeType }),
-      mimeType === "image/png" ? "reference.png" : "reference.jpg",
-    );
     body.append("width", "1024");
     body.append("height", "1024");
     try {

@@ -15,6 +15,7 @@ import {
   HuggingFaceImageEditor,
   validateImageEdit,
   validateCloudflareImageEdit,
+  validateCloudflareImageGeneration,
 } from "@sma/ai";
 import { gatewayCredential } from "./text-ai.config";
 import { DatabaseService } from "./database.service";
@@ -68,6 +69,7 @@ export class ImageAiService {
     return {
       configured: config.configured,
       verified: false,
+      canGenerate: config.configured && config.provider === "cloudflare",
       model:
         config.provider === "gateway" ? GATEWAY_IMAGE_MODEL : config.provider === "gemini"
           ? GEMINI_IMAGE_MODEL
@@ -80,6 +82,21 @@ export class ImageAiService {
       maxInputBytes: 2097152,
       maxOutputBytes: 4194304,
     };
+  }
+  async generate(identity: RequestIdentity, input: unknown) {
+    requireRole(identity);
+    let body: ReturnType<typeof validateCloudflareImageGeneration>;
+    try { body = validateCloudflareImageGeneration(input); }
+    catch { throw new BadRequestException("Provide an image description up to 1,500 characters. Image generation accepts only a prompt."); }
+    const config = this.imageConfig();
+    if (config.provider !== "cloudflare" || !config.configured)
+      throw new ServiceUnavailableException("AI image generation is not configured");
+    await this.reserveAttempt(identity, true);
+    try {
+      return await new CloudflareImageEditor(config.apiKey!, config.accountId!).generate(body);
+    } catch (error) {
+      throw aiServiceFailure(error, "AI image generation did not complete. Retry later or check the image provider connection.");
+    }
   }
   async edit(identity: RequestIdentity, input: unknown) {
     requireRole(identity);

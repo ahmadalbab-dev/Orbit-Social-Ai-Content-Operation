@@ -4,7 +4,7 @@ import { apiOrigin } from "../../orbit/api-origin";
 const MAX_BODY = 4 * 1024 * 1024;
 const routes: [string, RegExp][] = [
   ["GET", /^(workspaces|brands|content|ai\/status|integrations\/status|media\/status|media\/renders|media\/image-edit\/status|billing\/status)$/],
-  ["POST", /^(workspaces|brands|content\/(manual|generate)|billing\/(checkout|portal)|media\/(assets|renders|image-edit|video-plan|editor-plan))$/],
+  ["POST", /^(workspaces|brands|content\/(manual|generate)|billing\/(checkout|portal)|media\/(assets|renders|image-edit(?:\/generate)?|video-plan|editor-plan))$/],
   ["POST", /^integrations\/oauth\/(facebook|instagram|threads|tiktok)\/start$/],
   ["PUT", /^brands\/[A-Za-z0-9_-]+$/],
   ["PUT", /^content\/[A-Za-z0-9_-]+\/review$/],
