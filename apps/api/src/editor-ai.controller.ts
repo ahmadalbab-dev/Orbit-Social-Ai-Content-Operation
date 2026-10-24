@@ -13,7 +13,7 @@ export class EditorAiController {
   let input:ReturnType<typeof validateEditorInput>;
   try{input=validateEditorInput(body);}catch{throw new BadRequestException('Provide an edit instruction and valid editor settings.');}
   const config=textAiConfig();let provider:EditorPlanner;
-  try{if((input.previewDataUrl&&config.provider!=='groq')||!config.configured||(config.provider!=='groq'&&config.provider!=='huggingface'))throw new Error();provider=new EditorPlanner(config.apiKey!,config.provider,config.model,fetch,process.env.GROQ_VISION_MODEL);}catch{throw new ServiceUnavailableException('AI editing is not configured');}
+  try{if((input.previewDataUrl&&(config.provider==='huggingface'||(config.provider==='gemini'&&process.env.GEMINI_ALLOW_PREVIEW_SHARING!=='true')||(config.provider==='gateway'&&process.env.AI_GATEWAY_ALLOW_PREVIEW_SHARING!=='true')))||!config.configured||(config.provider!=='groq'&&config.provider!=='huggingface'&&config.provider!=='gemini'&&config.provider!=='gateway'))throw new Error();provider=new EditorPlanner(config.apiKey!,config.provider,config.model,fetch,process.env.GROQ_VISION_MODEL);}catch{throw new ServiceUnavailableException('AI editing is not configured');}
   await this.quota.reserveAttempt(request.identity,true);
   try{return await provider.plan(input);}catch(error){throw aiServiceFailure(error,'AI editing could not prepare this change. Please retry later.');}
  }

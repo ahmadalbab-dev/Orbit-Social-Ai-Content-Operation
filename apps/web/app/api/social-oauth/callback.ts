@@ -20,7 +20,7 @@ export async function socialOAuthCallback(request: Request, family: string, fetc
   const base = apiOrigin(process.env.NEXT_PUBLIC_API_URL, process.env.NODE_ENV === 'production');
   try {
     const state = query.get('state'), code = query.get('code'), error = query.get('error');
-    if (!base || !nonce || !noncePattern.test(nonce) || !state || !noncePattern.test(state) || query.getAll('state').length !== 1 || query.getAll('code').length > 1 || query.getAll('error').length > 1 || (code ? code.length > 2048 || Boolean(error) : !error || error.length > 200)) throw Error('Invalid callback');
+    if (!base || !nonce || !noncePattern.test(nonce) || !state || !noncePattern.test(state) || query.getAll('state').length !== 1 || query.getAll('code').length > 1 || query.getAll('error').length > 1 || (code ? code.length > 4096 || /[\r\n]/.test(code) || Boolean(error) : !error || error.length > 200)) throw Error('Invalid callback');
     const response = await fetcher(`${base}/v1/oauth/${family}/callback`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({state, ...(code ? {code} : {error}), browserNonce:nonce}), cache:'no-store', redirect:'error', credentials:'omit', signal:AbortSignal.timeout(45000)});
     if (!response.ok) {await response.body?.cancel(); throw Error('OAuth failed');}
     const data = await boundedJson(response) as {provider?:unknown;status?:unknown};

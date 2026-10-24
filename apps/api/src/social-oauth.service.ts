@@ -3,6 +3,7 @@ import {createHash,randomBytes} from 'node:crypto';
 import {DatabaseService} from './database.service';
 import {TokenVault,type RequestIdentity} from './security';
 import {requireRole} from './workflow.service';
+import {socialConnectionScopes as scopes} from './social-oauth.scopes';
 export const socialProviders=['facebook','instagram','threads','tiktok'] as const;
 export type SocialProvider=typeof socialProviders[number];
 const hash=(value:string)=>createHash('sha256').update(value).digest('hex');
@@ -21,7 +22,6 @@ export function socialOAuthConfig(provider:SocialProvider,env:NodeJS.ProcessEnv=
  }catch{return null;}
 }
 export function parseSocialProvider(value:string):SocialProvider{if(!(socialProviders as readonly string[]).includes(value))throw new BadRequestException('Unsupported social provider');return value as SocialProvider;}
-const scopes=(p:SocialProvider)=>p==='tiktok'?['user.info.basic']:p==='threads'?['threads_basic']:p==='instagram'?['pages_show_list','pages_read_engagement','instagram_basic']:['pages_show_list','pages_read_engagement'];
 @Injectable()
 export class SocialOAuthService {
  constructor(private readonly db:DatabaseService){}
@@ -128,6 +128,18 @@ export class SocialOAuthService {
  }
  async status(identity:RequestIdentity){
   const accounts=await this.db.socialAccount.findMany({where:{workspaceId:identity.workspaceId},select:{id:true,platform:true,displayName:true,status:true,token:{select:{expiresAt:true,scopes:true}}}});
-  return {connectorMode:'oauth',livePublishing:false,providers:Object.fromEntries(socialProviders.map(provider=>{const configured=!!socialOAuthConfig(provider),records=accounts.filter(account=>account.platform===provider.toUpperCase()).map(account=>({id:account.id,name:account.displayName,accountType:provider==='facebook'?'Page':provider==='instagram'?'Professional':'Profile',connected:account.status==='connected'&&!!account.token&&!!account.token.expiresAt&&account.token.expiresAt>new Date()&&scopes(provider).every(scope=>account.token!.scopes.includes(scope)),expiresAt:account.token?.expiresAt?.toISOString()??null,scopes:account.token?.scopes??[]}));return [provider,{configured,credentialsConfigured:configured,oauthImplemented:true,requiresOwnerAuthorization:!records.some(account=>account.connected),connected:records.some(account=>account.connected),reconnectRequired:records.length>0&&!records.some(account=>account.connected),reason:configured?null:'Server app credentials, exact HTTPS callback, encryption key or provider configuration is missing.',accounts:records}];}))};
+  // A stored publishing permission is not a working delivery implementation.
+  const unavailable={implemented:false,canPublishText:false,canPublishImage:false,canPublishVideo:false,reason:'Posting directly from Orbit is not available yet.'};
+  return {connectorMode:'oauth',livePublishing:false,providers:Object.fromEntries(socialProviders.map(provider=>{
+   const configured=!!socialOAuthConfig(provider);
+   const publishScope=provider==='facebook'?'pages_manage_posts':provider==='instagram'?'instagram_content_publish':provider==='threads'?'threads_content_publish':'video.publish';
+   const records=accounts.filter(account=>account.platform===provider.toUpperCase()).map(account=>{
+    const grantedScopes=account.token?.scopes??[];
+    const connected=account.status==='connected'&&!!account.token?.expiresAt&&account.token.expiresAt>new Date()&&scopes(provider).every(scope=>grantedScopes.includes(scope));
+    const missingScopes=[...scopes(provider),publishScope].filter(scope=>!grantedScopes.includes(scope));
+    return {id:account.id,name:account.displayName,accountType:provider==='facebook'?'Page':provider==='instagram'?'Professional':'Profile',connected,expiresAt:account.token?.expiresAt?.toISOString()??null,scopes:grantedScopes,publishing:{...unavailable,missingScopes,reason:!connected?'Account access needs reconnecting. Posting directly from Orbit is not available yet.':missingScopes.length?'Account access is connected, but publishing permission has not been granted. Posting directly from Orbit is not available yet.':'Publishing permission is recorded, but posting directly from Orbit is not available yet.'}};
+   });
+   return [provider,{configured,credentialsConfigured:configured,oauthImplemented:true,requiresOwnerAuthorization:!records.some(account=>account.connected),connected:records.some(account=>account.connected),reconnectRequired:records.length>0&&!records.some(account=>account.connected),reason:configured?null:'Server app credentials, exact HTTPS callback, encryption key or provider configuration is missing.',publishing:unavailable,accounts:records}];
+  }))};
  }
 }

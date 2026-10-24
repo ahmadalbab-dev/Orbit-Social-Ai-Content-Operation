@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { relayWorkspace } from "./relay";
+import { getVercelOidcToken } from "@vercel/oidc";
+vi.mock("@vercel/oidc", () => ({getVercelOidcToken: vi.fn()}));
 const origin="https://web.orbit.test";
 function request(path="workspaces", options:RequestInit={}) { return new Request(`${origin}/api/workspace/${path}`,{...options,headers:{Authorization:"Bearer private-test-token","x-workspace-id":"workspace-a",Cookie:"private-cookie=never-forward",...(options.headers??{})}}); }
-beforeEach(()=>{vi.stubEnv("NEXT_PUBLIC_API_URL","https://api.orbit.test");vi.stubEnv("NODE_ENV","production");});
+beforeEach(()=>{vi.stubEnv("NEXT_PUBLIC_API_URL","https://api.orbit.test");vi.stubEnv("NODE_ENV","production");vi.stubEnv("VERCEL", "");vi.mocked(getVercelOidcToken).mockReset();});
 afterEach(()=>{vi.unstubAllEnvs();vi.unstubAllGlobals();});
 describe("same-origin workspace relay",()=>{
  it("forwards only identity headers to the fixed upstream, never cookies",async()=>{
@@ -41,6 +43,60 @@ describe("same-origin workspace relay",()=>{
  });
 });
 
+describe("Vercel service identity for protected API previews", () => {
+ it("gets a fresh SDK token per request while preserving the user's Supabase bearer identity", async () => {
+  vi.stubEnv("VERCEL", "1"); vi.stubEnv("NEXT_PUBLIC_API_URL", "https://orbit-api-preview.vercel.app");
+  vi.mocked(getVercelOidcToken).mockResolvedValueOnce("runtime-oidc-first").mockResolvedValueOnce("runtime-oidc-second");
+  const fetcher = vi.fn(async (..._args: Parameters<typeof fetch>) => Response.json([]));
+  const req = () => request("workspaces", {headers: {"x-vercel-trusted-oidc-idp-token": "attacker-token", "x-vercel-oidc-token": "attacker-context-token"}});
+  const first = await relayWorkspace(req(), ["workspaces"], fetcher);
+  const second = await relayWorkspace(req(), ["workspaces"], fetcher);
+  expect(first.status).toBe(200); expect(second.status).toBe(200);
+  expect(getVercelOidcToken).toHaveBeenCalledTimes(2);
+  for (const [index, token] of ["runtime-oidc-first", "runtime-oidc-second"].entries()) {
+   const headers = new Headers(fetcher.mock.calls[index][1]?.headers);
+   expect(headers.get("x-vercel-trusted-oidc-idp-token")).toBe(token);
+   expect(headers.get("authorization")).toBe("Bearer private-test-token");
+   expect(headers.get("x-workspace-id")).toBe("workspace-a");
+   expect(headers.get("x-vercel-oidc-token")).toBeNull();
+   expect(headers.get("cookie")).toBeNull();
+  }
+  expect(first.headers.has("x-vercel-trusted-oidc-idp-token")).toBe(false);
+  expect(await first.text()).not.toContain("runtime-oidc");
+ });
+ it.each([
+  ["", "https://orbit-api-preview.vercel.app"],
+  ["1", "https://api.orbit.test"],
+  ["1", "https://vercel.app.attacker.test"],
+  ["1", "https://api.vercel.app.attacker.test"],
+  ["1", "https://notvercel.app"],
+  ["1", "https://vercel.app"],
+ ])("does not forward a protection token outside the hosted Vercel destination boundary (%s, %s)", async (hosted, api) => {
+  vi.stubEnv("VERCEL", hosted); vi.stubEnv("NEXT_PUBLIC_API_URL", api);
+  vi.mocked(getVercelOidcToken).mockResolvedValue("runtime-oidc-secret");
+  const fetcher = vi.fn(async (..._args: Parameters<typeof fetch>) => Response.json([]));
+  const response = await relayWorkspace(request("workspaces", {headers: {"x-vercel-trusted-oidc-idp-token": "attacker-token"}}), ["workspaces"], fetcher);
+  expect(response.status).toBe(200); expect(getVercelOidcToken).not.toHaveBeenCalled();
+  expect(new Headers(fetcher.mock.calls[0][1]?.headers).has("x-vercel-trusted-oidc-idp-token")).toBe(false);
+ });
+ it("preserves existing upstream behavior when the platform SDK has no token", async () => {
+  vi.stubEnv("VERCEL", "1"); vi.stubEnv("NEXT_PUBLIC_API_URL", "https://orbit-api-preview.vercel.app");
+  vi.mocked(getVercelOidcToken).mockRejectedValue(Error("private platform diagnostic"));
+  const fetcher = vi.fn(async (..._args: Parameters<typeof fetch>) => Response.json([]));
+  const response = await relayWorkspace(request("workspaces", {headers: {"x-vercel-trusted-oidc-idp-token": "attacker-token"}}), ["workspaces"], fetcher);
+  expect(response.status).toBe(200);
+  expect(new Headers(fetcher.mock.calls[0][1]?.headers).has("x-vercel-trusted-oidc-idp-token")).toBe(false);
+  expect(await response.text()).not.toContain("private platform diagnostic");
+ });
+ it("validates authentication and upload bounds before reading service identity", async () => {
+  vi.stubEnv("VERCEL", "1"); vi.stubEnv("NEXT_PUBLIC_API_URL", "https://orbit-api-preview.vercel.app");
+  const fetcher = vi.fn();
+  expect((await relayWorkspace(new Request(`${origin}/api/workspace/workspaces`), ["workspaces"], fetcher)).status).toBe(401);
+  expect((await relayWorkspace(request("media/assets", {method: "POST", headers: {"content-length": "5000000"}}), ["media", "assets"], fetcher)).status).toBe(413);
+  expect(getVercelOidcToken).not.toHaveBeenCalled(); expect(fetcher).not.toHaveBeenCalled();
+ });
+});
+
 it('relays only the approved AI media operations and preserves binary image output', async () => {
   vi.stubEnv('NEXT_PUBLIC_API_URL', 'https://api.orbit.test'); vi.stubEnv('NODE_ENV', 'production');
   const bytes = new Uint8Array([137,80,78,71,13,10,26,10]);
@@ -66,4 +122,18 @@ it('isolates TikTok browser binding and keeps the same-origin start requirement'
  const segments=['integrations','oauth','tiktok','start'],fetcher=vi.fn(async()=>Response.json({authorizationUrl:'https://www.tiktok.com/v2/auth/authorize/?state=opaque'}));
  expect((await relayWorkspace(request(segments.join('/'),{method:'POST',body:'{}'}),segments,fetcher)).status).toBe(403);expect(fetcher).not.toHaveBeenCalled();
  const response=await relayWorkspace(request(segments.join('/'),{method:'POST',headers:{Origin:origin},body:'{}'}),segments,fetcher);expect(response.status).toBe(200);expect(response.headers.get('set-cookie')).toMatch(/orbit_oauth_tiktok=[A-Za-z0-9_-]{43};/);expect(response.headers.get('set-cookie')).toContain('HttpOnly; SameSite=Lax; Max-Age=600; Secure');
+});
+
+it('relays only the exact authenticated image generation POST and keeps output private',async()=>{
+ vi.stubEnv('NEXT_PUBLIC_API_URL','https://api.orbit.test');
+ const fetcher=vi.fn(async(..._args:Parameters<typeof fetch>)=>new Response(new Uint8Array([137,80,78,71]),{headers:{'content-type':'image/png'}}));
+ const body=JSON.stringify({prompt:'A public test cup'});
+ const response=await relayWorkspace(request('media/image-edit/generate',{method:'POST',body}),['media','image-edit','generate'],fetcher);
+ expect(response.status).toBe(200);expect(response.headers.get('content-type')).toBe('image/png');expect(response.headers.get('cache-control')).toBe('private, no-store');
+ expect(fetcher).toHaveBeenCalledWith('https://api.orbit.test/v1/media/image-edit/generate',expect.objectContaining({method:'POST'}));
+ expect(new TextDecoder().decode(fetcher.mock.calls[0][1]?.body as Uint8Array)).toBe(body);
+ const denied=vi.fn();
+ expect((await relayWorkspace(request('media/image-edit/generate'),['media','image-edit','generate'],denied)).status).toBe(404);
+ expect((await relayWorkspace(request('media/image-edit/generate/other',{method:'POST',body}),['media','image-edit','generate','other'],denied)).status).toBe(404);
+ expect(denied).not.toHaveBeenCalled();
 });

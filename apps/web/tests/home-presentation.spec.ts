@@ -24,7 +24,7 @@ async function canvasHasArtwork(canvas: Locator) {
   })).toBeGreaterThan(.005);
 }
 
-for (const width of [320, 390, 1440, 3840]) {
+for (const width of [320, 390, 1024, 1440, 1920, 3840]) {
   test(`Home presents a full-bleed responsive hero and example posts at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: width < 768 ? 844 : 1080 });
     await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
@@ -56,6 +56,8 @@ for (const width of [320, 390, 1440, 3840]) {
     expect(copyBox.width).toBeGreaterThan(200);
     expect(title.height).toBeGreaterThan(10);
     expect((await art.boundingBox())!.height).toBeGreaterThan(100);
+    const launchpadBox = (await home.locator('.home-launchpad').boundingBox())!;
+    expect(Math.abs(copyBox.x - launchpadBox.x)).toBeLessThanOrEqual(1);
     const showcase = home.locator('.home-post-showcase');
     await expect(showcase.getByRole('heading', { name: 'One idea. Every channel.', exact: true })).toBeVisible();
     await expect(showcase.getByText('Example content and layouts. Live publishing is off.', { exact: true })).toBeVisible();
@@ -157,10 +159,31 @@ for (const preference of ['system', 'workspace'] as const) {
   });
 }
 
+test('motion preference responds to checkbox, keyboard and label clicks and survives reload', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/preview');
+  await page.getByRole('button', { name: 'Workspace Settings', exact: true }).click();
+  const reduce = page.getByRole('checkbox', { name: 'Reduce decorative animation', exact: true });
+  // Exercise the same immediate, below-the-fold interaction as the hero test.
+  await reduce.check();
+  await expect(reduce).toBeChecked();
+  await expect(page.locator('html')).toHaveAttribute('data-motion', 'paused');
+  await reduce.focus();
+  await page.keyboard.press('Space');
+  await expect(reduce).not.toBeChecked();
+  await expect(page.locator('html')).toHaveAttribute('data-motion', 'on');
+  await page.getByText('Reduce decorative animation', { exact: true }).click();
+  await expect(reduce).toBeChecked();
+  await page.reload();
+  await expect(reduce).toBeChecked();
+  await expect(page.locator('html')).toHaveAttribute('data-motion', 'paused');
+});
+
 
 test('hero records a complete live Orbit to ai studio and back handoff', async ({ browser, browserName }, testInfo) => {
   test.skip(browserName !== 'chromium', 'One Chromium recording complements cross-browser layout and reduced-motion checks.');
-  test.setTimeout(45000);
+  test.setTimeout(60000);
   const context = await browser.newContext({
     baseURL: testInfo.project.use.baseURL,
     viewport: { width: 1440, height: 900 },
@@ -174,10 +197,18 @@ test('hero records a complete live Orbit to ai studio and back handoff', async (
     await expect(canvas).toHaveAttribute('data-motion', 'running');
     await expect(canvas).toHaveAttribute('data-scene', 'orbit');
     await canvasHasArtwork(canvas);
+    await expect(canvas).toHaveAttribute('data-direction','bottom-to-top');
+    await expect.poll(()=>canvas.evaluate(node=>{const p=Number((node as HTMLCanvasElement).dataset.transition);return p>.25&&p<.75;}),{timeout:15000,intervals:[100]}).toBe(true);
+    await canvas.screenshot({path:testInfo.outputPath('hero-upward-handoff-light.png')});
     await expect(canvas).toHaveAttribute('data-scene', 'ai-studio', { timeout: 18000 });
     await canvasHasArtwork(canvas);
     await expect(canvas).toHaveAttribute('data-scene', 'orbit', { timeout: 18000 });
     await canvasHasArtwork(canvas);
+    await page.getByRole('button',{name:'Dark mode',exact:true}).click();
+    await expect(canvas).toHaveAttribute('data-palette','holographic');
+    await expect(canvas).toHaveAttribute('data-scene','ai-studio',{timeout:18000});
+    await canvasHasArtwork(canvas);
+    await canvas.screenshot({path:testInfo.outputPath('hero-upward-handoff-dark.png')});
   } finally {
     await context.close();
   }
@@ -194,4 +225,44 @@ test('TikTok uses the official icon in existing social rows and a working calend
   await filter.click(); await expect(filter).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'All', exact: true }).click();
   await expect(filter).toHaveAttribute('aria-pressed', 'false');
+});
+
+
+test('light mode uses deeper readable UI colours and saturated hero ink',async({page})=>{
+ await page.setViewportSize({width:1440,height:900});
+ await page.emulateMedia({colorScheme:'light',reducedMotion:'reduce'});
+ await page.goto('/preview');
+ const canvas=page.locator('.overview-view canvas.orbit-field');await canvasHasArtwork(canvas);
+ const samples=async()=>canvas.evaluate(node=>{
+  const cv=node as HTMLCanvasElement,p=cv.getContext('2d')!.getImageData(0,0,cv.width,cv.height).data;
+  let count=0,brightness=0,chroma=0;
+  for(let i=0;i<p.length;i+=4){if(p[i+3]<210)continue;count++;brightness+=(p[i]+p[i+1]+p[i+2])/3;chroma+=Math.max(p[i],p[i+1],p[i+2])-Math.min(p[i],p[i+1],p[i+2]);}
+  return{count,brightness:brightness/Math.max(1,count),chroma:chroma/Math.max(1,count)};
+ });
+ const light=await samples();expect(light.count).toBeGreaterThan(25);expect(light.chroma).toBeGreaterThan(35);
+ await page.getByRole('button',{name:'Dark mode',exact:true}).click();
+ await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+ await expect.poll(async()=>(await samples()).brightness).toBeGreaterThan(light.brightness*1.5);
+ await page.getByRole('button',{name:'Light mode',exact:true}).click();
+ const contrast=await page.locator('.hero-caption').evaluate(node=>{
+  const rgb=(v:string)=>v.match(/[\d.]+/g)!.slice(0,3).map(Number).map(c=>{c/=255;return c<=.04045?c/12.92:((c+.055)/1.055)**2.4;});
+  const lum=(v:string)=>{const c=rgb(v);return .2126*c[0]+.7152*c[1]+.0722*c[2];};
+  const fg=lum(getComputedStyle(node).color),bg=lum(getComputedStyle(document.body).backgroundColor);
+  return(Math.max(fg,bg)+.05)/(Math.min(fg,bg)+.05);
+ });expect(contrast).toBeGreaterThanOrEqual(4.5);
+});
+
+
+test('mobile ai studio remains formed in both themes during its full hold',async({page},testInfo)=>{
+ await page.setViewportSize({width:390,height:844});await page.emulateMedia({colorScheme:'light',reducedMotion:'no-preference'});
+ await page.goto('/preview');const canvas=page.locator('.overview-view canvas.orbit-field');
+ await expect(canvas).toHaveAttribute('data-scene','ai-studio',{timeout:18000});
+ await expect.poll(()=>canvas.getAttribute('data-transition')).toBe('0.000');
+ await canvasHasArtwork(canvas);
+ for(const mode of ['Light','Dark']){
+  await page.getByRole('button',{name:`${mode} mode`,exact:true}).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme',mode.toLowerCase());
+  await expect(canvas).toHaveAttribute('data-scene','ai-studio');
+  await page.screenshot({path:testInfo.outputPath(`mobile-ai-studio-${mode.toLowerCase()}.png`)});
+ }
 });

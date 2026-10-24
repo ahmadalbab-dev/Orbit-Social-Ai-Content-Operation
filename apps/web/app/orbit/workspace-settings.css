@@ -7,8 +7,10 @@
 .device-settings p {color:var(--soft);font-size:14px;line-height:1.65;}
 .device-settings .two-fields {margin:20px 0;}
 .settings-links {display:flex;flex-wrap:wrap;gap:16px;margin-top:22px;font-size:13px;}
-.preference-check {display:flex;align-items:center;gap:12px;margin-top:24px;}
-.preference-check input {accent-color:var(--primary);width:18px;height:18px;}
+/* Settings controls must not move under a pointer while native focus scrolls them into view. */
+html:has(.app-content>div:not([hidden])>.settings-page) {scroll-behavior:auto;}
+.preference-check {display:flex;align-items:center;gap:12px;margin-top:24px;min-height:44px;cursor:pointer;}
+.preference-check input {accent-color:var(--primary);width:18px;height:18px;padding:0;flex:none;}
 .profile-heading-actions {display:flex;gap:14px;align-items:center;flex-wrap:wrap;}
 html[data-motion=paused] {scroll-behavior:auto;}
 html[data-motion=paused] .orbit-shell *,html[data-motion=paused] .orbit-shell *::before,html[data-motion=paused] .orbit-shell *::after {animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;}

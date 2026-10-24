@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+test.use({ trace: "retain-on-failure" });
+
 test("light default keeps the auth form compact while widening only the hero", async ({
   page,
 }) => {
@@ -61,12 +63,26 @@ for(const size of [{width:390,height:844},{width:320,height:568}]) test(`mobile 
   expect(last.y+last.height).toBeLessThanOrEqual(bottom.y);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
-test("every page retains the animated Orbit mark and reduced-motion override",async({page},testInfo)=>{
- await page.goto("/preview");const ellipse=page.locator(".workspace-brand .orbit-mark ellipse");
- await expect(ellipse).toHaveCSS("animation-name","orbit-logo-ring");
+test("every page retains the animated Orbit mark and reduced-motion override",async({page})=>{
+ await page.emulateMedia({reducedMotion:"no-preference"});
+ await page.goto("/preview");const mark=page.locator('.workspace-brand [data-orbit-mark="connecting"] canvas');
+ const frame=()=>mark.evaluate(node=>{
+   const canvas=node as HTMLCanvasElement;
+   const pixels=canvas.getContext("2d")!.getImageData(0,0,canvas.width,canvas.height).data;
+   let hash=2166136261,painted=false;
+   for(let i=0;i<pixels.length;i++){hash=Math.imul(hash^pixels[i],16777619);if(i%4===3&&pixels[i]>0)painted=true;}
+   return {hash:hash>>>0,painted};
+ });
+ await expect.poll(async()=>(await frame()).painted).toBe(true);
+ const moving=await frame();await expect.poll(async()=>(await frame()).hash).not.toBe(moving.hash);
  await page.getByRole("button",{name:"Workspace Settings",exact:true}).click();
  await page.getByRole("checkbox",{name:"Reduce decorative animation"}).check();
- await expect(ellipse).toHaveCSS("animation-name","none");
+ await expect(page.locator("html")).toHaveAttribute("data-motion","paused");
+ await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
+ const paused=await frame();await page.waitForTimeout(200);expect(await frame()).toEqual(paused);
  await page.getByRole("button",{name:"Open profile",exact:true}).click();
- await expect(ellipse).toBeVisible();await expect(ellipse).toHaveCSS("animation-name","none");
+ await expect(mark).toBeVisible();
+ await expect.poll(async()=>(await frame()).painted).toBe(true);
+ await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
+ const profile=await frame();await page.waitForTimeout(200);expect(await frame()).toEqual(profile);
 });

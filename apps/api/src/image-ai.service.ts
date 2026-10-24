@@ -5,12 +5,19 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import {
+  CLOUDFLARE_IMAGE_MODEL,
+  CloudflareImageEditor,
+  GATEWAY_IMAGE_MODEL,
+  GatewayImageEditor,
   GEMINI_IMAGE_MODEL,
   GeminiImageEditor,
   HF_IMAGE_MODEL,
   HuggingFaceImageEditor,
   validateImageEdit,
+  validateCloudflareImageEdit,
+  validateCloudflareImageGeneration,
 } from "@sma/ai";
+import { gatewayCredential } from "./text-ai.config";
 import { DatabaseService } from "./database.service";
 import { BillingService } from "./billing.service";
 import { requireRole } from "./workflow.service";
@@ -25,29 +32,86 @@ export class ImageAiService {
   ) {}
   private imageConfig() {
     const selected = process.env.AI_IMAGE_PROVIDER ?? "huggingface";
-    const provider = selected === "gemini" || selected === "huggingface" ? selected : null;
-    const apiKey = provider === "gemini" ? process.env.GEMINI_API_KEY : provider === "huggingface" ? process.env.HF_TOKEN : undefined;
-    return { provider, apiKey, configured: !!provider && Boolean(apiKey?.trim()) && !/[\r\n]/.test(apiKey ?? "") };
+    const provider =
+      selected === "gateway" ||
+      selected === "gemini" ||
+      selected === "huggingface" ||
+      selected === "cloudflare"
+        ? selected
+        : null;
+    const apiKey =
+      provider === "gateway" ? gatewayCredential() : provider === "gemini"
+        ? process.env.GEMINI_API_KEY
+        : provider === "huggingface"
+          ? process.env.HF_TOKEN
+          : provider === "cloudflare"
+            ? process.env.CLOUDFLARE_API_TOKEN
+            : undefined;
+    const accountId =
+      provider === "cloudflare" ? process.env.CLOUDFLARE_ACCOUNT_ID : undefined;
+    return {
+      provider,
+      apiKey,
+      accountId,
+      configured:
+        !!provider &&
+        Boolean(apiKey?.trim()) &&
+        !/[\r\n]/.test(apiKey ?? "") &&
+        (provider !== "cloudflare" ||
+          (accountId?.length === 32 &&
+            /^[a-fA-F0-9]{32}$/.test(accountId) &&
+            apiKey!.trim().length <= 1024 &&
+            !/[^\x21-\x7e]/.test(apiKey!.trim()))),
+    };
   }
   status() {
     const config = this.imageConfig();
     return {
       configured: config.configured,
       verified: false,
-      model: config.provider === "gemini" ? GEMINI_IMAGE_MODEL : config.provider === "huggingface" ? HF_IMAGE_MODEL : null,
+      canGenerate: config.configured && config.provider === "cloudflare",
+      model:
+        config.provider === "gateway" ? GATEWAY_IMAGE_MODEL : config.provider === "gemini"
+          ? GEMINI_IMAGE_MODEL
+          : config.provider === "huggingface"
+            ? HF_IMAGE_MODEL
+            : config.provider === "cloudflare"
+              ? CLOUDFLARE_IMAGE_MODEL
+              : null,
       provider: config.provider === "huggingface" ? "fal-ai" : config.provider,
       maxInputBytes: 2097152,
       maxOutputBytes: 4194304,
     };
   }
+  async generate(identity: RequestIdentity, input: unknown) {
+    requireRole(identity);
+    let body: ReturnType<typeof validateCloudflareImageGeneration>;
+    try { body = validateCloudflareImageGeneration(input); }
+    catch { throw new BadRequestException("Provide an image description up to 1,500 characters. Image generation accepts only a prompt."); }
+    const config = this.imageConfig();
+    if (config.provider !== "cloudflare" || !config.configured)
+      throw new ServiceUnavailableException("AI image generation is not configured");
+    await this.reserveAttempt(identity, true);
+    try {
+      return await new CloudflareImageEditor(config.apiKey!, config.accountId!).generate(body);
+    } catch (error) {
+      throw aiServiceFailure(error, "AI image generation did not complete. Retry later or check the image provider connection.");
+    }
+  }
   async edit(identity: RequestIdentity, input: unknown) {
     requireRole(identity);
+    const config = this.imageConfig();
     let body: ReturnType<typeof validateImageEdit>;
     try {
-      body = validateImageEdit(input);
+      body =
+        config.provider === "cloudflare"
+          ? validateCloudflareImageEdit(input)
+          : validateImageEdit(input);
     } catch {
       throw new BadRequestException(
-        "Upload a PNG or JPEG up to 2 MiB and an editing instruction up to 2,000 characters.",
+        config.provider === "cloudflare"
+          ? "Upload a PNG or JPEG smaller than 512 pixels on each edge and up to 2 MiB, with an editing instruction up to 2,000 characters. Reopen the image editor to prepare a smaller preview."
+          : "Upload a PNG or JPEG up to 2 MiB and an editing instruction up to 2,000 characters.",
       );
     }
     if (
@@ -58,10 +122,17 @@ export class ImageAiService {
       throw new BadRequestException(
         "Music cannot be embedded in a PNG or JPEG. Open Music & sound under Turn your image or carousel into a movie, upload audio, then export an image movie. No AI request was sent.",
       );
-    const config = this.imageConfig();
     await this.reserveAttempt(identity, config.configured);
     try {
-      return config.provider === "gemini" ? await new GeminiImageEditor(config.apiKey!).edit(body) : await new HuggingFaceImageEditor(config.apiKey!).edit(body);
+      if (config.provider === "gateway") return await new GatewayImageEditor(config.apiKey!).edit(body);
+      if (config.provider === "cloudflare")
+        return await new CloudflareImageEditor(
+          config.apiKey!,
+          config.accountId!,
+        ).edit(body);
+      return config.provider === "gemini"
+        ? await new GeminiImageEditor(config.apiKey!).edit(body)
+        : await new HuggingFaceImageEditor(config.apiKey!).edit(body);
     } catch (error) {
       throw aiServiceFailure(
         error,

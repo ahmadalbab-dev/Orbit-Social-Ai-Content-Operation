@@ -1,0 +1,99 @@
+# Orbit delivery checkpoint, 23 October 2026
+
+## Current checkpoint after owner design approval
+
+The historical sections below retain their original evidence scope. This section supersedes their older CI/design status.
+
+- Owner approved the hero, light-mode contrast and bottom-to-top motion at feature commit `fda47799967bb985a53e560267af08f9adef0141`. Code is pushed to `feat/cloudflare-image-editing`; PR12 remains open. Production promotion is separate.
+- CI `39962216261` passed all four jobs: quality, secret-scan, web-preview and staging-images. Chromium: 81 passed / 1 skipped; WebKit: 53 passed / 4 skipped; web unit suite: 231 passed. Real compiled worker/private download and production dependency audit passed. Web deployment `dpl_En1pyo4zAXpgpRfqTT5K8jnxAsR3` is READY; `/preview` returned HTTP 200.
+- Current read-only Orbit database recheck: one FACEBOOK account with status connected. No Instagram, Threads or TikTok account row was returned. This does not establish whether consent succeeded elsewhere or in another environment; callback persistence into this workspace still needs real acceptance.
+- Web Vercel environment metadata recheck: no OPENVERSE_CLIENT_ID or OPENVERSE_CLIENT_SECRET entry. No values were decrypted. Music registered-access acceptance remains blocked on setup.
+- The available cloud browser reached Vercel's login page for the configured feature Preview. Local Chrome control is not exposed in this session. A local Chrome login does not authenticate this separate browser. Signed-in Studio/media acceptance has not passed; no session extraction or protection changes were attempted.
+- AI Gateway remains owner-deferred. Direct Gemini/Cloudflare and probe-off configuration remain the accepted route.
+
+## Next work in dependency order
+
+1. Authenticated feature Preview acceptance: Studio generate/save/reload/destinations, then image plan/Apply/Undo and Cloudflare output, then video plan/apply/export. Preserve the approved design. Stop at an actual failed boundary and fix that boundary before claiming success.
+2. Actual Instagram/Threads consent and callback persistence in the same Orbit workspace. TikTok developer setup remains owner-deferred.
+3. Music registration/configuration, then real search, playback, selection and audible export. Starter fallback does not pass live catalogue acceptance.
+4. Media Share needs durable exported assets and server-validated destinations bound to a draft revision, followed by immutable publishing jobs and provider dispatch/reconciliation. Current MediaShare only uses the native file-share menu; Studio saves selected accounts but does not post.
+5. Expand editable templates and advanced composition after these creation/export/share foundations pass. No verified trending-template or AI-segmentation claim is established.
+
+No new production release, database mutation, provider inference or social post was performed during this follow-up review.
+
+## Changes and acceptance evidence
+
+- Gemini **real provider inference** passed from Vercel Preview build with synthetic public input for Studio draft generation, Image Editor changes and Video Editor brief planning. Model: `gemini-3.5-flash-lite`; each returned HTTP 200 and passed existing domain validators. Deployment `dpl_5L7D4HxhBN6Gbap7svJgzp2EsiHK`, commit `2479959`. This is provider integration acceptance, not a signed-in user workflow test.
+- Earlier actual probes: `gemini-3.1-flash-lite` returned HTTP 503; `gemini-2.5-flash-lite` returned HTTP 404 for this project. No automatic paid fallback was added. Default changes to the live-tested 3.5 model. The probe switch is disabled after testing to avoid repeated provider requests on builds.
+- Layers: input photos up to 16MP and 8MiB are prepared into a bounded <=4MP/4096-edge overlay. Original files stay unchanged. Cancellation no longer reports a false 4MP error; invalid formats/decode have separate messages. Resized URLs remain valid through export.
+- DESKTOP-ALBAB browser acceptance passed: existing video template/layer export; 12MP overlay import and a decoded red overlay in the exported movie; AI preview-sharing boundary; coherent Apply/Undo; rejection of stale proposals. Provider responses in these browser AI tests are fixtures, not live inference.
+- OAuth web callback now accepts the API's 4096-character code limit and rejects CR/LF. A regression test covers 4096/4097 and control characters. This fixes a real boundary mismatch, but does not establish the cause of the user's failed Threads attempt.
+- Music: actual Vercel serverless request returned `mode=starter`, `reason=access_denied`, request ID `3d63fbd7-f35d-4955-998a-210d8d83b7bd`. Degraded responses now use no-store and sanitized diagnostics. **Live music search remains failed.** Do not call fallback a successful catalogue integration.
+- Ponytail source `assets/v5/site.css` and `site.js`, DESIGN.md, AGENTS.md and reconstruction notes were read from the user-supplied copy. Home hero now adopts source height/spacing/type rules, holographic stops and code glyph metrics, with Orbit-specific title positioning to prevent overlap. MIT attribution is retained. This is an adaptation of Home, not pixel-identical parity for every app screen or source animation.
+- Home browser tests passed at 320/390/1440/3840px. Pause/reduced motion, Orbit-to-ai-studio handoff, keyboard tabs and TikTok filter checks passed on the prior positioning; desktop title placement was corrected and all four viewport cases rerun successfully.
+- 27 focused Music/overlay/callback unit tests passed; six Node release/probe guard tests passed; five motion unit tests passed; existing OAuth service 60 tests passed during the read-only agent investigation. TypeScript web passed. The Gemini model-default tests are rerun with the final default.
+- Earlier PR13 CI quality, secret-scan, staging-images passed. Browser job timed out while installing Ubuntu packages, before app tests. Job allowance changed from 10 to 20 minutes; current-head CI remains a separate gate.
+
+## Current integrated provider evidence
+
+The configured feature Preview at `d9898cabac771c4931a4d11cbcac1bf198df07c9` passed all four actual provider probes: Gemini Studio, Gemini Image Editor with synthetic reduced preview, Gemini Video Editor planning, and Cloudflare pixel editing returning valid image bytes. Probe deployment: `dpl_2amhNTw8GrSQLtK9A9uQNdgqceE2`. The build probe has been switched off.
+
+The subsequent same-code API deployment `dpl_HhXXofjrPZgv7FN7jdwrrFXSFJAH` is ready and returned HTTP 200 from `/v1/ready` with database connected and livePublishing false. No signed-in browser acceptance is implied.
+
+Registered Openverse server-side authentication is now implemented with bounded token exchange, expiry cache, shared in-flight acquisition and rejected-token invalidation. No credentials were present and this mode has not passed a live request. See MUSIC_ACCESS_SETUP.md for exact owner steps.
+
+Current-head CI `39838261153`: quality, secret-scan and staging-images succeeded; web-preview was cancelled. Do not report all-CI success.
+
+## Media and draft acceptance
+
+- Final combined DESKTOP-ALBAB Chrome run: **16/16 passed**. It covers real decoded green-screen video pixels, retained image background/removal/Undo/source reset, two-clip stitch preview and export, both source audio frequencies in order, trim bounds, cancellation with no download, Before/After actual PNG export, Studio destination save/reload/clear, Channels return/status and AI stale-preview/privacy boundaries. AI/OAuth browser network responses are fixtures; these are not live consent/provider UI tests.
+- Web unit suite: **231/231 passed** across 34 files. Focused API Workflow/OAuth: **102/102 passed**. Web TypeScript passed after combined integration. API TypeScript passed for the destination changes.
+- Studio destination selection is server-validated for ownership, matching platform, connection scopes and future grant expiry. Changes create a new DRAFT revision and remove old schedules. Immutable dispatch snapshots/jobs remain future publishing work.
+- Read-only current Orbit database check: one connected Facebook account with one unexpired grant; no Instagram/Threads/TikTok account record. Supabase storage buckets query returned empty. No data or schema was modified.
+- Supabase security advisor: no ERROR findings, 25 INFO notices for RLS enabled without policies (server-only tables intentionally deny direct client access), and one WARN for leaked-password protection disabled. This is not a full security certification. Remediation: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection . Do not add broad client policies to silence the INFO notices.
+
+## Integration and work order
+
+Use the existing configured `feat/cloudflare-image-editing` Preview as the shared acceptance environment, integrating feature work with a fast-forward after checking its unchanged base. Reuse its database/auth/Cloudflare configuration. Keep production release separate from feature integration. Preview's server-only Gemini configuration uses the tested 3.5 model; the server permits reduced preview sharing, while each editor's independent checkbox remains off by default.
+
+1. Provider inference and API/database readiness, then signed-in Studio/image/video acceptance.
+2. Resolve Music provider access and Meta/Threads developer configuration with actual consent results.
+3. Stabilize multi-source composition/timeline, crop, chroma key and stitching; validate real output files.
+4. Build editable dynamic template recipes on supported engine capabilities.
+5. Add connected-account selection and actual provider publishing, with approved permissions, revision binding, quotas and duplicate prevention.
+
+## Remaining product gaps
+
+| Capability | Actual status |
+| --- | --- |
+| Facebook connection | Prior connected account/grant verified; publishing not proved |
+| Instagram | Provider rejected instagram_basic in user's screenshot; app/use-case/permission configuration still needs direct verification |
+| Threads | User reported failure; actual provider consent not completed by agent |
+| TikTok | App credentials/setup deferred by user; no new developer login attempted |
+| Music streaming catalogue | Openverse denies live search; no replacement commercial catalogue credentials supplied |
+| Studio and media assistant | Live Gemini provider paths passed; signed-in end-to-end workspace acceptance still required |
+| Image pixel editing | Real Cloudflare synthetic request returned a valid image; visual instruction correctness not assessed |
+| Green screen/stitch/multi-video timeline | Local chroma key and sequential two-clip stitch passed actual decoded export pixel/audio tests. Simultaneous split screen and native platform Stitch are not implemented |
+| Dynamic/trending templates | Before/After recipe passed actual uploaded-photo preview/apply/export/Undo browser acceptance; no verified trending claim |
+| Social account selection/publishing | Studio now saves connected destination accounts with revision/approval invalidation. Media uses native Share; direct provider publishing and Media saved destinations are still absent. Channels reports truthful posting capabilities |
+| Design | Home source adaptation verified, full application parity incomplete |
+
+No new billing, production promotion, database migration or social post was performed.
+
+## Settings WebKit follow-up
+
+CI on feature commit `f6945c3` passed Chromium browser acceptance (76 passed,
+1 intentional skip). WebKit had 47 passed, 4 intentional skips and one failed
+immediate Settings checkbox interaction. Its recorded trace showed document
+scroll moving 18 pixels between the computed click point and click delivery;
+the checkbox never changed state. Settings now disables root smooth scrolling
+while visible, and native preference checkboxes have appropriate padding and
+44px label targets. The original failing assertion remains unchanged.
+
+DESKTOP-ALBAB WebKit validation after the source fix: 16 passed, 1 intentional
+Chromium-recording skip across Home, appearance/navigation and device settings.
+The new regression covers pointer, keyboard, label activation and reload
+persistence. Linux CI is a separate remaining gate. The previous failed run was
+cancelled after its quality job stalled on unconditional codec installation;
+CI now reuses an existing ffmpeg executable and bounds installation time without
+removing any worker or export checks.

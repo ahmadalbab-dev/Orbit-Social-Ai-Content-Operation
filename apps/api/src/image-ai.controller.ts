@@ -7,6 +7,13 @@ import type { RequestIdentity } from "./security";
 export class ImageAiController {
   constructor(private readonly images: ImageAiService) {}
   @Get("status") status() { return this.images.status(); }
+  @Post("generate") async generate(@Req() request: Request & { identity: RequestIdentity }, @Body() body: unknown, @Res() response: Response) {
+    const result = await this.images.generate(request.identity, body);
+    response.setHeader("Content-Type", result.contentType);
+    response.setHeader("Cache-Control", "private, no-store");
+    response.setHeader("X-Content-Type-Options", "nosniff");
+    response.send(Buffer.from(result.bytes));
+  }
   @Post() async edit(@Req() request: Request & { identity: RequestIdentity }, @Body() body: unknown, @Res() response: Response) {
     const result = await this.images.edit(request.identity, body);
     response.setHeader("Content-Type", result.contentType);

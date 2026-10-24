@@ -25,3 +25,58 @@ it('handles timeout or invalid upstream body without inventing search results', 
  for (const [term, response] of [['html', new Response('<html>challenge</html>', { headers: { 'Content-Type': 'text/html' } })], ['broken', new Response('{', { headers: { 'Content-Type': 'application/json' } })]] as const) expect(await (await searchMusic(request(`q=${term}`), vi.fn().mockResolvedValue(response))).json()).toMatchObject({ mode: 'starter', results: [] });
  expect(await (await searchMusic(request('q=timeout'), vi.fn().mockRejectedValue(new DOMException('Timed out', 'TimeoutError')))).json()).toMatchObject({ mode: 'starter', results: [] });
 });
+it.each([[403,'access_denied'],[429,'rate_limited'],[500,'upstream']])('does not cache degraded %s responses or log private payloads',async(status,reason)=>{
+ const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+ try{
+  const response=await searchMusic(request(`q=private-input-${status}`),vi.fn().mockResolvedValue(new Response('secret-provider-body',{status:Number(status)})));
+  expect(response.headers.get('cache-control')).toBe('no-store');
+  expect(await response.json()).toMatchObject({mode:'starter',reason,requestId:expect.any(String)});
+  expect(warn).toHaveBeenCalledWith('orbit.music.search',{reason,phase:'catalogue',upstreamStatus:status,requestId:expect.any(String)});
+  expect(JSON.stringify(warn.mock.calls)).not.toMatch(/private-input|secret-provider-body|Bearer/);
+ }finally{warn.mockRestore();}
+});
+it('uses registered catalogue access server-side without exposing its token or secret',async()=>{
+ vi.stubEnv('OPENVERSE_CLIENT_ID','registered-route-client');vi.stubEnv('OPENVERSE_CLIENT_SECRET','registered-route-secret');
+ try{
+  const fetcher=vi.fn().mockResolvedValueOnce(Response.json({access_token:'private-catalogue-token',token_type:'Bearer',expires_in:3600})).mockResolvedValueOnce(Response.json({results:[row]}));
+  const response=await searchMusic(request('q=registered-music'),fetcher),body=await response.json();
+  expect(body.mode).toBe('live');expect(fetcher).toHaveBeenCalledTimes(2);
+  const headers=new Headers(fetcher.mock.calls[1][1].headers);expect(headers.get('authorization')).toBe('Bearer private-catalogue-token');expect(headers.has('cookie')).toBe(false);
+  expect(JSON.stringify(body)).not.toMatch(/private-catalogue-token|registered-route-secret|registered-route-client/);
+ }finally{vi.unstubAllEnvs();}
+});
+it('fails partial registered credentials before provider dispatch without leaking values',async()=>{
+ vi.stubEnv('OPENVERSE_CLIENT_ID','private-client-only');vi.stubEnv('OPENVERSE_CLIENT_SECRET','');
+ const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+ try{
+  const fetcher=vi.fn(),response=await searchMusic(request('q=partial-auth-config'),fetcher),body=await response.json();
+  expect(body).toMatchObject({mode:'starter',reason:'auth_configuration'});expect(response.headers.get('cache-control')).toBe('no-store');expect(fetcher).not.toHaveBeenCalled();
+  expect(JSON.stringify([body,warn.mock.calls])).not.toContain('private-client-only');
+ }finally{warn.mockRestore();vi.unstubAllEnvs();}
+});
+it('distinguishes a stalled token exchange from a failed catalogue request in private diagnostics',async()=>{
+ vi.stubEnv('OPENVERSE_CLIENT_ID','diagnostic-client');vi.stubEnv('OPENVERSE_CLIENT_SECRET','diagnostic-secret');
+ const signal=AbortSignal.abort(new DOMException('Timed out','TimeoutError'));
+ const deadline=vi.spyOn(AbortSignal,'timeout').mockReturnValue(signal),warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+ try{
+  const fetcher=vi.fn().mockRejectedValue(new DOMException('Timed out','TimeoutError'));
+  const body=await(await searchMusic(request('q=token-deadline-diagnostic'),fetcher)).json();
+  expect(body).toMatchObject({mode:'starter',reason:'timeout'});
+  expect(deadline).toHaveBeenCalledWith(12000);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(warn).toHaveBeenCalledWith('orbit.music.search',{requestId:expect.any(String),reason:'timeout',phase:'authentication'});
+  expect(body).not.toHaveProperty('phase');
+  expect(JSON.stringify([body,warn.mock.calls])).not.toMatch(/diagnostic-client|diagnostic-secret|token-deadline-diagnostic/);
+ }finally{deadline.mockRestore();warn.mockRestore();vi.unstubAllEnvs();}
+});
+it('does not replay a rejected bearer search and refreshes on the next explicit search',async()=>{
+ vi.stubEnv('OPENVERSE_CLIENT_ID','recovery-client');vi.stubEnv('OPENVERSE_CLIENT_SECRET','recovery-secret');
+ const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+ try{
+  const fetcher=vi.fn().mockResolvedValueOnce(Response.json({access_token:'rejected-token',token_type:'Bearer',expires_in:3600})).mockResolvedValueOnce(new Response('private upstream rejection',{status:401})).mockResolvedValueOnce(Response.json({access_token:'renewed-token',token_type:'Bearer',expires_in:3600})).mockResolvedValueOnce(Response.json({results:[row]}));
+  expect(await(await searchMusic(request('q=expired-catalogue-token'),fetcher)).json()).toMatchObject({mode:'starter',reason:'access_denied'});
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(await(await searchMusic(request('q=explicit-catalogue-retry'),fetcher)).json()).toMatchObject({mode:'live'});
+  expect(fetcher).toHaveBeenCalledTimes(4);expect(new Headers(fetcher.mock.calls[3][1].headers).get('authorization')).toBe('Bearer renewed-token');
+ }finally{warn.mockRestore();vi.unstubAllEnvs();}
+});

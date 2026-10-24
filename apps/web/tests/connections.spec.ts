@@ -20,10 +20,11 @@ for(const width of [390,1440])test(`social setup opens centered with focus recov
 });
 
 async function signedWorkspace(page:import('@playwright/test').Page,connected=false) {
+ const publishing={implemented:false,canPublishText:false,canPublishImage:false,canPublishVideo:false,reason:'Posting directly from Orbit is not available yet.'};
  await page.route('**/api/auth/session',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({access_token:'synthetic-connection-access',expires_in:3600,refreshable:true})}));
  await page.route('**/api/workspace/**',route=>{
   const path=new URL(route.request().url()).pathname;
-  const body=path.endsWith('/workspaces')?[{id:'fixture-workspace',name:'My Office',role:'OWNER'}]:path.endsWith('/integrations/status')?{livePublishing:false,providers:{threads:{configured:true,oauthImplemented:true,connected,accounts:connected?[{name:'Fixture Threads',accountType:'Profile'}]:[]}}}:[];
+  const body=path.endsWith('/workspaces')?[{id:'fixture-workspace',name:'My Office',role:'OWNER'}]:path.endsWith('/integrations/status')?{livePublishing:false,providers:{threads:{configured:true,oauthImplemented:true,connected,publishing,accounts:connected?[{name:'Fixture Threads',accountType:'Profile',publishing:{...publishing,missingScopes:['threads_content_publish'],reason:'Account access is connected, but publishing permission has not been granted. Posting directly from Orbit is not available yet.'}}]:[]}}}:[];
   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body)});
  });
 }
@@ -56,6 +57,8 @@ test('OAuth return opens centered Channels and verifies the account against work
  await expect(dialog).toBeVisible();
  await expect(dialog.getByRole('status')).toContainText('Threads is connected to this workspace');
  await expect(dialog.getByRole('button',{name:'Reconnect Threads',exact:true})).toBeVisible();
+ await expect(dialog.getByRole('region',{name:'Publishing capability'})).toContainText('publishing permission has not been granted');
+ await expect(page.locator('.connection-card.threads')).toContainText('Connected');
  await expect(page).not.toHaveURL(/[?&](oauth|provider)=/);
  const box=(await dialog.boundingBox())!;expect(Math.abs(box.y+box.height/2-422)).toBeLessThanOrEqual(2);
 });

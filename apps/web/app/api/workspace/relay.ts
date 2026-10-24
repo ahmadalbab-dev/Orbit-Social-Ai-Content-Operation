@@ -1,10 +1,11 @@
 import { randomBytes } from "node:crypto";
+import { getVercelOidcToken } from "@vercel/oidc";
 import { apiOrigin } from "../../orbit/api-origin";
 
 const MAX_BODY = 4 * 1024 * 1024;
 const routes: [string, RegExp][] = [
   ["GET", /^(workspaces|brands|content|ai\/status|integrations\/status|media\/status|media\/renders|media\/image-edit\/status|billing\/status)$/],
-  ["POST", /^(workspaces|brands|content\/(manual|generate)|billing\/(checkout|portal)|media\/(assets|renders|image-edit|video-plan|editor-plan))$/],
+  ["POST", /^(workspaces|brands|content\/(manual|generate)|billing\/(checkout|portal)|media\/(assets|renders|image-edit(?:\/generate)?|video-plan|editor-plan))$/],
   ["POST", /^integrations\/oauth\/(facebook|instagram|threads|tiktok)\/start$/],
   ["PUT", /^brands\/[A-Za-z0-9_-]+$/],
   ["PUT", /^content\/[A-Za-z0-9_-]+\/review$/],
@@ -55,6 +56,17 @@ export async function relayWorkspace(request: Request, segments: string[], fetch
       for (const chunk of chunks) { body.set(chunk, offset); offset += chunk.byteLength; }
       // Computed from bounded bytes, never copied from untrusted input.
       headers.set("content-length", String(bytes));
+    }
+  }
+  // Short-lived service identity is separate from the user's workspace JWT.
+  // Only the SDK's current request context may supply it; never forward a
+  // caller-supplied protection header or send it to a non-Vercel API origin.
+  if (process.env.VERCEL === "1" && new URL(base).hostname.endsWith(".vercel.app")) {
+    try {
+      const token = await getVercelOidcToken();
+      if (token) headers.set("x-vercel-trusted-oidc-idp-token", token);
+    } catch {
+      // Public deployments and non-OIDC setups retain their existing behavior.
     }
   }
   try {

@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, ServiceUnavailableException } from "@nestjs/common";
-import { GroqVideoPlanner, HuggingFaceVideoPlanner, validateVideoPlanInput } from "@sma/ai";
+import { GatewayVideoPlanner, GeminiVideoPlanner, GroqVideoPlanner, HuggingFaceVideoPlanner, validateVideoPlanInput } from "@sma/ai";
 import { ImageAiService } from "./image-ai.service";
 import type { RequestIdentity } from "./security";
 import { aiServiceFailure } from "./ai-errors";
@@ -15,7 +15,7 @@ export class VideoAiService {
     const config = textAiConfig();
     try {
       if (!config.configured || config.provider === "openai") throw new Error();
-      provider = config.provider === "groq" ? new GroqVideoPlanner(config.apiKey!, config.model) : new HuggingFaceVideoPlanner(config.apiKey!, config.model);
+      provider = config.provider === "gateway" ? new GatewayVideoPlanner(config.apiKey!,config.model) : config.provider === "gemini" ? new GeminiVideoPlanner(config.apiKey!, config.model) : config.provider === "groq" ? new GroqVideoPlanner(config.apiKey!, config.model) : new HuggingFaceVideoPlanner(config.apiKey!, config.model);
     }
     catch { throw new ServiceUnavailableException("AI video planning is not configured"); }
     await this.quota.reserveAttempt(identity, true);

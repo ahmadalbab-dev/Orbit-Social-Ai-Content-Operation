@@ -3,6 +3,18 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
+export function geminiSmokeEnabled(env) {
+  if (!['true', 'studio-and-generation'].includes(env.ORBIT_GEMINI_SMOKE_ON_BUILD)) return false;
+  if (env.VERCEL_ENV !== 'preview') throw Error('Gemini smoke requires Preview.');
+  return true;
+}
+
+export function gatewaySmokeEnabled(env) {
+  if (env.ORBIT_GATEWAY_SMOKE_ON_BUILD !== 'true') return false;
+  if (env.VERCEL_ENV !== 'preview') throw Error('Gateway smoke requires Preview.');
+  return true;
+}
+
 export function migrationUrl(env) {
   if (env.ORBIT_MIGRATE_ON_BUILD !== 'true') return null;
   if (env.VERCEL_ENV !== 'production') throw Error('Release migrations require Production.');
@@ -32,6 +44,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     if (result.error || result.status !== 0) process.exit(result.status || 1);
   }
   run(['--filter', '@sma/api...', 'build']);
+  if (geminiSmokeEnabled(process.env)) {
+    const result = spawnSync(process.execPath, ['scripts/gemini-live-smoke.mjs'], {cwd:root, env:process.env, stdio:'inherit'});
+    if (result.error || result.status !== 0) process.exit(result.status || 1);
+  }
+  if (gatewaySmokeEnabled(process.env)) {
+    const result = spawnSync(process.execPath, ['scripts/gateway-live-smoke.mjs'], {cwd:root, env:process.env, stdio:'inherit'});
+    if (result.error || result.status !== 0) process.exit(result.status || 1);
+  }
   if (releaseUrl) {
     run(['--filter', '@sma/database', 'migrate:deploy'], { ...process.env, DATABASE_URL: releaseUrl });
     console.log('Tracked release migrations completed. Runtime database configuration is unchanged.');

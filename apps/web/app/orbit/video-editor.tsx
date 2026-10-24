@@ -1,4 +1,9 @@
 "use client";
+import {VideoStitchControls} from "./video-stitch-controls";
+import {stitchedDuration, stitchIntroEdit, validateVideoStitch, type VideoStitchIntro} from "./video-stitch";
+import {VideoChromaControls} from "./video-chroma-controls";
+import {defaultVideoChromaKey, releaseVideoChromaKey, type VideoChromaKey} from "./video-chroma-key";
+import {prepareVideoOverlay} from "./video-overlay-image";
 
 import { useEffect, useRef, useState } from "react";
 import {
@@ -79,12 +84,24 @@ const failures: Record<string, string> = {
 export function VideoEditor({
   active = true,
   preview = false,
+  initialFile = null,
 }: {
   active?: boolean;
   preview?: boolean;
+  initialFile?: File|null;
 }) {
   const [tool, setTool] = useState<EditorTool>("media");
   const videoRef = useRef<HTMLVideoElement>(null);
+  const referenceVideoRef = useRef<HTMLVideoElement>(null);
+  const [stitchIntro,setStitchIntro] = useState<VideoStitchIntro|null>(null);
+  const [stitchEnabled,setStitchEnabled] = useState(false);
+  const [stitchUndo,setStitchUndo] = useState<boolean|null>(null);
+  const [stitchPreview,setStitchPreviewState] = useState<'reference'|'response'|null>(null);
+  const stitchPreviewState = useRef<'reference'|'response'|null>(null);
+  const stitchPreviewGeneration = useRef(0);
+  function setStitchPreview(phase:'reference'|'response'|null){stitchPreviewState.current=phase;setStitchPreviewState(phase);}
+  function stopStitchPreview(){stitchPreviewGeneration.current++;referenceVideoRef.current?.pause();videoRef.current?.pause();setStitchPreview(null);}
+  useEffect(()=>{const element=referenceVideoRef.current;return()=>{element?.pause();if(stitchIntro)URL.revokeObjectURL(stitchIntro.src);};},[stitchIntro?.src]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{
@@ -122,6 +139,16 @@ export function VideoEditor({
   const [flip, setFlip] = useState(false);
   const [playhead, setPlayhead] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [chromaKey, setChromaKey] = useState<VideoChromaKey | null>(null);
+  const [chromaDraft, setChromaDraft] = useState<VideoChromaKey>(defaultVideoChromaKey);
+  const [previewChroma, setPreviewChroma] = useState(false);
+  const [chromaUndo, setChromaUndo] = useState<{effect: VideoChromaKey | null} | null>(null);
+  const chosenChroma = previewChroma ? chromaDraft : chromaKey;
+  useEffect(() => {
+    if (chromaDraft.backgroundLayerId && !overlays.some(layer=>layer.id===chromaDraft.backgroundLayerId)) setChromaDraft(current=>({...current,backgroundLayerId:null}));
+    if (chromaKey?.backgroundLayerId && !overlays.some(layer=>layer.id===chromaKey.backgroundLayerId)) setChromaKey(current=>current?{...current,backgroundLayerId:null}:null);
+    if (chromaUndo?.effect?.backgroundLayerId && !overlays.some(layer=>layer.id===chromaUndo.effect!.backgroundLayerId)) setChromaUndo(null);
+  }, [overlays, chromaDraft.backgroundLayerId, chromaKey, chromaUndo]);
   const [lightning, setLightning] = useState<LightningEffect | null>(null);
   const [proposedLightning, setProposedLightning] = useState<LightningEffect | null>(null);
   const [previewLightning, setPreviewLightning] = useState(false);
@@ -163,6 +190,7 @@ export function VideoEditor({
     mounted.current = true;
     return () => {
       mounted.current = false;
+      stitchPreviewGeneration.current++;referenceVideoRef.current?.pause();videoRef.current?.pause();
       overlayUrls.current.forEach((url) => URL.revokeObjectURL(url));
       overlayUrls.current.clear();
       overlayImages.current.clear();
@@ -269,6 +297,28 @@ export function VideoEditor({
       c.end <= duration,
   );
   const dimensions = originalFrame && source ? sourceFrame : formats[format];
+  let validStitch = true;
+  try { if(stitchIntro)validateVideoStitch(stitchIntro,{duration,speed});else validStitch=false; } catch { validStitch=false; }
+  function chooseStitchReference(file:File|undefined){
+    stopStitchPreview();setStitchEnabled(false);setStitchUndo(null);
+    if(!file){setStitchIntro(null);return;}
+    if(!['video/mp4','video/webm','video/quicktime'].includes(file.type)||file.size>(status?.limits.uploadBytes??256*1024*1024)){setNotice('Choose a local MP4, WebM or MOV reference up to 256 MB.');return;}
+    setStitchIntro({src:URL.createObjectURL(file),name:file.name,start:0,duration:0,sourceDuration:0,volume:1});setNotice('Loading the reference video on your device…');
+  }
+  function previewStitch(){
+    if(!stitchIntro||!validStitch)return;stopStitchPreview();
+    const reference=referenceVideoRef.current;if(!reference)return;
+    const generation=stitchPreviewGeneration.current;reference.currentTime=stitchIntro.start;reference.volume=stitchIntro.volume;setStitchPreview('reference');
+    void reference.play().then(()=>{if(generation!==stitchPreviewGeneration.current)reference.pause();}).catch(()=>{stopStitchPreview();setNotice('Reference playback was blocked. Tap Preview again.');});
+  }
+  function finishReferencePreview(){
+    if(stitchPreviewState.current!=='reference')return;referenceVideoRef.current?.pause();
+    const response=videoRef.current;if(!response){stopStitchPreview();return;}
+    const generation=stitchPreviewGeneration.current;response.currentTime=start;setStitchPreview('response');
+    if(chosenLightning)void unlockThunder().catch(()=>setNotice('Tap Play to enable response thunder audio.'));
+    void response.play().then(()=>{if(generation!==stitchPreviewGeneration.current)response.pause();}).catch(()=>{stopStitchPreview();setNotice('Response playback was blocked. Tap Preview again.');});
+  }
+  useEffect(()=>{if(!active||busy)stopStitchPreview();const hidden=()=>{if(document.hidden)stopStitchPreview();};document.addEventListener('visibilitychange',hidden);return()=>document.removeEventListener('visibilitychange',hidden);},[active,busy,source]);
   useVideoSoundtrack(videoRef, soundtrack, {
     source,
     start,
@@ -328,6 +378,8 @@ export function VideoEditor({
     overlays,
     soundtrack,
     lightning: chosenLightning,
+    chromaKey: chosenChroma,
+    intro: stitchEnabled ? stitchIntro : null,
     ...(template === "product" ||
     template === "cinematic" ||
     template === "captions"
@@ -353,86 +405,75 @@ export function VideoEditor({
     captions,
     ...(news ? { news: { title: cleanText(title), date: dateLabel } } : {}),
   };
+  const advanceStitchPreview = useRef(finishReferencePreview);
+  advanceStitchPreview.current = finishReferencePreview;
   const latestEdit = useRef(edit);
   latestEdit.current = edit;
+  const latestIntroEdit = useRef<LocalVideoEdit|null>(null);
+  latestIntroEdit.current = stitchIntro ? stitchIntroEdit(edit,stitchIntro) : null;
   useEffect(() => {
     if (!active) videoRef.current?.pause();
   }, [active]);
   useEffect(() => {
     if (!source || !active) return;
     let frame = 0;
+    const output = canvasRef.current;
     const draw = () => {
-      const video = videoRef.current,
+      const referencePhase=stitchPreviewState.current==='reference';
+      const video = referencePhase?referenceVideoRef.current:videoRef.current,
         canvas = canvasRef.current;
       if (video && canvas && video.readyState >= 2) {
-        const current = latestEdit.current;
+        const current = referencePhase?latestIntroEdit.current!:latestEdit.current;
         if (canvas.width !== current.width) canvas.width = current.width;
         if (canvas.height !== current.height) canvas.height = current.height;
         const context = canvas.getContext("2d");
-        if (context)
-          drawEditedFrame(
-            context,
-            video,
-            current,
-            Math.max(0, video.currentTime - current.start),
-            overlayImages.current,
-          );
+        if (context) {
+          try {
+            const elapsed=Math.max(0,video.currentTime-current.start);
+            drawEditedFrame(context,video,current,elapsed,overlayImages.current);
+            if(stitchPreviewState.current==='reference'&&elapsed>=current.duration-.025)advanceStitchPreview.current();
+            else if(stitchPreviewState.current==='response'&&elapsed>=current.duration-.025)stopStitchPreview();
+          }
+          catch (error) { video.pause();stopStitchPreview();setPreviewChroma(false);setChromaKey(null);setNotice(readableError(error)); }
+        }
       }
       frame = requestAnimationFrame(draw);
     };
     frame = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(frame);
-  }, [source, active]);
+    return () => { cancelAnimationFrame(frame);releaseVideoChromaKey(output?.getContext("2d") ?? null); };
+  }, [source, active, stitchIntro?.src]);
   async function addOverlays(files: FileList | null) {
     if (!files || busy || overlayLoading.current) return;
     overlayLoading.current = true;
     const generation = sourceGeneration.current;
     const room = 6 - overlays.length;
     const next: VideoImageOverlay[] = [];
-    for (const file of Array.from(files).slice(0, room)) {
-      if (
-        !["image/png", "image/jpeg", "image/webp"].includes(file.type) ||
-        file.size > 8 * 1024 * 1024
-      ) {
-        setNotice("Use PNG, JPEG or WebP images up to 8 MB each.");
-        continue;
+    try {
+      for (const file of Array.from(files).slice(0, room)) {
+        try {
+          const prepared = await prepareVideoOverlay(file);
+          if (!mounted.current || generation !== sourceGeneration.current) {
+            URL.revokeObjectURL(prepared.src);
+            break;
+          }
+          const id = crypto.randomUUID();
+          overlayUrls.current.add(prepared.src);
+          overlayImages.current.set(id, prepared.image);
+          next.push({id, src:prepared.src, x:0.05, y:0.05, width:0.3, opacity:1, start:0, end:duration});
+          if (prepared.resized) setNotice('The overlay was resized for editing. Your original file is unchanged.');
+        } catch (error) {
+          if (mounted.current && generation === sourceGeneration.current)
+            setNotice(error instanceof Error ? error.message : 'This image could not be opened.');
+        }
       }
-      const src = URL.createObjectURL(file);
-      overlayUrls.current.add(src);
-      try {
-        const image = new Image();
-        image.src = src;
-        await image.decode();
-        if (
-          !mounted.current ||
-          generation !== sourceGeneration.current ||
-          image.naturalWidth * image.naturalHeight > 4_000_000
-        )
-          throw new Error("Use an overlay below 4 megapixels.");
-        const id = crypto.randomUUID();
-        overlayImages.current.set(id, image);
-        next.push({
-          id,
-          src,
-          x: 0.05,
-          y: 0.05,
-          width: 0.3,
-          opacity: 1,
-          start: 0,
-          end: duration,
-        });
-      } catch {
-        URL.revokeObjectURL(src);
-        overlayUrls.current.delete(src);
-        if (mounted.current)
-          setNotice(
-            "The image could not be loaded. Use an image below 4 megapixels.",
-          );
+      if (mounted.current && generation === sourceGeneration.current)
+        setOverlays((old) => [...old, ...next].slice(0, 6));
+      else for (const item of next) {
+        URL.revokeObjectURL(item.src);
+        overlayUrls.current.delete(item.src);
+        overlayImages.current.delete(item.id);
       }
-    }
-    overlayLoading.current = false;
-    if (mounted.current && generation === sourceGeneration.current)
-      setOverlays((old) => [...old, ...next].slice(0, 6));
+    } finally { overlayLoading.current = false; }
   }
   const aiCurrent: VideoEditorState = {
     sourceDuration,
@@ -544,6 +585,10 @@ export function VideoEditor({
     !soundtrack &&
     !lightning &&
     !previewLightning &&
+    !chromaKey &&
+    !previewChroma &&
+    !stitchEnabled &&
+    !stitchPreview &&
     !overlays.length &&
     brightness === 1 &&
     contrast === 1 &&
@@ -570,6 +615,8 @@ export function VideoEditor({
       return;
     }
     setAiUndo(null);
+    stopStitchPreview();setStitchIntro(null);setStitchEnabled(false);setStitchUndo(null);
+    setChromaKey(null);setChromaDraft(defaultVideoChromaKey);setPreviewChroma(false);setChromaUndo(null);
     setTemplate(neutralVideoSettings.template); setNews(neutralVideoSettings.news); setTitle(neutralVideoSettings.title);
     setBrightness(1); setContrast(1); setSaturation(1); setOriginalFrame(true); setViewZoom(1);
     sourceGeneration.current += 1;
@@ -591,6 +638,7 @@ export function VideoEditor({
     setPlayhead(0);
     setNotice("");
   }
+  useEffect(()=>{if(initialFile)choose(initialFile);},[initialFile]);
   async function download(job: RenderJob, signal: AbortSignal) {
     const blob = await renderDownload(job.id, signal);
     if (signal.aborted) return;
@@ -636,11 +684,12 @@ export function VideoEditor({
                 ref={videoRef}
                 onPlay={() => setPlaying(true)}
                 onPause={() => setPlaying(false)}
-                onEnded={() => setPlaying(false)}
+                onEnded={() => {setPlaying(false);if(stitchPreviewState.current==='response')stopStitchPreview();}}
                 onEmptied={() => setPlaying(false)}
-                onTimeUpdate={(event) =>
-                  setPlayhead(event.currentTarget.currentTime)
-                }
+                onTimeUpdate={(event) => {
+                  setPlayhead(event.currentTarget.currentTime);
+                  if(stitchPreviewState.current==='response'&&event.currentTarget.currentTime>=start+duration-.025)stopStitchPreview();
+                }}
                 src={source}
                 playsInline
                 onLoadedMetadata={(event) => {
@@ -679,6 +728,11 @@ export function VideoEditor({
                 <span>Your video goes here.</span>
               </div>
             )}
+            {stitchIntro ? <video key={stitchIntro.src} ref={referenceVideoRef} src={stitchIntro.src} playsInline preload="auto" style={{display:'none'}}
+              onLoadedMetadata={event=>{const element=event.currentTarget,length=element.duration;if(!Number.isFinite(length)||length<=0){setNotice('The reference has no usable duration. Choose another video.');setStitchIntro(null);return;}setStitchIntro(current=>current?.src===element.src?{...current,sourceDuration:length,duration:Math.min(length,5)}:current);setNotice('Reference loaded locally. Choose its trim, preview, then Apply stitch.');}}
+              onTimeUpdate={event=>{if(stitchPreviewState.current==='reference'&&event.currentTarget.currentTime>=stitchIntro.start+stitchIntro.duration-.025)finishReferencePreview();}}
+              onEnded={finishReferencePreview}
+              onError={()=>{stopStitchPreview();setStitchEnabled(false);setStitchIntro(null);setNotice('This reference could not be decoded. Try an MP4 with H.264 video.');}}/> : null}
             {source ? (
               <canvas
                 ref={canvasRef}
@@ -693,6 +747,7 @@ export function VideoEditor({
                 style={{ transform: `scale(${viewZoom})` }}
               >
                 {overlays
+                  .filter(layer=>!stitchPreview && layer.id!==chosenChroma?.backgroundLayerId)
                   .filter(
                     (o) =>
                       playhead - start >= o.start && playhead - start < o.end,
@@ -828,11 +883,12 @@ export function VideoEditor({
                 type="button"
                 variant="outline"
                 disabled={busy}
-                aria-label={playing ? "Pause video preview" : "Play video preview"}
-                aria-pressed={playing}
-                title={playing ? "Pause video preview" : "Play video preview"}
+                aria-label={playing || stitchPreview ? "Pause video preview" : "Play video preview"}
+                aria-pressed={playing || !!stitchPreview}
+                title={playing || stitchPreview ? "Pause video preview" : "Play video preview"}
                 style={{ minWidth: 44, minHeight: 44, padding: 10 }}
                 onClick={() => {
+                  if(stitchPreview){stopStitchPreview();return;}
                   const v = videoRef.current;
                   if (v) {
                     if (v.paused) {
@@ -844,7 +900,7 @@ export function VideoEditor({
                   }
                 }}
               >
-                {playing ? <Pause size={20} strokeWidth={1.5} aria-hidden="true" /> : <Play size={20} strokeWidth={1.5} aria-hidden="true" />}
+                {playing || stitchPreview ? <Pause size={20} strokeWidth={1.5} aria-hidden="true" /> : <Play size={20} strokeWidth={1.5} aria-hidden="true" />}
               </Button>
               <input
                 aria-label="Video playhead"
@@ -853,7 +909,7 @@ export function VideoEditor({
                 max={sourceDuration || 1}
                 step=".05"
                 value={playhead}
-                disabled={busy}
+                disabled={busy || !!stitchPreview}
                 onChange={(e) => {
                   if (videoRef.current) {
                     videoRef.current.currentTime = Number(e.target.value);
@@ -947,7 +1003,7 @@ export function VideoEditor({
           </Button>
 </EditorToolPanel><EditorToolPanel tool="ai" active={tool}>
           <EditorAiPanel
-            assetIdentity={JSON.stringify([source, overlays.map(layer => layer.id)])}
+            assetIdentity={JSON.stringify([source, overlays.map(layer => layer.id), chosenChroma, stitchIntro, stitchEnabled])}
             key={source}
             onPrepareLightning={prepareLightning}
             kind="video"
@@ -966,17 +1022,17 @@ export function VideoEditor({
               const ctx = canvas.getContext("2d");
               if (!ctx) return null;
               ctx.scale(scale, scale);
-              drawEditedFrame(
+              try { drawEditedFrame(
                 ctx,
                 video,
                 current,
                 Math.max(0, video.currentTime - current.start),
                 overlayImages.current,
-              );
+              ); } finally { releaseVideoChromaKey(ctx); }
               return canvas;
             }}
             current={aiCurrent}
-            disabled={busy || !source || !validRange}
+            disabled={busy || !source || !validRange || !!stitchPreview}
             preview={preview}
             onApply={(changes) => applyAi(changes as VideoEditorChanges)}
           />
@@ -1082,6 +1138,23 @@ export function VideoEditor({
             ))}
           </details>
 </EditorToolPanel><EditorToolPanel tool="layers" active={tool}>
+          <VideoStitchControls intro={stitchIntro} disabled={busy || !source || !validRange} valid={validStitch} enabled={stitchEnabled} previewing={!!stitchPreview} canUndo={stitchUndo!==null}
+            outputSeconds={stitchedDuration({duration,speed},stitchIntro)} onChoose={chooseStitchReference}
+            onChange={value=>{stopStitchPreview();setStitchIntro(value);setStitchEnabled(false);setStitchUndo(null);}}
+            onPreview={previewStitch} onStop={stopStitchPreview}
+            onApply={()=>{stopStitchPreview();setStitchUndo(stitchEnabled);setStitchEnabled(true);setNotice('Reference then edited response applied to local export.');}}
+            onRemove={()=>{stopStitchPreview();setStitchUndo(stitchEnabled);setStitchEnabled(false);}}
+            onUndo={()=>{stopStitchPreview();if(stitchUndo!==null){setStitchEnabled(stitchUndo);setStitchUndo(null);}}}/>
+          <VideoChromaControls
+            draft={chromaDraft} onChange={setChromaDraft} disabled={busy || !source || !validRange}
+            active={!!chromaKey} previewing={previewChroma} canUndo={!!chromaUndo}
+            backgrounds={overlays.map((layer,index)=>({id:layer.id,label:`Image layer ${index+1}`}))}
+            onPreview={()=>{setPreviewChroma(true);setNotice("Review green screen in the video preview, then Apply to include it in export.");}}
+            onStopPreview={()=>setPreviewChroma(false)}
+            onApply={()=>{setChromaUndo({effect:chromaKey});setChromaKey({...chromaDraft});setPreviewChroma(false);setNotice("Green screen applied to local preview and export.");}}
+            onRemove={()=>{setChromaUndo({effect:chromaKey});setChromaKey(null);setPreviewChroma(false);}}
+            onUndo={()=>{if(chromaUndo){setChromaKey(chromaUndo.effect);setChromaUndo(null);setPreviewChroma(false);}}}
+          />
           <details className="small-details" open={tool === "layers" || undefined}>
             <summary>Image overlays · {overlays.length}/6</summary>
             <p className="review-help">
@@ -1349,7 +1422,7 @@ export function VideoEditor({
           <VideoAiPlanPanel
             key={`${source}:${start}:${duration}`}
             duration={duration}
-            disabled={busy || !source || !validRange}
+            disabled={busy || !source || !validRange || !!stitchPreview}
             preview={preview}
             onApply={(plan) => {
               setTitle(plan.title);
@@ -1443,7 +1516,7 @@ export function VideoEditor({
 </EditorToolPanel><EditorToolPanel tool="export" active={tool}>
           <p className="review-help">
             {originalFrame ? "Original source frame is retained by local export (up to 1920px). Choose a standard format to enable a server render. " : ""}
-            Selected clip: {duration > 0 ? (duration / speed).toFixed(1) : "0"}{" "}
+            {stitchEnabled ? 'Stitched sequence' : 'Selected clip'}: {duration > 0 ? stitchedDuration({duration,speed},stitchEnabled?stitchIntro:null).toFixed(1) : "0"}{" "}
             seconds after speed adjustment. Speed, volume, rotate and flip are
             applied by local export with image layers and colour. The server
             preset uses trim, format, title and captions.
@@ -1459,6 +1532,9 @@ export function VideoEditor({
               !validMusic ||
               !validLightning ||
               previewLightning ||
+              previewChroma ||
+              !!stitchPreview ||
+              (stitchEnabled && !validStitch) ||
               (news && (!cleanText(title) || !dateLabel))
             }
             onClick={() =>
@@ -1485,6 +1561,8 @@ export function VideoEditor({
                       overlays,
                       soundtrack,
                       lightning,
+                      chromaKey,
+                      intro: stitchEnabled ? stitchIntro : null,
                       titleCard: edit.titleCard,
                       brightness,
                       contrast,
