@@ -53,6 +53,20 @@ does not prove the existing adapter implements transcription/TTS or that the
 remaining daily allowance can support Orbit's users. Compare one audio route at a
 time instead of installing several SDKs or calling multiple providers per action.
 
+## Other cloud alternatives reviewed, not selected now
+
+| Platform | Verified free/trial boundary | Why it is not being added now |
+| --- | --- | --- |
+| AWS / Bedrock candidate | AWS advertises up to $200 in new-customer credits and a Free plan lasting up to six months or credit exhaustion. Most new customers need no payment method, but identity verification may request one. Eligibility and individual model/service availability still need checking. | A finite onboarding offer is not a recurring free generative-media allowance. Another account, IAM and adapter would delay the existing working provider paths. |
+| Azure / Microsoft Foundry | The platform is free to explore; consumed features/services have their own rates. Building requires an Azure subscription. Its advertised $200/30-day credit is a trial, not blanket free model inference. | No verified ongoing free allowance for Orbit's selected generative-media tasks; avoid new subscription and deployment work without a specific capability gap. |
+| Cerebras | Official rate-limit FAQ requires a verified payment method for $5 trial credits, expiring after 30 days. It explicitly says there is no permanently free recurring tier; API/Playground remain inactive without payment-method setup. | Conflicts with the current no-card preference and duplicates existing text inference. Marketing's shorter account/free-credit description does not override the detailed setup conditions. |
+| Cohere | Trial API calls are free/rate-limited, but trial keys are explicitly not permitted for production or commercial purposes. Production keys are pay-as-you-go. | A commercial Orbit app cannot use trial keys as its free production backend. No immediate need to add another text/retrieval provider. |
+
+This is a practical shortlist, not an assertion that every cloud model has been
+audited. Revisit an alternative only when it fills a measured capability, quality,
+capacity or privacy gap. Do not create accounts or connect billing merely to
+collect temporary credits; provider allowances must not become product promises.
+
 ## Firebase: capability, cost and setup boundaries
 
 - The no-payment-method route is **Spark + Gemini Developer API**, with no Cloud
@@ -144,6 +158,11 @@ Preview acceptance does not authorize production promotion or paid activation.
 - https://console.groq.com/docs/speech-to-text
 - https://huggingface.co/docs/inference-providers/pricing
 - https://huggingface.co/docs/transformers.js/index
+- https://aws.amazon.com/free/free-tier-faqs/
+- https://azure.microsoft.com/en-us/pricing/details/microsoft-foundry/
+- https://inference-docs.cerebras.ai/support/rate-limits
+- https://www.cerebras.ai/inference
+- https://cohere.com/pricing
 
 Related repository records: `GEMINI_INTEGRATION.md`,
 `CLOUDFLARE_IMAGE_EDITING.md`, `AI_EDITOR_CAPABILITIES.md`,
