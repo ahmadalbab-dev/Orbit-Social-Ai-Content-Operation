@@ -71,3 +71,7 @@ Upstream advisory references:
 
 - https://github.com/advisories/GHSA-mrhx-c7xc-m3w5
 - https://github.com/expressjs/body-parser/security/advisories/GHSA-27r3-jxmh-p828
+
+## Owner review: hero typography adjustment
+
+After reviewing Preview 93be7a7, the owner requested removing only the hero Thinking Orb and making `ai studio` the same font size as `orbit.`. The hero now renders text-only masks at a 1:1 font-size ratio, centered on the same point and fitted to the longer title. Shared application icons, static app icons, colours, code texture and bottom-to-top handoff remain. This supersedes the hero connecting-geometry description above; ThinkingOrb remains in application chrome.

@@ -1,7 +1,6 @@
 "use client";
 import {useEffect,useRef} from 'react';
 import {AI_STUDIO_SCALE,heroCellBlend,heroCellCoverage,heroCodeRow,heroSequence} from './hero-sequence';
-import { MODE_FRAMES, paintFrame, resolvePreset } from 'thinking-orbs/engine';
 
 // Rendering adapted from Ponytail 5 site.js, DietrichGebert (MIT).
 // See docs/licenses/PONYTAIL_MIT.txt. The code texture and masks retain Orbit branding.
@@ -64,8 +63,6 @@ export function OrbitField({paused,centered=false}:{paused:boolean;centered?:boo
   let fontSize=13,columnWidth=8,lineHeight=17,columns=0,rows=0,cachedRow=-1;
   let orbit:Mask,studio:Mask,cells:Cell[]=[],union:Box={left:0,top:0,right:0,bottom:0};
   let dark=true,colours:number[][]=[];
-  let mark={x:0,y:0,size:64};
-  const connecting=resolvePreset('connecting',64);
   const frozen=()=>paused||reduced.matches;
   const active=()=>!disposed&&!document.hidden&&onScreen&&!frozen();
   const font=(weight:number,size=fontSize)=>`${weight} ${size}px "JetBrains Mono", ui-monospace, monospace`;
@@ -137,17 +134,6 @@ export function OrbitField({paused,centered=false}:{paused:boolean;centered?:boo
     context!.fillText(character,cell.x*columnWidth,(cell.y+1)*lineHeight);context!.shadowBlur=0;
    }
    context!.globalAlpha=1;
-   // Same geometry as <ThinkingOrb state="connecting" size={64}/>, drawn at
-   // native canvas resolution. Its wipe follows the title's bottom-to-top handoff.
-   const visible=state.orbit;
-   if(visible>0){
-    context!.save();context!.beginPath();
-    context!.rect(mark.x,mark.y+(state.toStudio?0:mark.size*(1-visible)),mark.size,mark.size*visible);context!.clip();
-    context!.translate(mark.x,mark.y);context!.scale(mark.size/64,mark.size/64);
-    const colour=colours[32];
-    paintFrame(context!,MODE_FRAMES[connecting.mode](64,seconds*connecting.speed,connecting.opts),dark,{r:colour[0],g:colour[1],b:colour[2]});
-    context!.restore();
-   }
    if(active())frame=requestAnimationFrame(draw);
   }
   function refresh(){cancelAnimationFrame(frame);frame=0;lastTick=0;lastPaint=0;palette();draw(performance.now());}
@@ -156,10 +142,9 @@ export function OrbitField({paused,centered=false}:{paused:boolean;centered?:boo
    const maskRatio=Math.min(1,Math.sqrt(2_000_000/(width*height)));
    mask.width=Math.max(1,Math.round(width*maskRatio));mask.height=Math.max(1,Math.round(height*maskRatio));
    const ink=mask.getContext('2d')!;ink.setTransform(maskRatio,0,0,maskRatio,0,0);ink.fillStyle='#fff';ink.textBaseline='middle';
-   const logo=size*.7,gap=size*.14;
-   if(kind==='orbit'){
-    ink.font=font(800,size);ink.fillText('orbit.',left+logo+gap,cy);
-   }else{ink.font=font(800,size*AI_STUDIO_SCALE);ink.textAlign='center';ink.fillText('ai studio',left+total/2,cy);}
+   ink.textAlign='center';
+   ink.font=font(800,size*(kind==='studio'?AI_STUDIO_SCALE:1));
+   ink.fillText(kind==='orbit'?'orbit.':'ai studio',left+total/2,cy);
    const sampled=document.createElement('canvas');sampled.width=columns;sampled.height=rows;
    const sample=sampled.getContext('2d',{willReadFrequently:true})!;sample.imageSmoothingEnabled=true;sample.imageSmoothingQuality='high';
    sample.drawImage(mask,0,0,columns,rows);
@@ -183,15 +168,12 @@ export function OrbitField({paused,centered=false}:{paused:boolean;centered?:boo
    context!.font=font(400);columnWidth=context!.measureText('M').width;columns=Math.ceil(width/columnWidth);rows=Math.ceil(height/lineHeight);
    const mobile=!centered&&width<=900;
    const available=width*(centered?.90:mobile?.91:.49);
-   context!.font=font(800,100);const widthPerSize=.84+context!.measureText('orbit.').width/100;
+   context!.font=font(800,100);const widthPerSize=Math.max(context!.measureText('orbit.').width,context!.measureText('ai studio').width*AI_STUDIO_SCALE)/100;
    const size=Math.min(300,width*(width<700?.23:.19),available/widthPerSize),total=size*widthPerSize;
    const left=centered||mobile?(width-total)/2:width*.75-total/2;
    const cy=centered?height*.42:mobile?Math.min(150,height*.30):height*.42;
-   mark={x:left,y:cy-size*.35,size:size*.7};
    orbit=makeMask('orbit',size,left,total,cy);studio=makeMask('studio',size,left,total,cy);
    union={left:Math.min(orbit.box.left,studio.box.left),top:Math.min(orbit.box.top,studio.box.top),right:Math.max(orbit.box.right,studio.box.right),bottom:Math.max(orbit.box.bottom,studio.box.bottom)};
-   // Include the separate brand canvas geometry in layout/overlap measurements.
-   union={left:Math.min(union.left,mark.x/columnWidth),top:Math.min(union.top,mark.y/lineHeight),right:Math.max(union.right,(mark.x+mark.size)/columnWidth),bottom:Math.max(union.bottom,(mark.y+mark.size)/lineHeight)};
    cells=[];
    for(let index=0;index<columns*rows;index++)if(orbit.set[index]||studio.set[index]){
     const x=index%columns,y=Math.floor(index/columns);cells.push({index,x,y,rowPosition:(y-union.top)/Math.max(1,union.bottom-union.top)});
@@ -213,5 +195,5 @@ export function OrbitField({paused,centered=false}:{paused:boolean;centered?:boo
   void Promise.all([document.fonts.load('400 13px "JetBrains Mono"'),document.fonts.load('800 13px "JetBrains Mono"'),document.fonts.ready]).then(ready,ready);
   return()=>{disposed=true;cancelAnimationFrame(frame);observer.disconnect();intersection.disconnect();themeObserver.disconnect();window.removeEventListener('orbit-appearance',refresh);reduced.removeEventListener('change',refresh);document.removeEventListener('visibilitychange',visibility);};
  },[paused,centered]);
- return <div className={`orbit-artwork ${centered?'orbit-artwork-centered':''}`} data-paused={paused}><canvas className="orbit-field" data-orbit-mark="connecting" ref={canvas} aria-hidden="true"/></div>;
+ return <div className={`orbit-artwork ${centered?'orbit-artwork-centered':''}`} data-paused={paused}><canvas className="orbit-field" ref={canvas} aria-hidden="true"/></div>;
 }

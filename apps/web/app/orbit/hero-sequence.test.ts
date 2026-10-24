@@ -1,8 +1,8 @@
 import {describe,expect,it} from 'vitest';
 import {AI_STUDIO_SCALE,HERO_SCENE_MS,HERO_TRANSITION_MS,heroSequence,heroCellBlend,heroCellCoverage,heroCodeRow} from './hero-sequence';
 describe('Ponytail-style upward Orbit code field',()=>{
- it('holds each readable title for nine seconds and preserves ai studio scale',()=>{
-  expect(AI_STUDIO_SCALE).toBe(.6);
+ it('holds each readable title for nine seconds and uses equal title font sizes',()=>{
+  expect(AI_STUDIO_SCALE).toBe(1);
   const duration=HERO_SCENE_MS+HERO_TRANSITION_MS;
   for(const t of [0,4500,HERO_SCENE_MS])expect(heroSequence(t)).toMatchObject({orbit:1,studio:0});
   for(const t of [duration,duration+4500,duration+HERO_SCENE_MS])expect(heroSequence(t)).toMatchObject({orbit:0,studio:1});

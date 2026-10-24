@@ -1,7 +1,7 @@
 export const HERO_SCENE_MS = 9000;
 // Original renderer: 1.3 s switching window plus .45 s character settling.
 export const HERO_TRANSITION_MS = 1750;
-export const AI_STUDIO_SCALE = 0.6;
+export const AI_STUDIO_SCALE = 1;
 const clamp = (value:number) => Math.max(0,Math.min(1,value));
 const smooth = (value:number) => { const x=clamp(value);return x*x*(3-2*x); };
 /** Nine readable seconds, then a directional character transition; never a blank scene. */
