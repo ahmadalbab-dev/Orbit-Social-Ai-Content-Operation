@@ -25,3 +25,7 @@ https://collectui.com/designs/pricing-ui-design-inspiration/b9c1d044-39fd-441c-8
 ## Checks
 
 Acceptance covers main-navbar and collapsed-menu navigation, public versus preview links, Free-to-Studio routing, paid modal price/notice/close/Escape/focus behavior, both themes, reduced motion, mobile overflow, Professional button text contrast and zero payment/provider POST requests. Results are recorded after execution. Backend billing code, secrets, data and production release configuration are unchanged.
+
+## Recorded acceptance
+
+Web TypeScript passed. Production Next.js builds used by browser acceptance passed. Ten existing appearance/navigation cases passed in Chromium/WebKit with the new link. All eight pricing cases passed after correcting keyboard containment and explicit trigger focus for WebKit; no assertion was removed. Pricing cases exercise 320/390/1440px, both themes, 4.5:1 Professional CTA contrast, internal comparison-table overflow, modal focus cycling/return/close, FAQ expansion, public/preview route targets and zero payment/provider POST requests. Desktop screenshots were inspected. Artifacts: apps/web/test-results/pricing-accepted in the isolated owner-device worktree. The pricing case is included in the WebKit CI selection.
