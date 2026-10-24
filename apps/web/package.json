@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@sma/ui": "workspace:*",
+    "@vercel/oidc": "4.0.3",
     "lucide-react": "^0.525.0",
     "motion": "^12.23.12",
     "next": "^15.5.28",

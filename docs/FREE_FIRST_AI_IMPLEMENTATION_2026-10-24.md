@@ -188,3 +188,32 @@ Related repository records: `GEMINI_INTEGRATION.md`,
 - These browser cases intercept provider/workspace responses. They do not establish actual signed-in cloud inference or production quota/billing correctness.
 - A separate direct live probe was attempted through `vercel env run` with the existing Preview settings. Vercel correctly withheld sensitive Preview secrets, so the script stopped at its credential precondition before inference; no model request was made. Do not weaken secret classification, expose keys or ask for key re-entry to bypass this. A signed-in deployed flow is the remaining acceptance path.
 - Configuration metadata confirms the selected feature Preview uses Gemini3.5Flash-Lite text with existing admin consent and a separate Cloudflare image route; presence/configuration is not live inference verification. Production provider selection was not decrypted or changed.
+
+## Deployed Preview transport blocker and prepared repair
+
+An unauthenticated transport check of the feature API `/v1/health` returned302
+with the Vercel authentication wall; the production API returned200 JSON. These
+public health checks made no AI request. The web relay previously sent only the
+Supabase workspace identity, so a protected API Preview could reject the call
+before Orbit authentication or inference. Vercel login in the user's browser does
+not authenticate a separate server-to-server fetch.
+
+The prepared repair uses `@vercel/oidc`4.0.3 to read the current function identity
+on each hosted request and forward `x-vercel-trusted-oidc-idp-token` only to the
+fixed configured `.vercel.app` API origin. The Supabase bearer/workspace checks
+remain independent. User-provided platform headers are never forwarded, tokens
+are not cached/logged/returned, redirects remain blocked, and custom non-Vercel
+origins receive no platform token.
+
+For this protected two-project setup, the target API also needs an explicit
+Trusted Source. Configuration has **not** been changed by this patch:
+
+1. Vercel project **orbit-ai-studio-api → Settings → Deployment Protection**.
+2. **Trusted Sources → Vercel Projects → Add** (or inspect/edit the existing Orbit web entry).
+3. Select **orbit-ai-studio** in team **ahmadfaizyaakop-7657s-projects**.
+4. Allow only **from Preview → to Preview** for this acceptance. Remove other prefilled environment pairs from a new entry; do not alter API self-access or unrelated existing rules. Do not add Preview→Production.
+5. Save. In **orbit-ai-studio → Settings → Security**, confirm **Secure Backend Access with OIDC Federation** is enabled if the runtime reports no platform token.
+6. Retry the signed-in Preview flow. A backend401 for an invalid Supabase token is different from a Vercel protection302; neither should be reported as successful inference.
+
+Do not disable Deployment Protection or distribute a long-lived bypass secret.
+Reference: https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/trusted-sources
