@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowRight, ArrowUpRight, CalendarDays, Check, ChevronLeft, ChevronRight, Clock3, ExternalLink, Eye, FilePenLine, Film, Hash, House, Info, LayoutDashboard, Link2, LockKeyhole, MoreHorizontal, PenLine, Play, RefreshCw, Save, Settings, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, ArrowUpRight, CalendarDays, CreditCard, Check, ChevronLeft, ChevronRight, Clock3, ExternalLink, Eye, FilePenLine, Film, Hash, House, Info, LayoutDashboard, Link2, LockKeyhole, MoreHorizontal, PenLine, Play, RefreshCw, Save, Settings, ShieldCheck, Sparkles } from "lucide-react";
 import { Button, Card } from "./ui";
 import { WorkspaceNavigation } from "./workspace-navigation";
 import { DatePicker } from "../../components/ui/date-picker";
@@ -77,7 +77,7 @@ export default function Home({workspaceId,workspaceName="Preview workspace",work
   return <main className={`orbit-shell ${paused?"motion-paused":""}`}>
     <header className="app-header workspace-header">
       <button className="brand-word workspace-brand" onClick={()=>go("overview")} aria-label="Orbit home"><OrbitMark small/><span className="workspace-brand-copy"><span>orbit<span className="word-dot">.</span></span><small className="current-workspace-name" title={workspaceName}>{workspaceName}</small></span></button>
-      <WorkspaceNavigation items={navigation.map(item=>({...item,badge:item.id==="calendar"&&scheduledCount?(scheduledCount>99?"99+":String(scheduledCount)):undefined}))} activeId={view} onSelect={id=>go(id as View)}/>
+      <WorkspaceNavigation items={[...navigation.map(item=>({...item,badge:item.id==="calendar"&&scheduledCount?(scheduledCount>99?"99+":String(scheduledCount)):undefined})),{id:"pricing",label:"Plans",accessible:"Pricing / Plans",icon:CreditCard,href:preview?"/preview/pricing":"/pricing"}]} activeId={view} onSelect={id=>go(id as View)}/>
       <div className="workspace-header-actions"><AppearanceToggle/><button className="profile-button" onClick={()=>go("profile")} aria-label="Open profile" aria-current={view==="profile"?"page":undefined} title={profile.name}>{profile.name.slice(0,1).toUpperCase()}</button></div>
     </header>
     <div className={`app-content ${view==="overview"?"app-content-home":""}`}>{notice?<div role="alert" className="alert-message">{notice}<IconButton label="Refresh workspace" onClick={refresh}><RefreshCw size={17}/></IconButton></div>:null}

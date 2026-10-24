@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Menu, X, type LucideIcon } from "lucide-react";
 
-type Destination = { id: string; label: string; accessible: string; icon: LucideIcon; badge?: string };
+type Destination = { id: string; label: string; accessible: string; icon: LucideIcon; badge?: string; href?: string };
 
 /** The sentinel stays in document flow; the floating menu cannot affect its observation. */
 export function WorkspaceNavigation({ items, activeId, onSelect }: { items: readonly Destination[]; activeId: string; onSelect: (id: string) => void }) {
@@ -44,7 +44,7 @@ export function WorkspaceNavigation({ items, activeId, onSelect }: { items: read
 
   useEffect(() => {
     if (!expanded) return;
-    const first = menuNav.current?.querySelector<HTMLButtonElement>('[aria-current="page"]') ?? menuNav.current?.querySelector<HTMLButtonElement>("button");
+    const first = menuNav.current?.querySelector<HTMLElement>('[aria-current="page"]') ?? menuNav.current?.querySelector<HTMLElement>("button,a");
     first?.focus();
     const dismiss = (event: PointerEvent) => {
       if (event.target instanceof Node && !popover.current?.contains(event.target)) {
@@ -86,10 +86,10 @@ export function WorkspaceNavigation({ items, activeId, onSelect }: { items: read
   }
 
   function links() {
-    return items.map(({ id, label, accessible, icon: Icon, badge }) => <button key={id} type="button" className="workspace-nav-link" data-destination={id} aria-label={accessible} aria-current={id === activeId ? "page" : undefined} onClick={() => select(id)}>
-      <span className="workspace-nav-symbol"><Icon size={21} strokeWidth={1.5} aria-hidden="true"/>{badge ? <span className="workspace-nav-count" aria-hidden="true">{badge}</span> : null}</span>
-      <span aria-hidden="true">{label}</span>
-    </button>);
+    return items.map(({ id, label, accessible, icon: Icon, badge, href }) => {
+      const content=<><span className="workspace-nav-symbol"><Icon size={21} strokeWidth={1.5} aria-hidden="true"/>{badge ? <span className="workspace-nav-count" aria-hidden="true">{badge}</span> : null}</span><span aria-hidden="true">{label}</span></>;
+      return href?<a key={id} className="workspace-nav-link" data-destination={id} aria-label={accessible} href={href} onClick={()=>setExpanded(false)}>{content}</a>:<button key={id} type="button" className="workspace-nav-link" data-destination={id} aria-label={accessible} aria-current={id===activeId?"page":undefined} onClick={()=>select(id)}>{content}</button>;
+    });
   }
 
   return <>
