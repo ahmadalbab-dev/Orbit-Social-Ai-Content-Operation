@@ -10,12 +10,45 @@ const variantsSchema = z.object({ variants: z.array(z.object({
   callToAction: z.string().max(240)
 })) });
 export type UsageRecord = { requestHash: string; model: string; inputTokens: number; outputTokens: number; estimatedCostUsd: number; cached: boolean };
-export interface UsageStore { find(workspaceId: string, requestHash: string): Promise<ContentVariant[] | null>; monthlyCost(workspaceId: string): Promise<number>; save(workspaceId: string, variants: ContentVariant[], usage: UsageRecord): Promise<void>; }
+export interface UsageStore { find(workspaceId: string, requestHash: string): Promise<ContentVariant[] | null>; monthlyCost(workspaceId: string): Promise<number>; save(workspaceId: string, variants: ContentVariant[], usage: UsageRecord): Promise<void>; recordUsage(workspaceId: string, usage: UsageRecord): Promise<void>; cacheVariants(workspaceId: string, requestHash: string, variants: ContentVariant[]): Promise<void>; }
 export class MemoryUsageStore implements UsageStore {
-  private cache = new Map<string, ContentVariant[]>();
-  async find(workspaceId: string, hash: string) { return this.cache.get(`${workspaceId}:${hash}`) ?? null; }
-  async monthlyCost() { return 0; }
-  async save(workspaceId: string, variants: ContentVariant[], usage: UsageRecord) { this.cache.set(`${workspaceId}:${usage.requestHash}`, variants); }
+  private cache = new Map<string, { variants: ContentVariant[]; savedAt: number }>();
+  private costs = new Map<string, number>();
+  private month = new Date().toISOString().slice(0, 7);
+  private resetMonth() {
+    const month = new Date().toISOString().slice(0, 7);
+    if (month !== this.month) { this.month = month; this.costs.clear(); }
+  }
+  private ensureWorkspace(workspaceId: string) {
+    this.resetMonth();
+    if (!this.costs.has(workspaceId)) {
+      if (this.costs.size >= 1000) throw new AiBudgetExceededError("Demo AI workspace capacity reached");
+      this.costs.set(workspaceId, 0);
+    }
+  }
+  async find(workspaceId: string, hash: string) {
+    const key = `${workspaceId}:${hash}`, entry = this.cache.get(key);
+    if (!entry) return null;
+    if (Date.now() - entry.savedAt > 86400000) { this.cache.delete(key); return null; }
+    this.cache.delete(key); this.cache.set(key, entry);
+    return structuredClone(entry.variants);
+  }
+  async monthlyCost(workspaceId: string) { this.ensureWorkspace(workspaceId); return this.costs.get(workspaceId)!; }
+  async save(workspaceId: string, variants: ContentVariant[], usage: UsageRecord) {
+    await this.recordUsage(workspaceId, usage);
+    await this.cacheVariants(workspaceId, usage.requestHash, variants);
+  }
+  async recordUsage(workspaceId: string, usage: UsageRecord) {
+    this.ensureWorkspace(workspaceId);
+    if (!usage.cached) this.costs.set(workspaceId, this.costs.get(workspaceId)! + usage.estimatedCostUsd);
+  }
+  async cacheVariants(workspaceId: string, requestHash: string, variants: ContentVariant[]) {
+    this.ensureWorkspace(workspaceId);
+    const key = `${workspaceId}:${requestHash}`;
+    this.cache.delete(key);
+    if (this.cache.size >= 200) this.cache.delete(this.cache.keys().next().value!);
+    this.cache.set(key, { variants: structuredClone(variants), savedAt: Date.now() });
+  }
 }
 export class AiBudgetExceededError extends Error {}
 
@@ -39,11 +72,13 @@ export class OpenAiContentProvider {
       } } },
       max_output_tokens: this.options.maxOutputTokens ?? 1200
     });
-    const parsed = variantsSchema.parse(JSON.parse(response.output_text));
     const inputTokens = response.usage?.input_tokens ?? 0;
     const outputTokens = response.usage?.output_tokens ?? 0;
     const usage = { requestHash, model, inputTokens, outputTokens, estimatedCostUsd: estimateCost(model, inputTokens, outputTokens), cached: false };
-    await this.store.save(input.workspaceId, parsed.variants, usage);
+    // Charge known usage even if response parsing fails. Failed output is not cached.
+    await this.store.recordUsage(input.workspaceId, usage);
+    const parsed = variantsSchema.parse(JSON.parse(response.output_text));
+    await this.store.cacheVariants(input.workspaceId, requestHash, parsed.variants);
     return { variants: parsed.variants, usage };
   }
 }

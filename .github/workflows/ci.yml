@@ -31,6 +31,9 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - run: node scripts/api-smoke.mjs
+      - run: pnpm --filter @sma/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @sma/web test:e2e
       # Runtime dependencies are release blockers. Build-only tooling is
       # monitored separately because some upstream tools have no patched line.
       - run: pnpm audit --prod --audit-level high
@@ -42,3 +45,33 @@ jobs:
       - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  mobile-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: tools/mobile-preview/package-lock.json }
+      - run: npm ci --prefix tools/mobile-preview
+      - run: npm run typecheck --prefix tools/mobile-preview
+      - run: npm test --prefix tools/mobile-preview
+      - run: npm run build --prefix tools/mobile-preview
+      - run: npm audit --prefix tools/mobile-preview --omit=dev --audit-level low
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Orbit-mobile-web-build
+          path: tools/mobile-preview/dist
+
+  hosted-oauth:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with: { version: 11.17.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: pnpm --dir tools/hosted-orbit install --frozen-lockfile
+      - run: pnpm --dir tools/hosted-orbit typecheck
+      - run: pnpm --dir tools/hosted-orbit test
+      - run: pnpm --dir tools/hosted-orbit build
+      - run: pnpm --dir tools/hosted-orbit audit --prod --audit-level high

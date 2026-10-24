@@ -8,6 +8,6 @@ import { TenantAuthGuard } from "./security";
 @Module({
   imports: [ThrottlerModule.forRoot([{ ttl: 60000, limit: 60 }])],
   controllers: [AppController],
-  providers: [WorkflowService, TenantAuthGuard, { provide: APP_GUARD, useClass: ThrottlerGuard }]
+  providers: [WorkflowService, { provide: APP_GUARD, useClass: TenantAuthGuard }, { provide: APP_GUARD, useClass: ThrottlerGuard }]
 })
 export class AppModule {}

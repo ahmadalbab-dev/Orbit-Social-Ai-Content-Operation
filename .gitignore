@@ -15,3 +15,8 @@ test-results
 packages/database/prisma/*.db
 My SOCMED/
 apps/vanilla-auth/
+# Private local video-render inputs and outputs
+tools/news-report/public/*
+!tools/news-report/public/.gitkeep
+tools/news-report/settings.json
+tools/news-report/output.mp4

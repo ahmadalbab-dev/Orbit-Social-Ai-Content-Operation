@@ -1,37 +1,41 @@
 # ai studio by Orbit
 
-A production-minded, multi-tenant content operations platform that turns a brand brief into reviewed, scheduled, and published social content. The first release defaults to mock publishing and strict AI budgets so it is safe and inexpensive to run.
+A configurable content writing and video workspace for businesses and creators. Create Facebook, Instagram and Threads drafts, edit them, approve the exact revision and record a schedule. Live publishing is inactive; simulations are explicitly labeled SIMULATED.
 
-## What works
+## Implemented
 
-- Monorepo with Next.js web, NestJS API, Prisma/PostgreSQL, Redis/BullMQ-ready infrastructure, and shared packages.
-- Brand profile → structured AI variants → edit/review → schedule → idempotent mock publish → analytics placeholder.
-- Eight connector adapters: Facebook, Instagram, LinkedIn, TikTok, YouTube, X, Threads, Pinterest.
-- Tenant-scoped data model, Supabase-compatible JWT verification, RBAC schema, encrypted OAuth token vault, rate limiting, audit model, health checks, retries/idempotency primitives.
-- AI request hashing, caching contract, structured outputs, usage metering, workspace budget cap, output cap, and inexpensive model routing.
+- Business/creator profile with audience, voice, topics and language, saved in this browser.
+- Content Studio with editable captions, hashtags and CTA; separate draft saving and owner approval.
+- Revision-aware API workflow: edits invalidate approval; scheduling requires a future timestamp and current approval.
+- Calendar shows actual demo schedule records in Malaysia time instead of sample metrics.
+- News report local-video preview, transparent title/date controls, settings export and standalone Remotion renderer under tools/news-report.
+- Explicit local demo auth, signed workspace/role checks outside local demo, and mounted API guard.
+- Server-only Meta API adapters for Facebook Page text/photo, Instagram image/Reel via Facebook Login, Threads text/image/video. These are unit-tested primitives, not an active account connection.
 
-## Quick start
+## Development setup
 
-1. Copy missing values from `.env.example` into the private `.env`. Never commit `.env`.
-2. Start infrastructure: `docker compose up -d postgres redis`
-3. Install: `pnpm install`
-4. Generate Prisma: `pnpm db:generate`
-5. Apply the development schema: `pnpm db:push`
-6. Run: `pnpm dev`
-7. Open `http://localhost:3000`; API health is at `http://localhost:3001/v1/health`.
+1. Copy `.env.example` to a private `.env`. Keep `AUTH_MODE=local-demo` for local development only and `SOCIAL_CONNECTOR_MODE=mock`.
+2. `pnpm install`
+3. `pnpm db:generate`
+4. `pnpm dev`
+5. Web: http://localhost:3000. API: http://localhost:3001/v1/health.
 
-Optional n8n: `docker compose --profile automation up -d n8n`.
+PostgreSQL/Redis schema and infrastructure are retained for the next implementation phase: `docker compose up -d postgres redis`. Current draft workflows do not use these services; memory resets on API restart. No schedule worker runs. Production login UI is not wired, so production API writes fail closed.
 
-## Validation
+For tests, set DATABASE_URL to a development PostgreSQL URL so Prisma can validate the schema. Run `pnpm check`, then `pnpm --filter @sma/web test:e2e`. Browser E2E runs on port 3100. Rendering tool has its own dependencies and installation under tools/news-report.
 
-Run `pnpm check`. End-to-end: `pnpm --filter @sma/web exec playwright install chromium`, then `pnpm --filter @sma/web test:e2e`.
+## Production work remaining
 
-## Safety defaults
+Prisma-backed content/approval/job persistence, database memberships, production login, durable scheduling worker, social OAuth callbacks and account selection, encrypted token refresh/revocation, media hosting and platform analytics. Do not enable live publication before these are implemented and tested. Setting SOCIAL_CONNECTOR_MODE=live currently returns an explicit unavailable error rather than falling back to mock.
 
-- Social publishing is `mock` unless `SOCIAL_CONNECTOR_MODE=live`.
-- Production requires valid Supabase JWTs and an `x-workspace-id`.
-- OAuth tokens use AES-256-GCM; use a secret manager for `TOKEN_ENCRYPTION_KEY`.
-- Duplicate AI prompts resolve through the request hash cache contract.
-- The default workspace AI cap is USD 10/month and each response is capped.
+Estimated AI usage is process-local and checked before generation; it is not a durable, concurrency-safe billing cap. No AI API key means demo text only, clearly marked for editing.
 
-See `docs/` for architecture, integrations, security, deployment, costs, and operations. Project links and decisions are maintained in [`WIKI.md`](WIKI.md).
+See docs/BUSINESS_CREATOR_REVIEW.md for findings and workflow, docs/META_INTEGRATION_OPTIONS.md for API/MCP and self-hosted options, and docs/META_SOCIAL_SETUP.md for account prerequisites.
+
+## Phone testing app
+
+A private iPhone-compatible web-app preview reuses the web UI and adds bottom navigation, adaptive icons, safe-area spacing and device-local sample workflows. Build/package instructions are in [tools/mobile-preview/README.md](tools/mobile-preview/README.md).
+
+Phone preview: https://orbit-mobile-albab-preview.airy-kiwi-2012.chatgpt.site
+
+This build uses browser-local test data, no AI API calls and no live social connections. Add it to the Home Screen from Safari. It is a portable web app, not a signed IPA or APK; video export remains render-settings JSON. Physical iPhone visual/playback verification remains a user testing step.
