@@ -58,3 +58,20 @@ not durable or unlimited multi-turn agent memory.
 
 Unverified: authenticated vendor editor screens, exact vendor animation curves,
 private UI source licences, mobile vendor layout and commercial resale permission.
+
+## Verification
+
+Twenty focused Chromium/WebKit browser cases passed across320/390/1440px,
+light/dark themes and Studio/Media request boundaries. Suggestions make no provider
+request; Generate remains explicit; clearing messages preserves the resulting
+draft/canvas; pixel generation, quota errors, stale proposals, Apply/Undo and saved
+channel destinations retain their behavior. Web TypeScript and production Next
+build passed on DESKTOP-ALBAB. Inspected actual screenshots include desktop light,
+phone dark and a fixture-backed Studio reply; no screenshot is presented as an
+authenticated vendor UI or a new live-provider acceptance run.
+
+The first run had18 passing cases and2 selector ambiguities because an error now
+appears both in historical chat and current status. The check was scoped to the
+current semantic status and separately verifies the chat copy; all20 then passed.
+The final motion selector also uses Orbit's `html[data-motion="paused"]` setting
+so dedicated Media workspaces follow the same preference as Studio.
