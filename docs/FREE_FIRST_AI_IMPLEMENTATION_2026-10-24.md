@@ -177,3 +177,14 @@ Related repository records: `GEMINI_INTEGRATION.md`,
 - The web relay permits only the exact new POST route; unknown suffixes and GET are rejected.
 - No Firebase project, billing plan, credentials, existing model selection, subscription entitlement or production promotion is changed. Existing Cloudflare account billing state/remaining daily allowance is not established by a configuration check; zero charge is not guaranteed for billing-enabled accounts.
 - Provider-shaped test responses verify integration behavior; they do not establish current live model access. Browser acceptance and deployment results are recorded after verification below.
+
+## Verification for this implementation
+
+- Web, API and AI-package TypeScript checks passed; production Next build passed as part of browser acceptance.
+- 108 focused API/provider tests passed together: status/privacy/configuration, shared quota/role controls, Gemini workflow, Cloudflare editing/generation, bounded parsing and private binary response.
+- 15 web relay tests passed, including the exact generation POST and denied GET/unknown suffixes.
+- 14 browser cases passed across Chromium and WebKit: Studio staged Rewrite/dirty cancellation/explicit dispatch, setup failure disabling AI, bounded briefs, preview isolation, saved destinations, existing pixel edits/Apply/Undo/stale media, and new prompt-only generation/Undo/quota failure.
+- The first browser pass exposed a one-unit WebKit RGB decode difference for the green fixture; the new assertion allows at most one unit per channel while still comparing the actual canvas pixels. No application behavior or older test assertion was changed for this adjustment. The complete14-case scope then passed.
+- These browser cases intercept provider/workspace responses. They do not establish actual signed-in cloud inference or production quota/billing correctness.
+- A separate direct live probe was attempted through `vercel env run` with the existing Preview settings. Vercel correctly withheld sensitive Preview secrets, so the script stopped at its credential precondition before inference; no model request was made. Do not weaken secret classification, expose keys or ask for key re-entry to bypass this. A signed-in deployed flow is the remaining acceptance path.
+- Configuration metadata confirms the selected feature Preview uses Gemini3.5Flash-Lite text with existing admin consent and a separate Cloudflare image route; presence/configuration is not live inference verification. Production provider selection was not decrypted or changed.
