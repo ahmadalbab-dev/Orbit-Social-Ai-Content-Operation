@@ -8,7 +8,7 @@ for(const width of [320,390,1440])test(`pricing navigation, plan details and the
  await expect(page.getByRole('region',{name:'Subscription plans'}).getByRole('article')).toHaveCount(3);
  for(const name of ['Essential','Professional']){
   const trigger=page.getByRole('button',{name:`View ${name}`,exact:true});await trigger.click();const dialog=page.getByRole('dialog',{name,exact:true});await expect(dialog).toBeVisible();await expect(dialog).toContainText('does not charge you or change your account');
-  await page.keyboard.press('Tab');expect(await dialog.evaluate(node=>node.contains(document.activeElement))).toBe(true);
+  for(const key of ['Tab','Tab','Tab','Shift+Tab']){await page.keyboard.press(key);expect(await dialog.evaluate(node=>node.contains(document.activeElement))).toBe(true);}
   await page.keyboard.press('Escape');await expect(dialog).toBeHidden();await expect(trigger).toBeFocused();
  }
  for(const mode of ['Light','Dark']){

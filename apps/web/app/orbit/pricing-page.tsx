@@ -9,7 +9,7 @@ import './pricing-page.css';
 function PlanDetails({plan,home,onClose}:{plan:PricingPlan;home:string;onClose:()=>void}){
  const dialog=useRef<HTMLDialogElement>(null);
  useEffect(()=>{dialog.current?.showModal();},[]);
- return <dialog ref={dialog} className="pricing-dialog" aria-labelledby="plan-dialog-title" aria-describedby="plan-dialog-description" onClose={onClose}>
+ return <dialog ref={dialog} className="pricing-dialog" aria-labelledby="plan-dialog-title" aria-describedby="plan-dialog-description" onClose={onClose} onKeyDown={event=>{if(event.key!=='Tab'||event.ctrlKey||event.altKey||event.metaKey)return;const controls=Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]),a[href],[tabindex="0"]'));if(!controls.length)return;const current=controls.indexOf(document.activeElement as HTMLElement);event.preventDefault();controls[(current+(event.shiftKey?-1:1)+controls.length)%controls.length].focus();}}>
   <form method="dialog"><button className="pricing-close" aria-label="Close plan details"><X size={20}/></button></form>
   <span className="pricing-eyebrow">YOUR PLAN, AT A GLANCE</span><h2 id="plan-dialog-title">{plan.name}</h2><p className="pricing-dialog-price">${plan.price}<span> USD / month</span></p>
   <p id="plan-dialog-description">This is a plan preview. Paid subscriptions are not open yet. Viewing this plan does not charge you or change your account.</p>
@@ -34,7 +34,7 @@ export function PricingPage({preview=false}:{preview?:boolean}){
   <section className="pricing-cards" aria-label="Subscription plans">{pricingPlans.map(plan=><article key={plan.id} className={`pricing-card pricing-card-${plan.id}`} aria-labelledby={`plan-${plan.id}`}>
    <div className="pricing-card-heading"><h2 id={`plan-${plan.id}`}>{plan.name}</h2>{plan.id==='professional'?<span className="pricing-card-tag">Full toolkit</span>:null}</div>
    <p className="pricing-audience">{plan.audience}</p><p className="pricing-amount"><span>$</span>{plan.price}<small>/ month</small></p><p className="pricing-tagline">{plan.tagline}</p>
-   {plan.id==='free'?<a className="pricing-cta" href={`${home}?view=studio`}>{plan.cta}<ArrowUpRight size={17}/></a>:<button className="pricing-cta" onClick={()=>setSelected(plan)}>{plan.cta}<ArrowUpRight size={17}/></button>}
+   {plan.id==='free'?<a className="pricing-cta" href={`${home}?view=studio`}>{plan.cta}<ArrowUpRight size={17}/></a>:<button className="pricing-cta" onClick={event=>{event.currentTarget.focus();setSelected(plan);}}>{plan.cta}<ArrowUpRight size={17}/></button>}
    <p className="pricing-credit-line"><Sparkles size={14}/>{plan.credits}</p><ul>{plan.features.map(feature=><li key={feature}><Check size={16}/><span>{feature}{/generation|6-second video trial/.test(feature)?<small className="pricing-soon">Coming soon</small>:null}</span></li>)}</ul>
    <div className="pricing-exclusions">{plan.excluded.map(feature=><span key={feature}><Minus size={14}/>{feature}</span>)}</div>
   </article>)}</section>
