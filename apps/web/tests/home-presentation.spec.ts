@@ -56,6 +56,8 @@ for (const width of [320, 390, 1024, 1440, 1920, 3840]) {
     expect(copyBox.width).toBeGreaterThan(200);
     expect(title.height).toBeGreaterThan(10);
     expect((await art.boundingBox())!.height).toBeGreaterThan(100);
+    const launchpadBox = (await home.locator('.home-launchpad').boundingBox())!;
+    expect(Math.abs(copyBox.x - launchpadBox.x)).toBeLessThanOrEqual(1);
     const showcase = home.locator('.home-post-showcase');
     await expect(showcase.getByRole('heading', { name: 'One idea. Every channel.', exact: true })).toBeVisible();
     await expect(showcase.getByText('Example content and layouts. Live publishing is off.', { exact: true })).toBeVisible();
