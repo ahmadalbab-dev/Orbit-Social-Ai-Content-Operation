@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 export function geminiSmokeEnabled(env) {
-  if (env.ORBIT_GEMINI_SMOKE_ON_BUILD !== 'true') return false;
+  if (!['true', 'studio-and-generation'].includes(env.ORBIT_GEMINI_SMOKE_ON_BUILD)) return false;
   if (env.VERCEL_ENV !== 'preview') throw Error('Gemini smoke requires Preview.');
   return true;
 }

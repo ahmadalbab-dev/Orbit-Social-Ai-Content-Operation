@@ -225,3 +225,26 @@ Next build passed with the declared dependency. The earlier15-relay-test total
 is superseded by24 (108 API/provider +24 relay =132 focused unit tests); the14
 browser cases remain the UI acceptance scope. Trusted Sources membership and a
 real signed-in inference request remain separate deployed acceptance conditions.
+
+## Follow-up: Trusted Sources repaired
+
+After the owner's confirmation, a direct settings read established that the
+Preview→Preview rule had been saved on the web project's self-access entry; the
+API project had no Trusted Sources entry. Both projects had OIDC enabled. Using
+the already-authorized project/environment pair, the API was updated to trust
+only `orbit-ai-studio` Preview→Preview. Existing web self-access was left alone.
+No production or cross-environment access was added.
+
+Readback confirmed the exact API rule. The deployed web relay then returned401
+`Invalid or expired identity` for an intentionally invalid Supabase token,
+replacing the earlier protection-redirect502. This proves the request reaches
+Orbit authentication while preserving rejection of invalid users; it is not
+successful authenticated inference.
+
+A Preview-only focused probe scope is available through the existing disabled
+build-probe switch. `studio-and-generation` runs only one public-synthetic Gemini
+Studio request and one Cloudflare prompt-only image request, with no original
+upload, database write, provider fallback or output/key logging. It requires both
+selected providers and the Gemini data-policy opt-in before loading providers.
+Eleven release/probe guard tests passed. The switch must be restored to its
+original `false` immediately after this bounded acceptance run.
