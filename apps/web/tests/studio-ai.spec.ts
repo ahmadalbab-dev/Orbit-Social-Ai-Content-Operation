@@ -66,6 +66,7 @@ test('Studio stages the active draft for AI rewrite without sending it until Gen
  const messages=chat.getByRole('log');
  await expect(messages.getByRole('listitem')).toHaveCount(2);
  await expect(messages).toContainText('AI rewritten public fixture');
+ await page.screenshot({path:test.info().outputPath('studio-ai-reply.png'),fullPage:true});
  await chat.getByRole('button',{name:'Clear messages',exact:true}).click();
  await expect(chat.getByRole('log')).toHaveCount(0);
  await expect(page.getByRole('textbox',{name:'facebook copy',exact:true})).toHaveValue('AI rewritten public fixture');

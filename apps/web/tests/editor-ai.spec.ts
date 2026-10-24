@@ -193,7 +193,8 @@ test('Cloudflare creates from text without an upload, restores with Undo and pre
  await selectEditorTool(page,'Image','AI editor');
  refuse=true;
  await page.getByRole('button',{name:'Generate image with AI',exact:true}).click();
- await expect(page.getByText('AI provider quota reached. Try again after it resets.',{exact:true})).toBeVisible();
+ await expect(page.getByRole('region',{name:'AI image editing',exact:true}).getByRole('status')).toHaveText('AI provider quota reached. Try again after it resets.');
+ await expect(chat.getByRole('log')).toContainText('AI provider quota reached. Try again after it resets.');
  await expect(canvas).toBeHidden();
  expect(prompts).toHaveLength(2);
 });
